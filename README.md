@@ -1,0 +1,77 @@
+# Yeow v0
+
+**用 TypeScript / JavaScript 编写 Minecraft Paper 插件。QuickJS 引擎。**
+
+Yeow 是一个面向 Minecraft Paper 服务器的插件开发框架：用现代前端工程化（TypeScript、npm、esbuild）编写插件，运行时为每个插件启动**独立的 QuickJS 线程**，通过消息桥与游戏主线程交互。插件代码不阻塞服务器主线程，一个插件崩溃不影响其他插件。
+
+```bash
+npm create yeow@latest -- -y     # 创建插件项目
+cd my-plugin
+npm install
+npm run dev                      # 一键启动 Paper + 秒级热重载
+npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.zip
+```
+
+- 文档（中文）：[Yeow-Docs](Yeow-Docs/) · [文档站点](https://github.com/iyexin/yeow/tree/main/Yeow-Docs)
+- 运行时下载：[Modrinth](https://modrinth.com/plugin/yeow)
+- 开发与贡献：[CONTRIBUTING.md](CONTRIBUTING.md)
+
+---
+
+## 组件总览（9 个目录）
+
+| 目录                                    | 语言       | 作用                                                                                                              |
+| --------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| [`yeow-runtime`](yeow-runtime/)         | Java 21    | **核心运行时**（Bukkit 插件）：QuickJS 上下文管理、三级优先级调度器、事件/命令桥、Service、Profile 预警与全量分析 |
+| [`yeow-api`](yeow-api/)                 | TypeScript | 插件开发期 npm 依赖：OOP 封装全部底层协议（Player/World/Event/Command/Service…），构建时随插件 bundle             |
+| [`yeow-utils`](yeow-utils/)             | TypeScript | 高层工具库（`createServer` HTTP 服务器、命令构造器），构建时随插件 bundle                                         |
+| [`create-yeow`](create-yeow/)           | Node.js    | `npm create yeow` 脚手架：交互式项目模板、dev-server（Paper + 热重载 + source-map 错误定位）、构建脚本            |
+| [`yeow-template`](yeow-template/)       | Java 21    | 空 JAR 骨架（`Bootstrap` 类），构建时注入 JS 代码生成标准 Paper 插件 JAR                                          |
+| [`quickjs-wrapper`](quickjs-wrapper/)   | Java + C++ | QuickJS 2025-09-13 的 JVM 封装（fork），含四平台预编译原生库；独立发布（GitHub Release 触发多平台 CI）            |
+| [`Yeow-Docs`](Yeow-Docs/)               | Markdown   | 全部中文文档：入门、API 参考（24 模块）、进阶、平台规范（协议层）、运行时警告                                     |
+| [`yeow-doc-website`](yeow-doc-website/) | VitePress  | 文档站点工程：`docs/` 为 `Yeow-Docs/zh` 的目录联接，自定义首页与主题；`npm run build` 产出 `/v1/` 站点            |
+| [`yeow-dev`](yeow-dev/)                 | Java 21    | 开发辅助工具：调度器/队列基准（Bench）、Base64 编解码诊断                                                         |
+
+### 运行链路
+
+```
+插件 JAR/.yeow.zip ──► yeow-template(Bootstrap) ──► yeow-runtime ──► Paper
+                              ▲                        │
+        create-yeow 构建 ──────┘      quickjs-wrapper(QuickJS 引擎)
+        yeow-api / yeow-utils（打包进插件）
+```
+
+---
+
+## 快速开始
+
+完整文档见 [Yeow-Docs/zh/getting-started.md](Yeow-Docs/zh/getting-started.md)。
+
+1. **安装运行时**：将 `yeow-runtime-0.1.0.jar` 放入服务器 `plugins/`
+2. **创建插件**：`npm create yeow@latest -- -y && cd my-plugin && npm install`
+3. **开发**：`npm run dev`（自动下载 Paper、启动热重载）
+4. **构建**：`npm run build` → `dist/<name>-<version>.jar` + `.yeow.zip`
+5. **部署**：JAR 放 `plugins/`；或 `.yeow.zip` 放 `plugins/Yeow/` 自动扫描，或 `/yeow install <url>`
+
+插件需要声明敏感权限（`fs:*`、`http:*`、`service:registerNative`、`assets:extract`），见 [权限声明](Yeow-Docs/zh/getting-started.md#权限声明)。
+
+---
+
+## 平台无关
+
+- 插件包是标准 ZIP（`.yeow.zip`，含打包 JS、资源、元信息与权限声明），**不依赖 Java 环境**
+- 任何实现[平台规范](Yeow-Docs/zh/specifications/README.md)的运行时都能运行同一份插件
+- Paper/Bukkit 的 `yeow-runtime` 是官方实现示例
+
+## 文档索引
+
+| 文档                         | 位置                                                                  |
+| ---------------------------- | --------------------------------------------------------------------- |
+| 快速开始 / API 参考 / 进阶   | [Yeow-Docs/zh](Yeow-Docs/zh/README.md)                                |
+| 构建与分发（Modrinth 等）    | [Yeow-Docs/zh/distribution.md](Yeow-Docs/zh/distribution.md)          |
+| 平台规范（协议层）           | [Yeow-Docs/zh/specifications/](Yeow-Docs/zh/specifications/README.md) |
+| 运行时警告（告警 code/阈值） | [Yeow-Docs/zh/runtime-warning.md](Yeow-Docs/zh/runtime-warning.md)    |
+
+## 许可证
+
+各组件独立：`yeow-runtime` / `yeow-api` / `yeow-utils` / `create-yeow` / `yeow-template` / `yeow-dev` 为 MIT；`quickjs-wrapper` 为 Apache-2.0（QuickJS 引擎 MIT）；`Yeow-Docs` 与文档站点为 MIT。

@@ -1,0 +1,76 @@
+/* ── Yeow 主题色：emerald 绿（浅色） ─────────────────────────── */
+:root {
+    --vp-c-brand-1: #0d9f6e;
+    --vp-c-brand-2: #0b8a5f;
+    --vp-c-brand-3: #0a7a54;
+    --vp-c-brand-soft: rgba(13, 159, 110, 0.14);
+
+    --vp-c-brand-1-active: #0d9f6e;
+    --vp-c-brand-2-active: #0b8a5f;
+    --vp-c-brand-3-active: #0a7a54;
+
+    --yeow-grad: linear-gradient(120deg, #0d9f6e 20%, #0284c7 100%);
+
+    --vp-home-hero-name-color: transparent;
+    --vp-home-hero-name-background: linear-gradient(120deg, #0d9f6e 20%, #38bdf8 100%);
+    --vp-home-hero-image-background-image: linear-gradient(-45deg, #0d9f6e66 30%, #38bdf866 60%);
+    --vp-custom-block-tip-border: #0d9f6e;
+    --vp-custom-block-tip-text: #0d9f6e;
+    --vp-custom-block-tip-bg: rgba(13, 159, 110, 0.08);
+}
+
+/* ── Yeow 主题色：emerald 绿（深色，默认） ───────────────────── */
+.dark {
+    --vp-c-brand-1: #3ddc97;
+    --vp-c-brand-2: #2bbf83;
+    --vp-c-brand-3: #1fa872;
+    --vp-c-brand-soft: rgba(61, 220, 151, 0.15);
+
+    --vp-c-brand-1-active: #3ddc97;
+    --vp-c-brand-2-active: #2bbf83;
+    --vp-c-brand-3-active: #1fa872;
+
+    --yeow-grad: linear-gradient(120deg, #3ddc97 20%, #7dd3fc 100%);
+
+    --vp-home-hero-name-background: linear-gradient(120deg, #3ddc97 20%, #7dd3fc 100%);
+    --vp-home-hero-image-background-image: linear-gradient(-45deg, #3ddc9766 30%, #7dd3fc66 60%);
+    --vp-custom-block-tip-border: #3ddc97;
+    --vp-custom-block-tip-text: #3ddc97;
+    --vp-custom-block-tip-bg: rgba(61, 220, 151, 0.1);
+
+    /* 深色底：比 VitePress 默认更深、偏冷 */
+    --vp-c-bg: #0c1014;
+    --vp-c-bg-alt: #10151a;
+    --vp-c-bg-soft: #141a20;
+    --vp-c-bg-elv: #161d24;
+    --vp-c-bg-elv-active: #1b232c;
+    --vp-c-gutter: #0a0e12;
+    --vp-c-divider: #202a33;
+    --vp-c-border: #1c2530;
+    --vp-c-border-dark: #2a3642;
+    --vp-sidebar-bg-color: #0c1014;
+    --vp-c-text-1: #e4ecef;
+    --vp-c-text-2: #93a7b4;
+    --vp-c-text-3: #61768a;
+    --vp-c-mute: #141a20;
+    --vp-c-mute-active: #1b232c;
+    --vp-code-block-bg: #0a0e12;
+}
+
+/* ── 全局微调 ─────────────────────────────────────────────── */
+/* 侧边栏收窄（默认 272px） */
+:root {
+    --vp-sidebar-width: 236px;
+}
+.vp-doc h1 {
+    letter-spacing: -0.02em;
+}
+
+/* 链接悬停 */
+.dark .vp-doc a:not(.header-anchor):hover {
+    color: var(--vp-c-brand-1);
+}
+
+::selection {
+    background: rgba(61, 220, 151, 0.28);
+}

@@ -1,0 +1,15 @@
+{
+    "name": "my-yeow-plugin",
+    "version": "1.0.0",
+    "author": "",
+    "description": "A Yeow plugin",
+    "api": "1.18",
+    "java": 21,
+    "typecheck": true,
+    "permissions": [],
+    "dev": {
+        "port": 17367,
+        "memory": "4G",
+        "paperJar": "https://fill-data.papermc.io/v1/objects/5ee4f542f628a14c644410b08c94ea42e772ef4d29fe92973636b6813d4eaffc/paper-1.21.4-232.jar"
+    }
+}

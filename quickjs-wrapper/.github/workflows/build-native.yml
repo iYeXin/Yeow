@@ -1,0 +1,157 @@
+name: Build Native Libraries
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'native/**'
+      - 'wrapper-java/src/main/CMakeLists.txt'
+      - 'CMakeLists.txt'
+      - '.github/workflows/build-native.yml'
+  pull_request:
+    paths:
+      - 'native/**'
+      - 'wrapper-java/src/main/CMakeLists.txt'
+      - 'CMakeLists.txt'
+      - '.github/workflows/build-native.yml'
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Build
+        run: |
+          cd wrapper-java
+          cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+                -DCMAKE_C_FLAGS="-O2 -flto -ffunction-sections -fdata-sections" \
+                -DCMAKE_CXX_FLAGS="-O2 -flto -ffunction-sections -fdata-sections" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-Wl,--gc-sections -Wl,--strip-all" \
+                -G Ninja -S src/main -B build
+          cmake --build build -j $(nproc)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-linux-x86_64
+          path: wrapper-java/build/libquickjs-java-wrapper.so
+
+  build-macos-x86_64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Build
+        run: |
+          cd wrapper-java
+          cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+                -DCMAKE_C_FLAGS="-O2 -flto -ffunction-sections -fdata-sections" \
+                -DCMAKE_CXX_FLAGS="-O2 -flto -ffunction-sections -fdata-sections" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-dead_strip" \
+                -G Ninja -S src/main -B build
+          cmake --build build -j $(sysctl -n hw.logicalcpu)
+
+      - name: Strip
+        run: strip -S wrapper-java/build/libquickjs-java-wrapper.dylib
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-macos-x86_64
+          path: wrapper-java/build/libquickjs-java-wrapper.dylib
+
+  build-macos-arm64:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Build
+        run: |
+          cd wrapper-java
+          cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+                -DCMAKE_C_FLAGS="-Os -flto -ffunction-sections -fdata-sections" \
+                -DCMAKE_CXX_FLAGS="-Os -flto -ffunction-sections -fdata-sections" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-dead_strip" \
+                -G Ninja -S src/main -B build
+          cmake --build build -j $(sysctl -n hw.logicalcpu)
+
+      - name: Strip
+        run: strip -S wrapper-java/build/libquickjs-java-wrapper.dylib
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-macos-arm64
+          path: wrapper-java/build/libquickjs-java-wrapper.dylib
+
+  # Windows: cross-compiled from Linux via MinGW-w64.
+  build-windows:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Install MinGW cross-compiler
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 ninja-build
+
+      - name: Prepare Windows JNI header
+        run: |
+          mkdir -p /tmp/jni-win32
+          echo '#define JNIEXPORT __declspec(dllexport)' > /tmp/jni-win32/jni_md.h
+          echo '#define JNIIMPORT __declspec(dllimport)' >> /tmp/jni-win32/jni_md.h
+          echo '#define JNICALL __stdcall' >> /tmp/jni-win32/jni_md.h
+          echo 'typedef int jint;' >> /tmp/jni-win32/jni_md.h
+          echo 'typedef long long jlong;' >> /tmp/jni-win32/jni_md.h
+          echo 'typedef signed char jbyte;' >> /tmp/jni-win32/jni_md.h
+
+      - name: Build (cross-compile)
+        env:
+          JAVA_PLATFORM_INCLUDE: /tmp/jni-win32
+        run: |
+          cd wrapper-java
+          cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+                -DCMAKE_SYSTEM_NAME=Windows \
+                -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
+                -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ \
+                -DCMAKE_C_FLAGS="-O2 -ffunction-sections -fdata-sections" \
+                -DCMAKE_CXX_FLAGS="-O2 -ffunction-sections -fdata-sections" \
+                -DCMAKE_SHARED_LINKER_FLAGS="-static-libgcc -static-libstdc++ -static -Wl,--gc-sections -Wl,--strip-all" \
+                -DCMAKE_FIND_ROOT_PATH=/usr/x86_64-w64-mingw32 \
+                -G Ninja -S src/main -B build
+          cmake --build build -j $(nproc)
+
+      - run: x86_64-w64-mingw32-strip --strip-all wrapper-java/build/libquickjs-java-wrapper.dll
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-x86_64
+          path: wrapper-java/build/libquickjs-java-wrapper.dll

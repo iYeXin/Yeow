@@ -1,0 +1,63 @@
+import com.vanniktech.maven.publish.SonatypeHost
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.vanniktech:gradle-maven-publish-plugin:0.33.0'
+    }
+}
+
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: "com.vanniktech.maven.publish"
+
+    group = "com.github.iYeXin"
+
+    boolean hasSigningKey = project.hasProperty('signingInMemoryKey') &&
+        project.property('signingInMemoryKey')?.toString()?.trim()?.length() > 0
+
+    mavenPublishing {
+        publishToMavenCentral(hasSigningKey)
+
+        if (hasSigningKey) {
+            signAllPublications()
+        }
+
+        pom {
+            name = "QuickJS Wrapper"
+            description = "QuickJS wrapper for JVM, upgraded to QuickJS 2025-09-13 with FinalizationRegistry support."
+            inceptionYear = "2022"
+            url = "https://github.com/iYeXin/quickjs-wrapper"
+            licenses {
+                license {
+                    name = "The Apache License, Version 2.0"
+                    url = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                    distribution = "http://www.apache.org/licenses/LICENSE-2.0.txt"
+                }
+            }
+            developers {
+                developer {
+                    id = "iYeXin"
+                    name = "YeXin"
+                    url = "https://github.com/iYeXin"
+                }
+            }
+            scm {
+                url = "https://github.com/iYeXin/quickjs-wrapper"
+                connection = "scm:git:git://github.com/iYeXin/quickjs-wrapper.git"
+                developerConnection = "scm:git:ssh://github.com/iYeXin/quickjs-wrapper.git"
+            }
+        }
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

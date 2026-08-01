@@ -1,0 +1,49 @@
+# Message 通道规范
+
+## 概述
+
+除 `task` 通道（通过调度器）外，Yeow 还存在其他非调度器通道。它们直接由插件线程处理，不受调度器时间片限制。
+
+所有通道使用相同的 `$send(channel, payload)` 入口，`payload` 为包含操作名称和参数的对象。
+
+---
+
+## 通道列表
+
+| 通道        | 说明                    | 规范文档                          |
+| ----------- | ----------------------- | --------------------------------- |
+| `task`      | 游戏任务（进入调度器）  | [task 模块规范](../task/index.md) |
+| `timer`     | 定时器                  | [timer 通道](timer.md)            |
+| `fs`        | 文件系统                | [fs 通道](fs.md)                  |
+| `http`      | HTTP 客户端/服务端      | [http 通道](http.md)              |
+| `assets`    | 插件的内置资源读取      | [assets 通道](assets.md)          |
+| `lifecycle` | 生命周期确认 + 资源回收 | [lifecycle 通道](lifecycle.md)    |
+| `log`       | 日志                    | [log 通道](log.md)                |
+| `now`       | 获取纳秒时间戳          | 见下方                            |
+| `dir`       | 获取插件数据目录路径    | 见下方                            |
+| `debug`     | 调试 / 错误上报 / Ping  | [debug 通道](debug.md)            |
+| `service`   | 服务注册/请求/订阅/发布 | [service 通道](service.md)        |
+
+---
+
+## 通用通道
+
+### `now`
+
+- **请求**：任意字符串
+- **返回**：`string` — 纳秒时间戳
+
+### `dir`
+
+- **请求**：任意字符串
+- **返回**：`string` — 插件数据目录路径（如 `plugins/<pluginName>`）
+
+---
+
+## 通用错误格式
+
+各通道在执行失败时返回：
+
+```json
+{ "err": "<error message>" }
+```

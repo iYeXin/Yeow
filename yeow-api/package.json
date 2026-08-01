@@ -1,0 +1,12 @@
+{
+    "name": "yeow-api",
+    "version": "0.2.100",
+    "description": "Yeow API",
+    "type": "module",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "files": [
+        "src/"
+    ],
+    "license": "MIT"
+}

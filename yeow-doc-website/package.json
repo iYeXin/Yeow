@@ -1,0 +1,17 @@
+{
+    "name": "yeow-doc-website",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Yeow documentation site (VitePress)",
+    "scripts": {
+        "setup:docs": "node scripts/setup-docs.mjs",
+        "postinstall": "node scripts/setup-docs.mjs",
+        "dev": "vitepress dev .",
+        "build": "vitepress build .",
+        "preview": "vitepress preview ."
+    },
+    "devDependencies": {
+        "vitepress": "^1.6.3"
+    }
+}

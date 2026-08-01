@@ -1,0 +1,10 @@
+name: YeowPlugin
+version: 1.0.0
+main: yeow.template.Bootstrap
+api-version: '1.18'
+
+depend:
+  - Yeow
+
+author: Unknown
+description: A Yeow plugin

@@ -1,0 +1,109 @@
+package yeow.task;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import org.bukkit.Bukkit;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.CommandSender;
+import org.bukkit.command.defaults.BukkitCommand;
+import org.bukkit.entity.Player;
+import yeow.YeowRuntime;
+import yeow.channel.SyncCallbackHelper;
+import yeow.profile.instrumentation.CommandMetric;
+import yeow.profile.instrumentation.ProfileSink;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+
+public class CommandTasks {
+    static final Gson gson = new Gson();
+    private static final Map<String, List<String>> pluginCommands = new ConcurrentHashMap<>();
+    private static volatile ProfileSink sink;
+    private static volatile long timeoutMs = 1000;
+
+    public static void setProfileSink(ProfileSink s) { sink = s; }
+    public static void setTimeoutMs(long ms) { timeoutMs = Math.max(100, ms); }
+
+    public static Object register(JsonObject p) throws Exception {
+        var pluginName = p.get("pluginName").getAsString();
+        var cmdName = p.get("commandName").getAsString();
+        var cbId = p.has("callbackId") ? p.get("callbackId").getAsString() : null;
+        var compCbId = p.has("completerCbId") ? p.get("completerCbId").getAsString() : null;
+        var perm = p.has("permission") ? p.get("permission").getAsString() : null;
+
+        var map = getMap();
+        if (map == null) return false;
+
+        var cmd = new BukkitCommand(cmdName) {
+            public boolean execute(CommandSender s, String l, String[] a) {
+                if (perm != null && !s.hasPermission(perm)) { s.sendMessage("No permission."); return true; }
+                var payload = Map.of("sender",Map.of("name",s.getName(),"uuid",s instanceof Player pl?pl.getUniqueId().toString():"CONSOLE","isPlayer",s instanceof Player),"args",List.of(a),"label",l);
+                if (cbId != null && !cbId.isEmpty()) {
+                    var pt = YeowRef.getPluginThread(pluginName);
+                    if (pt != null) pt.queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",payload)));
+                }
+                return true;
+            }
+
+            @Override public java.util.List<String> tabComplete(CommandSender s, String l, String[] a) {
+                if (compCbId == null || compCbId.isEmpty()) return super.tabComplete(s, l, a);
+                var pt = YeowRef.getPluginThread(pluginName);
+                if (pt == null) return super.tabComplete(s, l, a);
+                long t0 = System.nanoTime();
+                var pend = yeow.channel.SyncCallbackHelper.register(compCbId);
+                pt.queue.sendJs(gson.toJson(Map.of("t","cb","p",compCbId,"r",Map.of(
+                    "sender", Map.of("name",s.getName(),"uuid",s instanceof Player p?p.getUniqueId().toString():"CONSOLE","isPlayer",s instanceof Player),
+                    "args", List.of(a)))));
+                long timeout = timeoutMs;
+                var deadline = System.nanoTime() + timeout * 1_000_000;
+                while (System.nanoTime() < deadline && !pend.isDone()) {
+                    var rt = YeowRuntime.inst();
+                    if (rt != null) rt.getScheduler().tick();
+                    Thread.onSpinWait();
+                }
+                long elapsedNs = System.nanoTime() - t0;
+                boolean timedOut = !pend.isDone();
+                ProfileSink ps = sink;
+                if (ps != null) ps.onCommand(new CommandMetric(pluginName, cmdName, elapsedNs, timedOut));
+                if (pend.isDone() && pend.getResult() instanceof java.util.List<?> list)
+                    return list.stream().map(Object::toString).toList();
+                return super.tabComplete(s, l, a);
+            }
+        };
+        cmd.setDescription(p.has("description") ? p.get("description").getAsString() : "");
+        cmd.setUsage("/" + cmdName);
+        if (p.has("aliases")) { var as = new ArrayList<String>(); for(var e:p.getAsJsonArray("aliases")) as.add(e.getAsString()); cmd.setAliases(as); }
+        map.register(pluginName.toLowerCase(), cmd);
+        pluginCommands.computeIfAbsent(pluginName, k -> new ArrayList<>()).add(cmdName);
+        return true;
+    }
+
+    public static Object unregisterAll(String pluginName) {
+        var names = pluginCommands.remove(pluginName);
+        if (names == null || names.isEmpty()) return true;
+        var map = getMap();
+        if (map == null) return true;
+        var known = map.getKnownCommands();
+        known.values().removeIf(cmd -> cmd instanceof BukkitCommand && names.contains(cmd.getName()));
+        return true;
+    }
+
+    public static Object dispatch(JsonObject p) throws Exception {
+        var cmd = p.get("command").getAsString();
+        return Bukkit.dispatchCommand(Bukkit.getConsoleSender(), cmd);
+    }
+
+    /** Sync commands to all clients (call after hot-reload to refresh client tab-completion list). */
+    public static void syncCommands() {
+        try { var map = getMap(); if (map != null) { var m = map.getClass().getMethod("syncCommands"); m.invoke(map); } } catch (Exception ignored) {}
+    }
+
+    public static CommandMap getBukkitCommandMap() {
+        try { var f = Bukkit.getServer().getClass().getDeclaredField("commandMap"); f.setAccessible(true); return (CommandMap)f.get(Bukkit.getServer()); }
+        catch (Exception ignored) { return null; }
+    }
+
+    private static CommandMap getMap() {
+        return getBukkitCommandMap();
+    }
+}

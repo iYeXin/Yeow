@@ -1,0 +1,32 @@
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+def nativePlatforms = ['linux-x86_64', 'macos-x86_64', 'macos-arm64', 'windows-x86_64']
+
+tasks.named('jar').configure {
+    archiveBaseName = 'quickjs-java-wrapper'
+}
+
+nativePlatforms.each { platform ->
+    def taskName = platform.replace('-', '').capitalize()
+    tasks.register("jar${taskName}", Jar) {
+        archiveBaseName = 'quickjs-java-wrapper'
+        archiveClassifier = platform
+        from sourceSets.main.output
+        nativePlatforms.each { other ->
+            if (other != platform) {
+                exclude "native/${other}/**"
+            }
+        }
+    }
+}
+
+tasks.named('assemble') {
+    dependsOn nativePlatforms.collect { "jar${it.replace('-', '').capitalize()}" }
+}

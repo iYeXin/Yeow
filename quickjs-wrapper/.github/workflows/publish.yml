@@ -1,0 +1,195 @@
+name: Publish Release
+
+on:
+  push:
+    tags:
+      - '**'
+
+jobs:
+  build-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            os: ubuntu-24.04
+            artifact: native-linux-x86_64
+            lib_name: libquickjs-java-wrapper.so
+            c_flags: "-O2 -flto -ffunction-sections -fdata-sections"
+            cxx_flags: "-O2 -flto -ffunction-sections -fdata-sections"
+            link_flags: "-Wl,--gc-sections -Wl,--strip-all"
+            parallel: nproc
+
+          - name: macos-x86_64
+            os: macos-14
+            artifact: native-macos-x86_64
+            lib_name: libquickjs-java-wrapper.dylib
+            c_flags: "-O2 -flto -ffunction-sections -fdata-sections"
+            cxx_flags: "-O2 -flto -ffunction-sections -fdata-sections"
+            link_flags: "-Wl,-dead_strip"
+            parallel: sysctl -n hw.logicalcpu
+
+          - name: macos-arm64
+            os: macos-15
+            artifact: native-macos-arm64
+            lib_name: libquickjs-java-wrapper.dylib
+            c_flags: "-Os -flto -ffunction-sections -fdata-sections"
+            cxx_flags: "-Os -flto -ffunction-sections -fdata-sections"
+            link_flags: "-Wl,-dead_strip"
+            parallel: sysctl -n hw.logicalcpu
+
+          - name: windows
+            os: ubuntu-24.04
+            artifact: native-windows-x86_64
+            lib_name: libquickjs-java-wrapper.dll
+            c_flags: "-O2 -ffunction-sections -fdata-sections"
+            cxx_flags: "-O2 -ffunction-sections -fdata-sections"
+            link_flags: "-static-libgcc -static-libstdc++ -static -Wl,--gc-sections -Wl,--strip-all"
+            parallel: nproc
+            is_cross: true
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Install MinGW cross-compiler
+        if: matrix.is_cross
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 ninja-build
+
+      - name: Prepare Windows JNI header
+        if: matrix.is_cross
+        run: |
+          mkdir -p /tmp/jni-win32
+          echo '#define JNIEXPORT __declspec(dllexport)' > /tmp/jni-win32/jni_md.h
+          echo '#define JNIIMPORT __declspec(dllimport)' >> /tmp/jni-win32/jni_md.h
+          echo '#define JNICALL __stdcall' >> /tmp/jni-win32/jni_md.h
+          echo 'typedef int jint;' >> /tmp/jni-win32/jni_md.h
+          echo 'typedef long long jlong;' >> /tmp/jni-win32/jni_md.h
+          echo 'typedef signed char jbyte;' >> /tmp/jni-win32/jni_md.h
+
+      - name: Build
+        env:
+          JAVA_PLATFORM_INCLUDE: ${{ matrix.is_cross && '/tmp/jni-win32' || '' }}
+        run: |
+          cd wrapper-java
+          cmake -DCMAKE_BUILD_TYPE=MinSizeRel \
+                ${{ matrix.is_cross && '-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ -DCMAKE_FIND_ROOT_PATH=/usr/x86_64-w64-mingw32' || '' }} \
+                -DCMAKE_C_FLAGS="${{ matrix.c_flags }}" \
+                -DCMAKE_CXX_FLAGS="${{ matrix.cxx_flags }}" \
+                -DCMAKE_SHARED_LINKER_FLAGS="${{ matrix.link_flags }}" \
+                -G Ninja -S src/main -B build
+          cmake --build build -j $(${{ matrix.parallel }})
+
+      - name: Strip
+        if: matrix.is_cross
+        run: x86_64-w64-mingw32-strip --strip-all wrapper-java/build/${{ matrix.lib_name }}
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: wrapper-java/build/${{ matrix.lib_name }}
+
+  publish:
+    needs: [build-native]
+    if: always()
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: 21
+
+      - name: Download native artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: native-*
+          path: native-dist
+
+      - name: Install MinGW tools for DLL inspection
+        run: sudo apt-get install -y -qq binutils-mingw-w64-x86-64
+
+      - name: Embed native libs into JAR resources
+        run: |
+          cd wrapper-java
+          mkdir -p src/main/resources/native/linux-x86_64
+          mkdir -p src/main/resources/native/macos-x86_64
+          mkdir -p src/main/resources/native/macos-arm64
+          mkdir -p src/main/resources/native/windows-x86_64
+          cp ../native-dist/native-linux-x86_64/* src/main/resources/native/linux-x86_64/ 2>/dev/null || true
+          cp ../native-dist/native-macos-x86_64/* src/main/resources/native/macos-x86_64/ 2>/dev/null || true
+          cp ../native-dist/native-macos-arm64/* src/main/resources/native/macos-arm64/ 2>/dev/null || true
+          cp ../native-dist/native-windows-x86_64/* src/main/resources/native/windows-x86_64/ 2>/dev/null || true
+
+      - name: Copy matching MinGW runtime DLLs
+        run: |
+          cd wrapper-java
+          WIN_DIR=src/main/resources/native/windows-x86_64
+          # Dump DLL dependencies for debugging
+          echo "=== DLL dependencies ==="
+          x86_64-w64-mingw32-objdump -p $WIN_DIR/libquickjs-java-wrapper.dll | grep -i "DLL Name" || true
+          echo "=== Sysroot DLLs ==="
+          ls /usr/x86_64-w64-mingw32/lib/*.dll 2>/dev/null || true
+
+          # Copy all matching runtime DLLs from the cross-compiler sysroot
+          for dll in $(x86_64-w64-mingw32-objdump -p $WIN_DIR/libquickjs-java-wrapper.dll 2>/dev/null | grep -i "DLL Name" | awk '{print $3}'); do
+            # Skip Windows system DLLs
+            case "$dll" in
+              KERNEL32*|USER32*|GDI32*|COMDLG32*|ADVAPI32*|SHELL32*|OLE32*|OLEAUT32*|RPCRT4*|IMM32*|WINMM*|WS2_32*|MSVCRT*|VCRUNTIME*|api-ms-win-*|ext-ms-win-*)
+                echo "Skipping system DLL: $dll"
+                ;;
+              *)
+                SYSROOT=/usr/x86_64-w64-mingw32/lib
+                FOUND=$(find $SYSROOT -name "$dll" 2>/dev/null | head -1)
+                if [ -n "$FOUND" ]; then
+                  cp "$FOUND" "$WIN_DIR/"
+                  echo "Copied: $dll"
+                else
+                  echo "WARNING: $dll not found in sysroot"
+                fi
+                ;;
+            esac
+          done
+
+      - uses: gradle/gradle-build-action@v2
+
+      - name: Build JARs
+        run: ./gradlew :wrapper-java:assemble
+
+      - name: Collect release artifacts
+        run: |
+          mkdir -p release-artifacts
+          cp -r native-dist/native-* release-artifacts/ 2>/dev/null || true
+          cp wrapper-java/build/libs/*.jar release-artifacts/
+
+      - name: Get release notes
+        run: |
+          VERSION=$(echo "${{ github.ref_name }}" | sed 's/^v//')
+          echo "RELEASE_NOTES<<EOF" >> $GITHUB_ENV
+          echo "$(awk "/^## $VERSION/{flag=1;next}/^## /{flag=0}flag" CHANGELOG.md)" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          token: ${{ github.token }}
+          update_release: true
+          body: ${{ env.RELEASE_NOTES }}
+          files: release-artifacts/**/*
+          fail_on_unmatched_files: false

@@ -1,0 +1,2 @@
+rootProject.name = "quickjs-wrapper"
+include ':wrapper-java'

@@ -1,0 +1,40 @@
+export function post<T = unknown>(
+  type: string,
+  params: Record<string, unknown> = {},
+  priority?: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const cbId = _registerCallback((result: any) => {
+      if (result?.err) {
+        const msg = result.type ? `[${result.type}] ${result.err}` : result.err;
+        const e = new Error(msg);
+        if ($dev && typeof _getCurrentCbStack === 'function') {
+          const s = _getCurrentCbStack();
+          if (s) e.stack += '    --- cb registered at ---\n' + s;
+        }
+        if (result.stack) {
+          e.stack += '\n    --- runtime executer error(for reference) ---\n' + result.stack;
+        }
+        (e as any).javaType = result.type || null;
+        (e as any).taskType = result.task || null;
+        reject(e);
+      } else resolve(result as T);
+    });
+    const pld: Record<string, unknown> = { type, params, cb: cbId };
+    if (priority) pld.priority = priority;
+    $send('task', pld);
+  });
+}
+
+export function call<T = unknown>(
+  type: string,
+  params: Record<string, unknown> = {},
+  priority?: string
+): T {
+  const pld: Record<string, unknown> = { type, params };
+  if (priority) pld.priority = priority;
+  const r = $send('task', pld);
+  if (r == null) return undefined as T;
+  if ((r as any)?.err) throw new Error((r as any).err);
+  return r as T;
+}

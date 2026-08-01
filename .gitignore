@@ -1,0 +1,54 @@
+# ── 通用 ───────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.class
+
+# ── IDE ─────────────────────────────────────────────────
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+*.eclipse*
+
+# ── Java / Maven ────────────────────────────────────────
+target/
+dependency-reduced-pom.xml
+build/
+
+# ── Node.js ─────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ── Gradle ──────────────────────────────────────────────
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+
+# ── 运行时/构建产物目录 ─────────────────────────────────
+dist/
+bin/
+*.jar
+*.zip
+
+# 必须保留的二进制资产（模板构建必需）
+!create-yeow/templates/default/.yeow/assets/*.jar
+!quickjs-wrapper/gradle/wrapper/gradle-wrapper.jar
+
+# ── quickjs-wrapper（native 资源保留，构建产物忽略）────
+quickjs-wrapper/wrapper-java/build/
+quickjs-wrapper/wrapper-java/bin/
+quickjs-wrapper/.gradle/
+
+# ── 文档站点 ────────────────────────────────────────────
+yeow-doc-website/.vitepress/dist/
+yeow-doc-website/.vitepress/cache/
+yeow-doc-website/docs/
+
+# ── 运行数据 ────────────────────────────────────────────
+plugins/
+*.zip.bak
