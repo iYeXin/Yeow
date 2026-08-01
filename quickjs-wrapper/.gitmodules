@@ -1,3 +1,0 @@
-[submodule "native/quickjs"]
-	path = native/quickjs
-	url = https://github.com/HarlonWang/quickjs.git

@@ -1,0 +1,3 @@
+[submodule "quickjs-wrapper/native/quickjs"]
+	path = quickjs-wrapper/native/quickjs
+	url = https://github.com/HarlonWang/quickjs.git

@@ -14,6 +14,14 @@
 | Gradle | 8.x（仓库自带 wrapper） | quickjs-wrapper 构建 |
 | Git | 任意 | 版本控制（本仓库与 quickjs-wrapper 均使用） |
 
+**克隆时必须带 submodule**（`quickjs-wrapper/native/quickjs` 是 QuickJS 本体的 submodule）：
+
+```bash
+git clone --recursive https://github.com/iYeXin/Yeow.git
+```
+
+已克隆后补拉 submodule：`git submodule update --init --recursive`。
+
 ---
 
 ## 仓库结构
@@ -104,7 +112,7 @@ cp target/yeow-template-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
 5. 从 Releases 下载 `quickjs-java-wrapper.jar` → 同步到本仓库 `yeow-runtime/lib/` → 执行上面方式 A 的安装
 6. 重新构建并安装 yeow-runtime（第 2 步）
 
-> 镜像同步：主仓库的代码与 Release 更新后，将 `quickjs-wrapper/` 内容同步到本仓库（不含 `.git`），保持镜像与主仓库一致。
+> 镜像同步：主仓库的代码与 Release 更新后，将 `quickjs-wrapper/` 内容同步到本仓库（不含 `.git`）；`native/quickjs` 的 submodule commit 与主仓库保持一致（`git submodule update`）。提交镜像更新时需同时提交 `.gitmodules` 与 submodule gitlink。
 
 ---
 
