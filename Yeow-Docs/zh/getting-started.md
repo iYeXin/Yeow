@@ -9,6 +9,8 @@ cd my-plugin
 npm install
 ```
 
+![创建 Yeow 项目](assets/create-yeow.png)
+
 ## 开发
 
 ```bash
@@ -18,6 +20,10 @@ npm run dev -- --stop=30m      # 30 分钟后自动停止
 ```
 
 编辑 `src/` 或 `assets/` 下的文件自动触发热重载，无需重启服务器。
+
+开发模式下，运行时错误会自动定位到**源码位置**（source-map 反解）并附带完整异步调用链，直接在终端展示：
+
+![dev-server 错误定位](assets/error-show.png)
 
 ## 构建与部署
 
@@ -239,6 +245,10 @@ profile:
 ```
 
 ## 遇到问题？
+
+插件出现异常行为时，运行时会在控制台输出结构化警告（心跳超时、事件超时、队列积压等），并给出排查建议：
+
+![运行时警告](assets/warning-log.png)
 
 - 运行时警告（心跳超时、事件超时等）→ [运行时警告指南](runtime-warning.md)
 - 详细架构与线程模型 → [进阶知识](advanced.md)
