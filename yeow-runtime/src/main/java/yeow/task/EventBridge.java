@@ -27,6 +27,7 @@ public class EventBridge implements Listener {
 
     private final YeowRuntime runtime;
     private final Map<String, Map<String, String>> subs = new ConcurrentHashMap<>();
+    /** 事件类型 → 是否已注册 Bukkit 监听器（生命周期 = EventBridge，一经注册永久保留）。 */
     private final Map<String, Boolean> reg = new ConcurrentHashMap<>();
     private volatile ProfileSink sink;
     private volatile long timeoutMs = 5000;
@@ -81,6 +82,11 @@ public class EventBridge implements Listener {
     public void subscribe(String plugin, String et, String cbId) {
         var c = EVENTS.get(et); if (c == null) { LOG.warning("Unknown event: " + et); return; }
         subs.computeIfAbsent(et, k -> new ConcurrentHashMap<>()).put(plugin, cbId);
+        // 监听器一经注册永久保留（reg 只作去重标记，绝不在 unsubscribe 时移除）——
+        // Bukkit 无法注销匿名监听器，若热重载后重新注册会累积多个监听器，
+        // callEvent 会串行调用每个监听器（每个都走一遍完整超时等待），
+        // 死循环插件场景下 N 个监听器 = N × 5s 阻塞主线程。
+        // dispatch() 开头已对空订阅短路，空订阅时监听器零开销。
         if (reg.putIfAbsent(et, true) == null) {
             // AsyncPlayerChatEvent fires on a Netty thread — hop to the main thread before dispatching,
             // because dispatch() runs the scheduler tick (Bukkit API must stay on the main thread).
@@ -98,17 +104,11 @@ public class EventBridge implements Listener {
     }
     public void unsubscribe(String plugin, String et) {
         var s = subs.get(et);
-        if (s != null) {
-            s.remove(plugin);
-            if (s.isEmpty()) reg.remove(et);
-        }
+        if (s != null) s.remove(plugin);
     }
 
     public void unsubscribeAll(String plugin) {
-        subs.forEach((et, s) -> {
-            s.remove(plugin);
-            if (s.isEmpty()) reg.remove(et);
-        });
+        subs.forEach((et, s) -> s.remove(plugin));
     }
 
     void dispatch(Event ev, String et) {
