@@ -27,6 +27,8 @@ npm create yeow@latest [-- options]
   ▸ JavaScript ◂    TypeScript         ← Tab 切换，Enter 确认
 ```
 
+![create-yeow 语言选择](assets/create-yeow.png)
+
 默认 **JavaScript**。TypeScript 项目在构建时自动运行 `tsc --noEmit` 类型检查，可在 `yeow.config.json` 中设置 `"typecheck": false` 关闭。
 
 ### 示例
@@ -86,6 +88,8 @@ npm run dev [-- options]
     →   29| test1();
         30|
 ```
+
+![dev-server 错误定位展示](assets/error-show.png)
 
 - 自动定位**用户源码**中的出错帧，显示错误行 ±3 行上下文与 `→` 定位符
 - 行号/列号直接对应 `src/` 里的真实代码，而不是打包产物
