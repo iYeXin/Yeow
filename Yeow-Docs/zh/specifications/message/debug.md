@@ -13,7 +13,7 @@
 
 ## `pong`
 
-调试 ping 响应。运行时可通过发送 `DEBUG ping` 消息测量往返延迟（预留，当前未自动触发）。
+调试 ping 响应。运行时通过消息队列向 JS 投递 `DEBUG ping` 心跳，JS 端响应此操作测量往返延迟。
 
 - **请求**：`{ "t": "pong" }`
 - **返回**：`null`
@@ -23,4 +23,7 @@
 运行时通过消息队列向 JS 投递 `DEBUG` 类型消息。JS 端 `$hm` 在收到 `t === 'DEBUG'` 时处理。
 
 当前支持：
-- `{ "t": "DEBUG", "p": "ping" }` → JS 应立即响应 `$send('debug', { t: 'pong' })`（预留，用于未来的性能检测与评估）
+
+- `{ "t": "DEBUG", "p": "ping" }` → JS 应立即响应 `$send('debug', { t: 'pong' })`
+
+**心跳检测**：运行时周期性（默认每 1 秒一个窗口）向每个插件 JS 线程发送一次 `DEBUG ping`，并记录 pong 往返时间。单次往返超过 `latency-warn-threshold-ms`（默认 200ms）触发 `heartbeat.timeout` 警告；连续 `suspend-warn-seconds`（默认 30s）无任何响应升级为 `plugin.hung`（线程挂起）。阈值在运行时 `config.yml` 的 `profile` 段配置，详见 [运行时警告指南](../../runtime-warning.md)。

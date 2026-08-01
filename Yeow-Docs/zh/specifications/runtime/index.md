@@ -157,7 +157,6 @@ JS 端处理流程：
 | `dir`       | 否      | `$send` 直接返回目录路径字符串                   | —                                                          |
 | `debug`     | 否      | `$send` 返回 `null`（fire-and-forget）           | —                                                          |
 | `service`   | 是      | 注册/请求/订阅/发布。request 异步，register 同步 | —                                                          |
-| `dir`       | 否      | `$send` 直接返回目录路径字符串                   | —                                                          |
 
 ---
 

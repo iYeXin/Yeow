@@ -121,12 +121,15 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 |------|------|:------:|
 | `inventoryOpen` | player, inventoryType, title | |
 | `inventoryClose` | player, inventoryType | |
+| `inventoryClick` | player, slot, hotbarKey, action, inventoryType, isLeftClick, isRightClick, isShiftClick, clickedItem, cursorItem | ✔ |
 
 ### 服务器事件
 
 | 类型 | 字段 | 可取消 |
 |------|------|:------:|
 | `serverPing` | address, numPlayers, maxPlayers, motd | ✔ |
+| `serverCommand` | command, sender | ✔ |
+| `playerResourcePackStatus` | player, status, hash | |
 
 > `player` 字段在 JS 侧自动转为 `Player.get(uuid)`。`block` 为命名空间 ID（如 `minecraft:stone`）。
 

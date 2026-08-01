@@ -338,7 +338,7 @@ for(loc of locs){
 
 ```
 call('player.getPing', {uuid})
-  → $send('task', '{"type":"player.getPing","p":{"uuid":"...","_priority":"normal"}}')
+  → $send('task', '{"type":"player.getPing","p":{"uuid":"..."}}')
   → PluginThread: scheduler.submitGameSync(pld, future, priority, name)
   → future.get(5s) [JS 线程阻塞]
   → 主线程 tick(): 从对应优先级队列取出 → Tasks.execute()
@@ -349,7 +349,7 @@ call('player.getPing', {uuid})
 
 ```
 post('player.sendMessage', {...})
-  → $send('task', '{"type":"...","p":{...},"cb":"cb_1","_priority":"normal"}')
+  → $send('task', '{"type":"...","p":{...},"cb":"cb_1"}')
   → PluginThread: scheduler.submitGameAsync(pld, cbId, callback, priority, name)
   → 立即返回 [JS 线程不阻塞]
   → 主线程 tick(): 执行 → callback.accept(result)
