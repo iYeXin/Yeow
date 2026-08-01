@@ -184,7 +184,7 @@ npm run build
 
 1. TypeScript 项目自动运行 `tsc --noEmit` 类型检查（可通过 `yeow.config.json` 的 `typecheck` 字段关闭）
 2. esbuild 打包 `src/index.ts`（或 `index.js`） → `.yeow/main.js`（生产）/ `.dev/main.js`（开发）
-3. 资源文件（`import './assets/icon.png'`）自动哈希、复制到 `dist/.assets/`（生产）或 `dist/.dev/.assets/`（开发）
+3. 资源文件（`import './assets/icon.png'`）按依赖项命名空间复制到 `dist/.assets/<id>/`（生产）或 `dist/.dev/.assets/<id>/`（开发）
 4. 从 `.yeow/assets/` 读取模板 JAR
 5. 注入 `main.js` + `yeow.json` + `plugin.yml` + 全部资源文件
 6. 输出到 `dist/<name>-<version>.jar` + `.yeow.zip`（生产）/ `dist/plugins/<name>-<version>.jar` + `.yeow.zip`（开发，zip 内含 `.yeow/dev.json`）

@@ -125,7 +125,8 @@ servicePublish(token, 'playerJoin', { name: player.name, time: Date.now() });
 `platforms` 支持三种格式：
 
 ```js
-import { registerNativeService, getAssetsPath } from 'yeow-api';
+import { registerNativeService } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';
 
 // 1. 字符串（向后兼容）
 const { serviceId, ready } = await registerNativeService('myNative', {
@@ -169,7 +170,7 @@ const svc = await registerNativeService('iyexin.image-svc.v1', {
 
 > **建议至少提供 `windows-x64` + `linux-x64` + `linux-arm64`**：绝大多数 Paper 服务器部署在 Linux x64 VPS、Linux ARM（树莓派/NAS/ARM 云主机）或 Windows x64。缺少当前平台的配置时，注册返回错误 `No binary for platform: <os> (<os>-<arch>)`。
 
-`dir` 使用 `getAssetsPath()` 时，**顶层目录整体哈希**（如 `assets/native.a1b2c3d4/`），目录内一切保持原名——`entry` 及其引用的所有文件（含嵌套子目录、`../` 兄弟目录）都不会被改名，引用关系完整。
+`dir` 使用 `getAssetsPath()` 时，返回 `assets/<id>/native/`——文件**不哈希改名**，`entry` 及其引用的所有文件（含嵌套子目录、`../` 兄弟目录）都保持原名，引用关系完整。
 
 > **`dir` 应指向包含全部依赖的最顶层目录**，`entry` 用相对子路径：
 >
@@ -190,7 +191,8 @@ const svc = await registerNativeService('iyexin.image-svc.v1', {
 > **serviceId 命名规范：** 公共服务的 serviceId 即 `refName`，为避免不同作者的包冲突，应写明 `作者.服务名.版本`，例如 `iyexin.image-svc.v1`：
 >
 > ```js
-> import { registerNativeService, getAssetsPath } from 'yeow-api';
+> import { registerNativeService } from 'yeow-api';
+> import { getAssetsPath } from 'yeow-dev';
 >
 > const svc = await registerNativeService('iyexin.image-svc.v1', {
 >     windows: getAssetsPath('native/windows/image-svc.exe'),
@@ -199,10 +201,11 @@ const svc = await registerNativeService('iyexin.image-svc.v1', {
 > });
 > ```
 
-> **推荐用法：** 使用 `getAssetsPath()` 获取资源路径，而非手写字符串。它在构建时对文件做哈希处理，确保发布 npm 包后路径仍然正确：
+> **推荐用法：** 使用 `getAssetsPath()` 获取资源路径，而非手写字符串。它按调用方所属依赖项注入命名空间，确保发布 npm 包后路径仍然正确：
 >
 > ```js
-> import { getAssetsPath, registerNativeService } from 'yeow-api';
+> import { registerNativeService } from 'yeow-api';
+> import { getAssetsPath } from 'yeow-dev';
 > 
 > const svc = await registerNativeService('mySvc', {
 >     windows: getAssetsPath('native/win/my-svc.exe'),
@@ -292,9 +295,10 @@ unsub();
 ```
 
 ```js
-import { registerNativeService, getAssetsPath } from 'yeow-api';
+import { registerNativeService } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';
 
-// 注册 Native Service + 等待就绪（路径必须经 getAssetsPath 哈希解析）
+// 注册 Native Service + 等待就绪（路径必须经 getAssetsPath 解析）
 const { serviceId, ready } = await registerNativeService('image-svc', {
     windows: getAssetsPath('image-svc.exe'),
 });

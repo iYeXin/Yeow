@@ -57,7 +57,7 @@
 | 文档 | 说明 |
 |------|------|
 | ⭐ [FS](fs.md) | 文件系统读写（含 `path` 工具） |
-| ⭐ [Assets](assets.md) | 打包资源：`getAssetsPath` + 读取/解压 |
+| ⭐ [Assets](assets.md) | 打包资源：`getAssetsPath`（`yeow-dev`）+ 读取/解压 |
 | [PDC](pdc.md) | 持久数据容器 |
 
 ## 日志

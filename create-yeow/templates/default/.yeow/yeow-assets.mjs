@@ -1,113 +1,145 @@
-import { readFileSync, readdirSync, existsSync, statSync, mkdirSync, copyFileSync } from 'fs';
-import { resolve, dirname, basename, extname } from 'path';
+import { readFileSync, readdirSync, existsSync, statSync, mkdirSync, copyFileSync, realpathSync } from 'fs';
+import { resolve } from 'path';
 import { createRequire } from 'module';
-import { createHash } from 'crypto';
+import { randomBytes } from 'crypto';
 
 const require = createRequire(import.meta.url);
 
-// ── 哈希树 ─────────────────────────────────────────────────────────
-// 哈希规则：
-//   - 根级文件：独立哈希 <name>.<contentHash><ext>
-//   - 顶层目录（assets/ 直接子目录）：整体哈希 <name>.<dirHash>/，内部一切保持原名
-// 保证目录内部（含深层子目录）的相对引用始终有效。
-function buildTree(absDir) {
-    const children = {};
-    for (const e of readdirSync(absDir, { withFileTypes: true })) {
-        const p = resolve(absDir, e.name);
-        if (e.isDirectory()) {
-            children[e.name] = buildTree(p);
-        } else {
-            children[e.name] = {
-                isFile: true,
-                contentHash: createHash('md5').update(readFileSync(p)).digest('hex').slice(0, 8),
-            };
-        }
-    }
-    const parts = Object.keys(children).sort().map(k => {
-        const c = children[k];
-        return k + ':' + (c.isFile ? c.contentHash : c.hash);
+const slash = p => p.replace(/\\/g, '/');
+const normKey = p => slash(resolve(p)).toLowerCase();
+
+// ── 依赖项收集（node_modules 扫描）─────────────────────────────
+// 规则：
+//   - 主项目无条件参与（始终分配 id，保证 getAssetsPath 恒可用；有 assets/ 才复制）
+//   - 依赖包：node_modules 顶层目录（含 @scope/name 两级），要求
+//     assets/ 目录存在 且 peerDependencies 含 yeow-api 键
+// 键：<name>-<version>。npm/pnpm 扁平布局支持良好；yarn 的 hoisting
+// 差异可能导致依赖不在预期位置（见文档说明）。
+function collectCandidates(root, pkgJson) {
+    const candidates = [];
+    const ownAssets = resolve(root, 'assets');
+    candidates.push({
+        key: pkgJson.name + '-' + pkgJson.version,
+        pkgDir: root,
+        absSrc: ownAssets,
+        hasAssets: existsSync(ownAssets),
     });
-    return { children, isFile: false, hash: createHash('md5').update(parts.join(',')).digest('hex').slice(0, 8) };
-}
 
-// ── 部署 + map ─────────────────────────────────────────────────────
-// overwrite=false 时（依赖包）不覆盖主项目已有的 map 条目与文件
-// topLevel=true：当前目录是 assets/ 直接子目录，需要哈希；内部目录保持原名
-function deploy(node, absSrc, outDir, map, origRel, hashedRel, overwrite, topLevel) {
-    if (!node.isFile && hashedRel) mkdirSync(resolve(outDir, hashedRel), { recursive: true });
-    for (const [name, child] of Object.entries(node.children || {})) {
-        if (child.isFile) {
-            if (hashedRel === '') {
-                const ext = extname(name);
-                const base = basename(name, ext);
-                const dest = base + '.' + child.contentHash + ext;
-                const dst = resolve(outDir, dest);
-                if (overwrite || !existsSync(dst)) copyFileSync(resolve(absSrc, name), dst);
-                if (overwrite || !map[name]) map[name] = 'assets/' + dest;
-            } else {
-                const dst = resolve(outDir, hashedRel, name);
-                if (overwrite || !existsSync(dst)) {
-                    mkdirSync(resolve(outDir, hashedRel), { recursive: true });
-                    copyFileSync(resolve(absSrc, name), dst);
+    const nm = resolve(root, 'node_modules');
+    if (existsSync(nm)) {
+        const names = [];
+        for (const entry of readdirSync(nm)) {
+            const p = resolve(nm, entry);
+            let st;
+            try { st = statSync(p); } catch { continue; } // statSync 跟随 symlink（pnpm）
+            if (!st.isDirectory()) continue;
+            if (entry.startsWith('@')) {
+                for (const sub of readdirSync(p)) {
+                    const sp = resolve(p, sub);
+                    try { if (statSync(sp).isDirectory()) names.push(entry + '/' + sub); } catch { /* 跳过 */ }
                 }
-                if (overwrite || !map[origRel + name]) map[origRel + name] = 'assets/' + hashedRel + name;
+            } else {
+                names.push(entry);
             }
-        } else {
-            const subOrig = origRel + name + '/';
-            // 仅顶层目录哈希；内部目录保持原名（保护深层相对引用）
-            const subHashed = topLevel
-                ? name + '.' + child.hash + '/'
-                : hashedRel + name + '/';
-            deploy(child, resolve(absSrc, name), outDir, map, subOrig, subHashed, overwrite, false);
-            if (overwrite || !map[subOrig]) map[subOrig] = 'assets/' + subHashed;
+        }
+        for (const name of names) {
+            const pkgDir = resolve(nm, ...name.split('/'));
+            let meta;
+            try { meta = JSON.parse(readFileSync(resolve(pkgDir, 'package.json'), 'utf-8')); } catch { continue; }
+            if (!meta.peerDependencies || !meta.peerDependencies['yeow-api']) continue;
+            const pkgAssets = resolve(pkgDir, 'assets');
+            if (!existsSync(pkgAssets)) continue;
+            candidates.push({
+                key: meta.name + '-' + (meta.version || '0.0.0'),
+                pkgDir,
+                absSrc: pkgAssets,
+                hasAssets: true,
+            });
         }
     }
+    return candidates;
 }
 
-// ── 收集所有资产来源（主项目 + 依赖包）───────────────────────────
-function collectSources(root, pkgJson) {
-    const sources = [];
-    const own = resolve(root, 'assets');
-    if (existsSync(own)) sources.push({ tree: buildTree(own), absSrc: own, overwrite: true });
-
-    for (const pkgName of Object.keys(pkgJson.dependencies || {})) {
-        try {
-            const pkgJsonPath = require.resolve(pkgName + '/package.json', { paths: [root] });
-            const pkgAssets = resolve(dirname(pkgJsonPath), 'assets');
-            if (existsSync(pkgAssets)) {
-                sources.push({ tree: buildTree(pkgAssets), absSrc: pkgAssets, overwrite: false });
-            }
-        } catch { /* 非 Yeow 包或未安装，跳过 */ }
+// ── id 分配（8 位 hex，不哈希内容，仅保证构建内唯一）──────────
+// 每个依赖项的资产部署到 .assets/<id>/，id 唯一 → 无同名冲突。
+function assignIds(candidates) {
+    const used = new Set();
+    const ids = new Map(); // 路径（realpath + 原始路径，lowercase）→ id
+    for (const c of candidates) {
+        let id;
+        do { id = randomBytes(4).toString('hex'); } while (used.has(id));
+        used.add(id);
+        c.id = id;
+        ids.set(normKey(c.pkgDir), id);
+        try { ids.set(normKey(realpathSync(c.pkgDir)), id); } catch { /* 保持原始路径 */ }
     }
-    return sources;
+    return ids;
 }
 
-// ── esbuild 插件：__yeow-assets 虚拟模块 ──────────────────────────
+// ── 原样部署到 .assets/<id>/（无改名，相对引用天然有效）────────
+function copyDir(src, dst) {
+    mkdirSync(dst, { recursive: true });
+    for (const entry of readdirSync(src, { withFileTypes: true })) {
+        const s = resolve(src, entry.name);
+        const d = resolve(dst, entry.name);
+        if (entry.isDirectory()) copyDir(s, d);
+        else copyFileSync(s, d);
+    }
+}
+
+function deployAll(candidates, assetsOutDir) {
+    for (const c of candidates) {
+        if (!c.hasAssets) continue;
+        copyDir(c.absSrc, resolve(assetsOutDir, c.id));
+    }
+}
+
+// ── esbuild 插件：yeow-dev 虚拟模块 ────────────────────────────
+// yeow-dev 是构建期模块（发布为空包）：getAssetsPath 由构建器按
+// importer 所属依赖项注入对应命名空间 id，运行时无需任何改动。
 export function makeAssetPlugin({ root, pkgJson, outDir }) {
     const assetsOutDir = resolve(outDir, '.assets');
     return {
         name: 'yeow-assets',
         setup(build) {
-            build.onResolve({ filter: /^__yeow-assets$/ }, args => ({
-                path: args.path,
+            const candidates = collectCandidates(root, pkgJson);
+            const ids = assignIds(candidates);
+            const rootId = ids.get(normKey(root));
+            deployAll(candidates, assetsOutDir);
+
+            // importer → 所属依赖项 id（最长路径前缀匹配；未匹配归主项目）
+            const idForImporter = importer => {
+                const imp = normKey(importer);
+                let best = null;
+                let bestLen = -1;
+                for (const [dir, id] of ids) {
+                    if (dir === imp || imp.startsWith(dir + '/')) {
+                        if (dir.length > bestLen) { best = id; bestLen = dir.length; }
+                    }
+                }
+                return best || rootId;
+            };
+
+            build.onResolve({ filter: /^yeow-dev$/ }, args => ({
+                path: 'yeow-dev?id=' + idForImporter(args.importer),
                 namespace: 'yeow-assets',
             }));
-            build.onLoad({ filter: /.*/, namespace: 'yeow-assets' }, async () => {
-                const map = {};
-                mkdirSync(assetsOutDir, { recursive: true });
-                for (const src of collectSources(root, pkgJson)) {
-                    deploy(src.tree, src.absSrc, assetsOutDir, map, '', '', src.overwrite, true);
-                }
+            build.onLoad({ filter: /.*/, namespace: 'yeow-assets' }, args => {
+                const m = /yeow-dev\?id=([0-9a-f]+)/.exec(args.path);
+                const id = m ? m[1] : rootId;
                 return {
                     contents:
-                        'const _map = ' + JSON.stringify(map) + ';\n' +
-                        'function _norm(p) { return p.endsWith("/") ? p.slice(0, -1) : p; }\n' +
-                        'export function getPath(p) {\n' +
-                        '  if (_map[p]) return _map[p];\n' +
-                        '  const n = _norm(p);\n' +
-                        '  if (_map[n]) return _map[n];\n' +
-                        '  if (_map[n + "/"]) return _map[n + "/"];\n' +
-                        '  return p;\n' +
+                        'const _id = ' + JSON.stringify(id) + ';\n' +
+                        'export function getAssetsPath(p) {\n' +
+                        '  const parts = String(p).replace(/\\\\/g, "/").split("/");\n' +
+                        '  const out = [];\n' +
+                        '  for (const s of parts) {\n' +
+                        '    if (!s || s === ".") continue;\n' +
+                        '    if (s === "..") { if (out.length) out.pop(); continue; }\n' +
+                        '    out.push(s);\n' +
+                        '  }\n' +
+                        '  const trailing = /[\\/\\\\]$/.test(String(p)) ? "/" : "";\n' +
+                        '  return "assets/" + _id + (out.length ? "/" + out.join("/") : "") + trailing;\n' +
                         '}\n',
                     loader: 'js',
                 };
@@ -137,5 +169,3 @@ export function makeDedupePlugin(root) {
 export function assetsOutDirFor(outDir) {
     return resolve(outDir, '.assets');
 }
-
-export { buildTree };

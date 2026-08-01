@@ -27,7 +27,8 @@ Yeow Native Service 是通过子进程启动的可执行文件，通过 TCP 与 
 JS 端可通过 `registerNativeService` 返回的 `ready()` 方法等待就绪：
 
 ```js
-import { registerNativeService, getAssetsPath } from 'yeow-api';
+import { registerNativeService } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';
 
 const { serviceId, ready } = await registerNativeService('image-svc', {
     windows: getAssetsPath('image-svc.exe'),
@@ -35,7 +36,7 @@ const { serviceId, ready } = await registerNativeService('image-svc', {
 await ready(); // Promise resolve 表示 TCP 连接已建立、就绪消息已收到
 ```
 
-> **路径必须经 `getAssetsPath()` 解析**：构建时资源会被哈希改名（如 `image-svc.exe` → `image-svc.a1b2c3d4.exe`），硬编码原始路径在运行时找不到文件。
+> **路径必须经 `getAssetsPath()` 解析**：构建时资源会获得命名空间前缀（如 `image-svc.exe` → `assets/a1b2c3d4/image-svc.exe`），硬编码原始路径在运行时找不到文件。
 
 若进程在发送就绪消息前异常退出，`ready()` 会 reject。Error 对象包含：
 

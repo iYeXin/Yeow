@@ -34,4 +34,11 @@ declare global {
   /** @deprecated 兼容保留——优先使用 ES2026 原生 `Uint8Array.fromBase64()` */
   function base64ToUint8Array(base64: string): ArrayBuffer;
 }
+
+// yeow-dev：构建期虚拟模块（由 Yeow 构建器按 importer 所属依赖项注入命名空间）。
+// 插件未安装 yeow-dev 时此声明生效；类型与实际构建行为一致。
+declare module 'yeow-dev' {
+  export function getAssetsPath(path: string): string;
+}
+
 export {};

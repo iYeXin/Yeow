@@ -9,7 +9,7 @@
 | 工具 | 版本 | 用途 |
 |------|------|------|
 | Node.js | 18+ | `yeow-api` / `yeow-utils` / `create-yeow` / 文档站点 |
-| JDK | 21+ | `yeow-runtime` / `yeow-template` / `yeow-dev` / `quickjs-wrapper` |
+| JDK | 21+ | `yeow-runtime` / `yeow-template` / `yeow-tools` / `quickjs-wrapper` |
 | Maven | 3.9+ | 运行时与模板构建 |
 | Gradle | 8.x（仓库自带 wrapper） | quickjs-wrapper 构建 |
 | Git | 任意 | 版本控制（本仓库与 quickjs-wrapper 均使用） |
@@ -33,7 +33,8 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 | `yeow-api` / `yeow-utils` | TS 库 | 无构建步骤（源码直接随插件 bundle）；类型检查 `tsc --noEmit` |
 | `create-yeow` | CLI 脚手架 | 无构建步骤；模板改动直接生效 |
 | `quickjs-wrapper` | QuickJS JVM 封装 | Gradle + CMake（详见下文） |
-| `yeow-dev` | 开发基准/诊断工具 | `mvn package`（独立，不依赖运行时） |
+| `yeow-tools` | 开发基准/诊断工具 | `mvn package`（独立，不依赖运行时） |
+| `yeow-dev` | 构建期虚拟模块（空 npm 包） | 无构建；发布 `npm publish`（构建时被 esbuild 拦截，不实际加载） |
 | `Yeow-Docs` | 文档源 | 无构建；直接编辑 Markdown |
 | `yeow-doc-website` | 文档站点 | `npm run build`（`docs/` 是指向 `Yeow-Docs/zh` 的目录联接） |
 

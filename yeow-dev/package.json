@@ -1,0 +1,13 @@
+{
+    "name": "yeow-dev",
+    "version": "0.1.0",
+    "description": "Yeow build-time module — virtual, resolved by the Yeow bundler (installing is optional)",
+    "type": "module",
+    "main": "./index.js",
+    "types": "./index.d.ts",
+    "files": [
+        "index.js",
+        "index.d.ts"
+    ],
+    "license": "MIT"
+}

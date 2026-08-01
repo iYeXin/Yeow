@@ -40,7 +40,7 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 ├── .yeow/
 │   ├── main.js            ← esbuild 打包的插件代码（IIFE 格式，生产构建）
 │   └── dev.json           ← 开发模式信息（仅 dev 构建，见下）
-├── assets/                ← 打包资源（哈希后的文件名）
+├── assets/                ← 打包资源（按命名空间 id 分目录）
 └── plugin.yml             ← 宿主平台元信息（Bukkit 需要；`.yeow.zip` 与纯平台实现可忽略）
 ```
 
@@ -88,12 +88,9 @@ esbuild 打包的 **IIFE**（`"use strict"; (() => {...})()`），`bundle: true`
 
 ### `assets/` — 打包资源
 
-构建时对 `assets/` 目录树做**内容哈希**：
+构建时对每个依赖项（主项目与满足条件的 npm 包）的 `assets/` 目录分配一个**唯一命名空间 id**（8 位十六进制，非内容哈希），内容**原样**复制到 `assets/<id>/` 下——**文件不哈希改名**，`assets/` 内部（含跨目录）的相对引用永远有效。
 
-- **根级文件**：独立哈希 `name.<contentHash8>.ext`（如 `icon.a1b2c3d4.png`）
-- **顶层目录**：整体哈希 `name.<dirHash8>/`，**目录内一切保持原名**（含嵌套子目录）
-
-JS 侧通过 `getAssetsPath()` 获取哈希后的 JAR 内路径（如 `"assets/icon.a1b2c3d4.png"`）。运行时按该路径在 JAR 的 `assets/` 下查找即可，**不要**对路径做二次变换。
+JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b2c3d4/icon.png"`）。运行时按该路径在 JAR 的 `assets/` 下查找即可，**不要**对路径做二次变换。
 
 ---
 
@@ -365,7 +362,7 @@ JS 端通过 `task` 通道回传补全结果：
 
 插件可携带原生程序（Go/Rust/C++ 等）并通过 `service` 通道调用。详见 [Native Service 规范](native-service/index.md)。要点：
 
-- 二进制放在 `assets/`（经 `getAssetsPath()` 哈希）
+- 二进制放在 `assets/`（经 `getAssetsPath()` 注入命名空间）
 - `registerNativeService` 按平台（os + arch）提取并 spawn 子进程
 - 子进程通过 TCP JSON line 与运行时通信（ready / request / response / publish）
 
@@ -390,7 +387,7 @@ JS 端通过 `task` 通道回传补全结果：
 - [ ] **事件桥**：subscribe/unsubscribe、事件数据提取（仅基本类型）、event.complete 应用
 - [ ] **命令桥**：register/execute/tabComplete
 - [ ] **通道实现**：timer / fs / http / assets / service / log / now / dir / debug / lifecycle
-- [ ] **资源访问**：按 `assets/<哈希路径>` 读取 JAR 内资源
+- [ ] **资源访问**：按 `assets/<命名空间id>/` 读取 JAR 内资源
 - [ ] **错误处理**：JS 异常捕获、`debug` 通道上报
 - [ ] **健康检测**（推荐）：`debug` ping-pong 心跳、回调超时告警
 - [ ] **热重载**（开发环境）：RELOAD → unloadDone → 新上下文 → 新代码；生产卸载采用相同逻辑（5s 强制终止）

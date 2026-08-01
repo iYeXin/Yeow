@@ -373,7 +373,7 @@ $send('assets', '{"t":"read","p":{"path":"assets/config.a1b2c3d4.yml"}}')
 
 路径安全：所有文件操作限制在 `plugins/<插件名>/` 下，`resolvePath()` 拦截 `../` 穿越。
 
-**资源哈希**：构建时 `getAssetsPath()` 会把资源路径解析为哈希后的 JAR 路径（根级文件独立哈希，顶层目录整体哈希）。JS 侧应始终通过 `getAssetsPath()` 获取路径，而非硬编码。详见 [Assets API](api/assets.md)。
+**资源命名空间**：构建时每个依赖项（主项目与满足条件的 npm 包）的 `assets/` 分配唯一命名空间 id，内容原样复制到 JAR `assets/<id>/`（不哈希改名，相对引用永远有效）。JS 侧应始终通过 `getAssetsPath()`（来自 `yeow-dev`）获取路径，而非硬编码。详见 [Assets API](api/assets.md)。
 
 ## 开始执行游戏任务的时机
 
@@ -831,7 +831,7 @@ profile:
 ```
 registerNativeService(refName, platforms)
   → 按当前平台（os + arch，精确匹配回退 os）选择二进制
-  → 从 JAR assets/ 提取到临时目录（哈希路径经 getAssetsPath 解析）
+  → 从 JAR assets/ 提取到临时目录（命名空间路径经 getAssetsPath 解析）
   → spawn(binary, nativePort, serviceId)
   → 子进程连接 TCP → 发送 {"type":"ready"} → ready() resolve
   → 请求走 TCP JSON line：request → response

@@ -18,7 +18,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 
 ---
 
-## 组件总览（9 个目录）
+## 组件总览（10 个目录）
 
 | 目录                                    | 语言       | 作用                                                                                                              |
 | --------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -28,9 +28,10 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 | [`create-yeow`](create-yeow/)           | Node.js    | `npm create yeow` 脚手架：交互式项目模板、dev-server（Paper + 热重载 + source-map 错误定位）、构建脚本            |
 | [`yeow-template`](yeow-template/)       | Java 21    | 空 JAR 骨架（`Bootstrap` 类），构建时注入 JS 代码生成标准 Paper 插件 JAR                                          |
 | [`quickjs-wrapper`](quickjs-wrapper/) | Java + C++ | QuickJS 2026-06-04 的 JVM 封装（fork），含四平台预编译原生库。**本仓库中的副本仅为镜像**——主维护仓库：[github.com/iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper)（版本标签、多平台 CI 构建、Release 发布均在那里进行）。`native/quickjs`（QuickJS 本体 C 源码）为 **git submodule**（[iyexin/quickjs](https://github.com/iyexin/quickjs)，上游 bellard/quickjs 的 fork，锁定 2026-06-04 快照） |
+| [`yeow-dev`](yeow-dev/)                 | Node.js    | 构建期虚拟模块（空 npm 包）：`getAssetsPath` 的引入来源，构建时被 esbuild 拦截并按依赖项注入命名空间            |
+| [`yeow-tools`](yeow-tools/)             | Java 21    | 开发辅助工具：调度器/队列基准（Bench）、Base64 编解码诊断                                                         |
 | [`Yeow-Docs`](Yeow-Docs/)               | Markdown   | 全部中文文档：入门、API 参考（24 模块）、进阶、平台规范（协议层）、运行时警告                                     |
 | [`yeow-doc-website`](yeow-doc-website/) | VitePress  | 文档站点工程：`docs/` 为 `Yeow-Docs/zh` 的目录联接，自定义首页与主题；`npm run build` 产出 `/v1/` 站点            |
-| [`yeow-dev`](yeow-dev/)                 | Java 21    | 开发辅助工具：调度器/队列基准（Bench）、Base64 编解码诊断                                                         |
 
 ### 运行链路
 
@@ -84,4 +85,4 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 ## 许可证
 
-各组件独立：`yeow-runtime` / `yeow-api` / `yeow-utils` / `create-yeow` / `yeow-template` / `yeow-dev` 为 MIT；`quickjs-wrapper` 为 Apache-2.0（QuickJS 引擎 MIT）；`Yeow-Docs` 与文档站点为 MIT。
+各组件独立：`yeow-runtime` / `yeow-api` / `yeow-utils` / `create-yeow` / `yeow-template` / `yeow-dev` / `yeow-tools` 为 MIT；`quickjs-wrapper` 为 Apache-2.0（QuickJS 引擎 MIT）；`Yeow-Docs` 与文档站点为 MIT。

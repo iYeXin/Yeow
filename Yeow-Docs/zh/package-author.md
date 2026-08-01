@@ -116,7 +116,8 @@ npm install --save-dev yeow-api
 
 ```ts
 // src/index.ts
-import { registerNativeService, getAssetsPath } from 'yeow-api';
+import { registerNativeService } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';   // 构建期虚拟模块
 
 export const IMAGE_SERVICE = 'iyexin.image-svc.v1';
 
@@ -129,11 +130,13 @@ export async function registerImageService(): Promise<string> {
 }
 ```
 
+> **为什么从 `yeow-dev` 引入？** `getAssetsPath` 必须知道调用代码属于哪个依赖项（以注入对应的命名空间 id），而 `yeow-dev` 是构建期虚拟模块——构建器按 importer 归属解析，这正是"编译期"语义。`yeow-dev` 已发布为空包（可不安装，类型声明由 `yeow-api` 提供）。
+
 **构建时自动处理：**
 
-- 主项目 esbuild 扫描本包 `assets/` → 文件哈希 → 复制到 JAR `assets/`
-- `getAssetsPath('image-svc.exe')` 在构建后返回 `"assets/image-svc.a1b2c3d4.exe"`（真实路径）
-- **无需任何额外配置** — 构建插件自动扫描所有依赖包的 `assets/`
+- 构建器扫描主项目与所有依赖包的 `assets/`，为每个依赖项分配唯一命名空间 id（8 位十六进制），内容**原样**复制到 JAR `assets/<id>/`
+- `getAssetsPath('image-svc.exe')` 在构建后返回 `"assets/<id>/image-svc.exe"`（真实路径）
+- **无需任何额外配置** — 构建插件自动扫描所有依赖包（见下文「依赖项识别」）
 
 ### 目录资源
 
@@ -145,28 +148,18 @@ const svc = await registerNativeService('my-svc', {
 });
 ```
 
-**哈希规则**：顶层目录（`assets/` 直接子目录）整体哈希（`native.a1b2c3d4/`），目录内一切保持原名（含嵌套子目录）——内部相对引用（`./`、`../`）完整有效。
+**无哈希**：所有文件**保持原名**（含嵌套子目录）——`assets/` 内部（含跨目录）的任何相对引用（`./`、`../`）都**永远有效**，不再有「目录应自包含」「跨顶层目录断裂」的限制。
 
-### 目录边界（重要）
+### 目录边界
 
-**① 目录应自包含** — 相对引用只能指向同一顶层目录内部。跨顶层目录引用在哈希后会断裂：
-
-```ts
-// ❌ pkg1 引用 pkg2（pkg2 被哈希改名）→ 断裂
-// ✅ 需要互相引用的文件放在同一顶层目录
-```
-
-**② `dir` 指向最顶层自包含单元**，`entry` 用相对子路径：
+**`dir` 指向包含全部依赖的最顶层目录**，`entry` 用相对子路径：
 
 ```ts
-// ❌ 只提取 win/，若 start.bat 引用 ../shared/ 会断
-{ dir: getAssetsPath('native/win/'), entry: 'start.bat' }
-
 // ✅ 提取整个 native/，内部引用完整
 { dir: getAssetsPath('native/'), entry: 'win/start.bat' }
 ```
 
-**③ `{ file }` 只提取单文件** — 该文件对目录内其他文件的引用会失效（不被提取）。需要自包含请用 `{ dir, entry }`。
+**`{ file }` 只提取单文件** — 该文件对目录内其他文件的引用会失效（不被提取）。需要自包含请用 `{ dir, entry }`。
 
 ---
 
@@ -182,7 +175,16 @@ const svc = await registerNativeService('my-svc', {
 
 ### 2. 资产插件
 
-扫描主项目 + 所有依赖包的 `assets/`，统一哈希后进 JAR。依赖包条目**不覆盖**主项目同名条目。
+扫描主项目 + 所有依赖包的 `assets/`，按命名空间部署进 JAR。
+
+### 依赖项识别（node_modules 扫描）
+
+构建器扫描 `node_modules` 顶层目录（含 `@scope/name` 两级），以 `<name>-<version>` 为键识别依赖项：
+
+- **识别条件**：包存在 `assets/` 目录，且 `peerDependencies` 含 `yeow-api` 键
+- **主项目**：有 `assets/` 即参与（始终分配 id）
+- **同名冲突**：各依赖项有独立命名空间，同名文件互不覆盖
+- **兼容性**：npm / pnpm 的扁平布局支持良好；yarn 的 hoisting 差异可能导致依赖不在预期位置，如遇问题请使用 npm 或 pnpm
 
 ---
 
@@ -269,7 +271,8 @@ export function record(kind: string, value: number) {
 
 ```ts
 // yeow-image —— 原生服务
-import { registerNativeService, getAssetsPath, serviceRequest } from 'yeow-api';
+import { registerNativeService, serviceRequest } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';
 
 export const IMAGE_SERVICE = 'iyexin.image-svc.v1';
 
@@ -303,7 +306,8 @@ JS 服务作为门面（对外路径约定、事件发布），原生子进程�
 
 ```ts
 // yeow-image-svc —— 类型 2 + 3 组合
-import { registerService, registerNativeService, serviceRequest, servicePublish, getAssetsPath } from 'yeow-api';
+import { registerService, registerNativeService, serviceRequest, servicePublish } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';
 
 let _serviceId: string;
 let _svc: { serviceId: string; token: string } | null = null;
@@ -361,7 +365,8 @@ export function render(width: number, height: number, pixels: Uint8Array) {
 
 ```ts
 // src/index.ts
-import { registerNativeService, getAssetsPath, serviceRequest } from 'yeow-api';
+import { registerNativeService, serviceRequest } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';
 
 export const IMAGE_SERVICE = 'iyexin.image-svc.v1';
 

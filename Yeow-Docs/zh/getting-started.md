@@ -1,5 +1,9 @@
 ﻿# 快速开始
 
+> Yeow 暂未正式发布。Yeow 在正式发布前不保证 API 的稳定性。
+
+> 如果 Modrinth 上的 Yeow 项目仍未结束 Under Review 状态，可以[点此下载](https://raw.githubusercontent.com/iYeXin/Yeow/main/create-yeow/templates/default/.yeow/assets/yeow-runtime-0.1.0.jar) Yeow 运行时插件。
+
 ## 创建项目
 
 ```bash
@@ -142,7 +146,7 @@ const q = Player.getSync('Notch');
 | 订阅事件                 | `eventOn('playerJoin', handler)`                             | [Event](api/event.md)     |
 | 注册命令 + Tab 补全      | `registerCommand()` 或 `Command.create()`                    | [Command](api/command.md) |
 | 读写插件数据文件         | `fs.readFileSync()` / `fs.writeFileSync()`                   | [FS](api/fs.md)           |
-| 读取打包资源             | `getAssetsPath()` + `assetsReadSync()`                       | [Assets](api/assets.md)   |
+| 读取打包资源             | `getAssetsPath()`（`yeow-dev`）+ `assetsReadSync()`            | [Assets](api/assets.md)   |
 | 插件间通信 / 原生程序    | `registerService()` / `registerNativeService()`              | [Service](api/service.md) |
 | 日志                     | `log.info()` / `console.log()`                               | [Log](api/log.md)         |
 

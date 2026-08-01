@@ -1,4 +1,4 @@
-﻿package yeow.dev;
+package yeow.dev;
 import com.whl.quickjs.wrapper.QuickJSContext;
 public class Base64Diag {
     public static void main(String[] a) {
