@@ -4,7 +4,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import { execSync } from 'child_process';
-import { makeAssetPlugin, makeDedupePlugin, assetsOutDirFor } from './yeow-assets.mjs';
+import { makeAssetPlugin, makeDedupePlugin, assetsOutDirFor, readMergedPermissions } from './yeow-assets.mjs';
 
 const root = resolve(fileURLToPath(import.meta.url), '..', '..');
 const cfg = JSON.parse(readFileSync(resolve(root, 'yeow.config.json'), 'utf-8'));
@@ -36,6 +36,14 @@ const assetsOut = assetsOutDirFor(outDir);
 async function main() {
     // 清空资产输出，避免旧哈希目录残留
     rmSync(assetsOut, { recursive: true, force: true });
+
+    // ── 合并权限（主项目 + 依赖包 yeow.config.json）──
+    const mergedPerms = readMergedPermissions(root, pkgJson);
+    if (mergedPerms.length > 0) {
+        console.log('  \u2713 Merged permissions (' + mergedPerms.length + '): ' + mergedPerms.join(', '));
+    } else {
+        console.log('  \u2713 No permissions declared');
+    }
 
     // ── 打包 ──
     await esbuild.build({
@@ -88,7 +96,7 @@ async function main() {
         console.log('  \u2713 Assets included (' + files.length + ' files)');
     }
 
-    zip.addFile('yeow.json', Buffer.from(JSON.stringify(cfg)));
+    zip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, permissions: mergedPerms })));
     const outJar = resolve(root, 'dist', isDev ? 'plugins' : '', name + '-' + version + '.jar');
     mkdirSync(dirname(outJar), { recursive: true });
     zip.writeZip(outJar);
@@ -110,7 +118,7 @@ async function main() {
                 pkgZip.addFile('assets/' + f.replace(/\\/g, '/'), readFileSync(resolve(assetsOut, f)));
             }
         }
-        pkgZip.addFile('yeow.json', Buffer.from(JSON.stringify(cfg)));
+        pkgZip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, permissions: mergedPerms })));
         const outZip = resolve(root, 'dist', isDev ? 'plugins' : '', name + '-' + version + '.yeow.zip');
         mkdirSync(dirname(outZip), { recursive: true });
         pkgZip.writeZip(outZip);

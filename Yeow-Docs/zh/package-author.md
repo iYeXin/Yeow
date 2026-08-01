@@ -186,6 +186,18 @@ const svc = await registerNativeService('my-svc', {
 - **同名冲突**：各依赖项有独立命名空间，同名文件互不覆盖
 - **兼容性**：npm / pnpm 的扁平布局支持良好；yarn 的 hoisting 差异可能导致依赖不在预期位置，如遇问题请使用 npm 或 pnpm
 
+### 依赖包权限声明（yeow.config.json）
+
+依赖包可以自带 `yeow.config.json`，目前只需声明 `permissions`：
+
+```json
+{
+    "permissions": ["fs:readFile", "http:*", "service:registerNative"]
+}
+```
+
+构建时与主项目的 `permissions` **合并**（主项目在前、依赖包按序追加、自动去重），合并结果写入最终 `yeow.json` 并打印到构建终端——使用者插件加载后即获得合并后的完整权限，无需在包文档中手动列举。缺失 `yeow.config.json` 或 `permissions` 字段的依赖包不贡献任何权限。
+
 ---
 
 ## 封装 Service 的包（三种类型）

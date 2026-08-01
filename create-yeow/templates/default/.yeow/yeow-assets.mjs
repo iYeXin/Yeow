@@ -8,11 +8,21 @@ const require = createRequire(import.meta.url);
 const slash = p => p.replace(/\\/g, '/');
 const normKey = p => slash(resolve(p)).toLowerCase();
 
+/** 读取 yeow.config.json 的 permissions（缺失/解析失败 → 空数组）。 */
+function readPerms(configPath) {
+    try {
+        const j = JSON.parse(readFileSync(configPath, 'utf-8'));
+        if (Array.isArray(j.permissions)) return j.permissions.filter(x => typeof x === 'string');
+    } catch { /* 无 yeow.config.json 或解析失败 */ }
+    return [];
+}
+
 // ── 依赖项收集（node_modules 扫描）─────────────────────────────
 // 规则：
 //   - 主项目无条件参与（始终分配 id，保证 getAssetsPath 恒可用；有 assets/ 才复制）
 //   - 依赖包：node_modules 顶层目录（含 @scope/name 两级），要求
 //     assets/ 目录存在 且 peerDependencies 含 yeow-api 键
+//   - 每个候选同时读取其 yeow.config.json 的 permissions（依赖包可自行声明权限）
 // 键：<name>-<version>。npm/pnpm 扁平布局支持良好；yarn 的 hoisting
 // 差异可能导致依赖不在预期位置（见文档说明）。
 function collectCandidates(root, pkgJson) {
@@ -23,6 +33,7 @@ function collectCandidates(root, pkgJson) {
         pkgDir: root,
         absSrc: ownAssets,
         hasAssets: existsSync(ownAssets),
+        perms: readPerms(resolve(root, 'yeow.config.json')),
     });
 
     const nm = resolve(root, 'node_modules');
@@ -54,10 +65,26 @@ function collectCandidates(root, pkgJson) {
                 pkgDir,
                 absSrc: pkgAssets,
                 hasAssets: true,
+                perms: readPerms(resolve(pkgDir, 'yeow.config.json')),
             });
         }
     }
     return candidates;
+}
+
+/**
+ * 合并主项目与全部依赖包的权限声明（yeow.config.json 的 permissions）。
+ * 主项目在前，依赖包按收集顺序追加，去重保持首个出现顺序。
+ */
+export function readMergedPermissions(root, pkgJson) {
+    const merged = [];
+    const seen = new Set();
+    for (const c of collectCandidates(root, pkgJson)) {
+        for (const p of c.perms) {
+            if (!seen.has(p)) { seen.add(p); merged.push(p); }
+        }
+    }
+    return merged;
 }
 
 // ── id 分配（8 位 hex，不哈希内容，仅保证构建内唯一）──────────
