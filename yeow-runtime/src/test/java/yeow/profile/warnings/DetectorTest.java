@@ -6,6 +6,7 @@ import yeow.profile.collector.LogHistogram;
 import yeow.profile.collector.WindowMetrics;
 import yeow.profile.warnings.detectors.EventSlowDetector;
 import yeow.profile.warnings.detectors.HeartbeatTimeoutDetector;
+import yeow.profile.warnings.detectors.PluginHungDetector;
 import yeow.profile.warnings.detectors.SchedulerBacklogDetector;
 import yeow.profile.warnings.detectors.SchedulerSaturationDetector;
 import yeow.profile.warnings.detectors.TabSlowDetector;
@@ -55,6 +56,68 @@ class DetectorTest {
         var w = window(20, 0, 0, tier(0,0), tier(0,0), tier(0,0),
             List.of(), List.of(), List.of("slow"), Map.of("slow", 300_000_000L), 1_000_000_000L);
         assertFalse(d.check(w).isEmpty());
+    }
+
+    /** 构造一个 1s 窗口：startMs 起、20 tick、插件已被 ping 但无 pong。 */
+    private static WindowMetrics hungWindow(long startMs, String plugin) {
+        return new WindowMetrics(startMs, 20, 1_000_000_000L, 1_000_000_000L, 0, 0,
+            List.of(plugin), tier(0,0), tier(0,0), tier(0,0),
+            Map.of(), Map.of(), Map.of(), List.of(), List.of());
+    }
+
+    @Test
+    void pluginHungFromFirstUnresponsiveWindow() {
+        var d = new PluginHungDetector(CFG);
+        long t0 = 10_000L;
+        // 从加载起就死循环：从未响应过任何 ping → 以第一个无响应窗口为基准
+        for (int i = 0; i < 30; i++) { // silent = i 秒（0..29）
+            var w = hungWindow(t0 + i * 1000L, "hungry");
+            assertTrue(d.check(w).isEmpty(), "silent " + i + "s must not warn");
+        }
+        var w30 = hungWindow(t0 + 30 * 1000L, "hungry"); // silent = 30s
+        var warns = d.check(w30);
+        assertTrue(warns.stream().anyMatch(x -> x.code().equals("plugin.hung")));
+    }
+
+    @Test
+    void pluginHungFromLastResponse() {
+        var d = new PluginHungDetector(CFG);
+        long t0 = 10_000L;
+        // 曾正常响应（窗口 end = t0+1000 → 基准）
+        var ok = new WindowMetrics(t0, 20, 1_000_000_000L, 1_000_000_000L, 0, 0,
+            List.of("p"), tier(0,0), tier(0,0), tier(0,0),
+            Map.of(), Map.of(), Map.of("p", 50_000L), List.of(), List.of());
+        assertTrue(d.check(ok).isEmpty());
+        // 之后死循环：窗口 start = t0+(i+2)s，end = t0+(i+3)s → silent = (i+2)s
+        for (int i = 0; i < 28; i++) { // silent = 2..29s
+            var w = hungWindow(t0 + (i + 2) * 1000L, "p");
+            assertTrue(d.check(w).isEmpty(), "silent " + (i + 2) + "s must not warn");
+        }
+        var w30 = hungWindow(t0 + 30 * 1000L, "p"); // end = t0+31s → silent = 30s
+        var warns = d.check(w30);
+        assertTrue(warns.stream().anyMatch(x -> x.code().equals("plugin.hung")));
+    }
+
+    @Test
+    void pluginHungRecoversAfterPong() {
+        var d = new PluginHungDetector(CFG);
+        long t0 = 10_000L;
+        // 死循环 30s 触发（silent = i 秒，基准 = 窗口 0 的 end = t0+1000）
+        for (int i = 0; i < 30; i++) d.check(hungWindow(t0 + i * 1000L, "p"));
+        var w30 = hungWindow(t0 + 30 * 1000L, "p"); // silent = 30s → 触发
+        assertTrue(d.check(w30).stream().anyMatch(x -> x.code().equals("plugin.hung")));
+        // 恢复响应 → 更新基准，不再告警
+        var ok = new WindowMetrics(t0 + 31 * 1000L, 20, 1_000_000_000L, 1_000_000_000L, 0, 0,
+            List.of("p"), tier(0,0), tier(0,0), tier(0,0),
+            Map.of(), Map.of(), Map.of("p", 50_000L), List.of(), List.of());
+        assertTrue(d.check(ok).isEmpty());
+        // 再次死循环需重新积累（新基准 = t0+32s）
+        for (int i = 0; i < 29; i++) { // silent = i+1 .. 29s
+            var w = hungWindow(t0 + 32 * 1000L + i * 1000L, "p");
+            assertTrue(d.check(w).isEmpty(), "silent " + (i + 1) + "s must not warn");
+        }
+        var w30b = hungWindow(t0 + 61 * 1000L, "p"); // end = t0+62s → silent = 30s
+        assertTrue(d.check(w30b).stream().anyMatch(x -> x.code().equals("plugin.hung")));
     }
 
     @Test
