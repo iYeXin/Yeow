@@ -15,6 +15,8 @@
 - `JSON.parse` / `JSON.stringify`
 - `Error`、`SyntaxError`、`TypeError`
 
+> **官方实现引擎版本**：Paper/Bukkit 的 `yeow-runtime` 使用 **QuickJS 2026-06-04**（[iyexin/quickjs](https://github.com/iyexin/quickjs) fork，上游 [bellard/quickjs](https://bellard.org/quickjs/)），额外提供：resizable `ArrayBuffer`、`ArrayBuffer.prototype.transfer`、`Iterator` 对象与 set 方法、`Math.sumPrecise()`、正则重复具名组，以及 ES2026 的 `Uint8Array.prototype.toBase64()` / `Uint8Array.fromBase64()`（参见 [https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array））。兼容层全局函数 `uint8ArrayToBase64` / `base64ToUint8Array` 仍然可用。
+
 ---
 
 ## 回调系统
@@ -381,7 +383,17 @@ string[]
 
 将 Base64 字符串解码为 ArrayBuffer。
 
-以上两个函数由运行时原生实现，全局可用。
+以上两个函数由运行时原生实现，全局可用，**保留用于兼容**。
+
+> [!NOTE]
+> QuickJS 引擎（2026-06-04 起）已原生支持 **ES2026 的 `Uint8Array.prototype.toBase64()` 与 `Uint8Array.fromBase64()`**，新代码应优先使用它们：
+
+> ```js
+> const b64 = new Uint8Array([1, 2, 3]).toBase64(); // "AQID"
+> const bytes = Uint8Array.fromBase64(b64);         // Uint8Array(3) [1, 2, 3]
+> ```
+>
+> 两个全局函数（`uint8ArrayToBase64` / `base64ToUint8Array`）仍可用，不会被移除。
 
 ---
 
@@ -414,12 +426,12 @@ string[]
 
 运行时**必须**根据插件 `yeow.json` 的 `permissions` 声明对以下通道执行权限检查（粒度 = 消息节点）：
 
-| 默认拒绝的类别 | 覆盖的操作 | 声明示例 |
-| -------------- | ---------- | -------- |
-| `fs:*` | fs 全部操作 | `["fs:*"]` 或 `["fs:readFile", "fs:writeFile"]` |
-| `http:*` | http 全部操作（含 `fetch` 使用的 `requestAsync`） | `["http:*"]` 或 `["http:requestAsync"]` |
-| `service:registerNative` | 注册原生服务（spawn 子进程） | `["service:registerNative"]` |
-| `assets:extract` | 解压资源到磁盘 | `["assets:extract"]` |
+| 默认拒绝的类别           | 覆盖的操作                                        | 声明示例                                        |
+| ------------------------ | ------------------------------------------------- | ----------------------------------------------- |
+| `fs:*`                   | fs 全部操作                                       | `["fs:*"]` 或 `["fs:readFile", "fs:writeFile"]` |
+| `http:*`                 | http 全部操作（含 `fetch` 使用的 `requestAsync`） | `["http:*"]` 或 `["http:requestAsync"]`         |
+| `service:registerNative` | 注册原生服务（spawn 子进程）                      | `["service:registerNative"]`                    |
+| `assets:extract`         | 解压资源到磁盘                                    | `["assets:extract"]`                            |
 
 规则：
 

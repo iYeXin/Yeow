@@ -1,12 +1,12 @@
 # QuickJS Wrapper for JVM
 
-QuickJS wrapper for JVM, upgraded to [QuickJS 2025-09-13](https://bellard.org/quickjs/).
+QuickJS wrapper for JVM, upgraded to [QuickJS 2026-06-04](https://github.com/iyexin/quickjs) (fork of [bellard/quickjs](https://bellard.org/quickjs/)).
 
 > Forked from [HarlonWang/quickjs-wrapper](https://github.com/HarlonWang/quickjs-wrapper).
 
 ## Highlights
 
-- **QuickJS 2025-09-13** — latest upstream with `FinalizationRegistry`, `WeakRef`, new BigInt, ES2023
+- **QuickJS 2026-06-04** — latest upstream (iyexin/quickjs fork) with `FinalizationRegistry`, `WeakRef`, new BigInt, ES2023+, resizable ArrayBuffer, `Iterator`, set methods, `Uint8Array` base64/hex encodings
 - **Native cross-platform** — Linux / macOS x86_64 / macOS ARM64 / Windows prebuilt binaries
 - **Auto-native loading** — detects platform and extracts native library from JAR automatically
 - **No external dependencies** — QuickJS C source compiled to ~750 KB native library
@@ -165,7 +165,7 @@ Output: `wrapper-java/build/cmake/libquickjs-java-wrapper.{so,dylib,dll}`
 
 | Change                   | Reason                                                       |
 | ------------------------ | ------------------------------------------------------------ |
-| QuickJS → 2025-09-13     | ES2023, `FinalizationRegistry`, `WeakRef`, new BigInt        |
+| QuickJS → 2026-06-04     | ES2023+, `FinalizationRegistry`, `WeakRef`, new BigInt, resizable ArrayBuffer, `Uint8Array.toBase64`/`fromBase64` |
 | Removed `CONFIG_BIGNUM`  | Bignum extension removed in QuickJS 2025-04-26               |
 | Added `dtoa.c/h`         | Replaces removed `libbf`                                     |
 | Auto-native loading      | `QuickJSNativeLoader` detects platform, extracts from JAR    |

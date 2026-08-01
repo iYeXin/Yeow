@@ -206,8 +206,8 @@ JS 侧通过 `getAssetsPath()` 获取哈希后的 JAR 内路径（如 `"assets/i
 | 全局                 | 签名                                                      | 说明                                                                           |
 | -------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `$_send`             | `(channel: string, jsonString: string) => string \| null` | **唯一 JS→运行时桥**。同步通道返回结果 JSON；含 `cb` 的异步通道立即返回 `null` |
-| `uint8ArrayToBase64` | `(buffer: ArrayBuffer) => string`                         | 二进制 → Base64                                                                |
-| `base64ToUint8Array` | `(base64: string) => ArrayBuffer`                         | Base64 → 二进制                                                                |
+| `uint8ArrayToBase64` | `(buffer: ArrayBuffer) => string`                         | 二进制 → Base64（**兼容保留**；优先用 ES2026 `Uint8Array.prototype.toBase64()`） |
+| `base64ToUint8Array` | `(base64: string) => ArrayBuffer`                         | Base64 → 二进制（**兼容保留**；优先用 ES2026 `Uint8Array.fromBase64()`）          |
 | `__plugin`           | `{ name, version, author }`                               | 来自 yeow.json，只读                                                           |
 | `$dev`               | `boolean`                                                 | 开发模式标记                                                                   |
 

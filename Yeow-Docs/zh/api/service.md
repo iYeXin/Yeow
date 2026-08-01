@@ -246,7 +246,7 @@ svc.onTerminate((info) => {
 
 可执行文件接收 `<yeowPort> <serviceId>` 两个启动参数，通过 TCP 以 JSON line 协议与 Runtime 通信。详见 [Native Service 规范](../specifications/native-service/index.md)。
 
-> **二进制数据传输：** 请求/响应的 `body` 为 JSON，不支持直接传递二进制。需要传输二进制数据时，用 Base64 编码。运行时的 `uint8ArrayToBase64()` 和 `base64ToUint8Array()` 全局函数可用于编解码。
+> **二进制数据传输：** 请求/响应的 `body` 为 JSON，不支持直接传递二进制。需要传输二进制数据时，用 Base64 编码。可用 `Uint8Array.prototype.toBase64()` / `Uint8Array.fromBase64()`（ES2026，引擎原生支持），或兼容保留的全局函数 `uint8ArrayToBase64()` / `base64ToUint8Array()`。
 
 ## 请求服务
 

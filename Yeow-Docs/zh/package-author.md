@@ -287,7 +287,7 @@ export async function initRenderer(): Promise<ImageRenderer> {
     return {
         serviceId,
         render(width, height, pixels) {
-            return serviceRequest(serviceId, '/imageRender', { width, height, base64: uint8ArrayToBase64(pixels.buffer) });
+            return serviceRequest(serviceId, '/imageRender', { width, height, base64: pixels.toBase64() });
         },
     };
 }
@@ -337,7 +337,7 @@ export async function initImageService() {
 }
 
 export function render(width: number, height: number, pixels: Uint8Array) {
-    return serviceRequest(_serviceId, '/render', { width, height, base64: uint8ArrayToBase64(pixels.buffer) });
+    return serviceRequest(_serviceId, '/render', { width, height, base64: pixels.toBase64() });
 }
 ```
 
@@ -392,7 +392,7 @@ export async function initRenderer(): Promise<ImageRenderer> {
     return {
         serviceId,
         async render(width, height, pixels) {
-            const base64 = uint8ArrayToBase64(pixels.buffer as ArrayBuffer); // Yeow 运行时内置实现
+            const base64 = pixels.toBase64(); // ES2026 原生；兼容旧版可用全局 uint8ArrayToBase64(pixels.buffer)
             return serviceRequest(serviceId, '/imageRender', {
                 width,
                 height,

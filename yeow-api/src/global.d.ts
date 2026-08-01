@@ -29,7 +29,9 @@ declare global {
       >
     | undefined;
 
+  /** @deprecated 兼容保留——优先使用 ES2026 原生 `Uint8Array.prototype.toBase64()` */
   function uint8ArrayToBase64(buffer: ArrayBuffer): string;
+  /** @deprecated 兼容保留——优先使用 ES2026 原生 `Uint8Array.fromBase64()` */
   function base64ToUint8Array(base64: string): ArrayBuffer;
 }
 export {};

@@ -1,6 +1,6 @@
 # QuickJS Wrapper — Java
 
-JVM bindings for QuickJS 2025-09-13.
+JVM bindings for QuickJS 2026-06-04.
 
 ## Building
 
