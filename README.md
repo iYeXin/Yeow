@@ -27,7 +27,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 | [`yeow-utils`](yeow-utils/)             | TypeScript | 高层工具库（`createServer` HTTP 服务器、命令构造器），构建时随插件 bundle                                         |
 | [`create-yeow`](create-yeow/)           | Node.js    | `npm create yeow` 脚手架：交互式项目模板、dev-server（Paper + 热重载 + source-map 错误定位）、构建脚本            |
 | [`yeow-template`](yeow-template/)       | Java 21    | 空 JAR 骨架（`Bootstrap` 类），构建时注入 JS 代码生成标准 Paper 插件 JAR                                          |
-| [`quickjs-wrapper`](quickjs-wrapper/)   | Java + C++ | QuickJS 2025-09-13 的 JVM 封装（fork），含四平台预编译原生库；独立发布（GitHub Release 触发多平台 CI）            |
+| [`quickjs-wrapper`](quickjs-wrapper/) | Java + C++ | QuickJS 2025-09-13 的 JVM 封装（fork），含四平台预编译原生库。**本仓库中的副本仅为镜像**——主维护仓库：[github.com/iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper)（版本标签、多平台 CI 构建、Release 发布均在那里进行） |
 | [`Yeow-Docs`](Yeow-Docs/)               | Markdown   | 全部中文文档：入门、API 参考（24 模块）、进阶、平台规范（协议层）、运行时警告                                     |
 | [`yeow-doc-website`](yeow-doc-website/) | VitePress  | 文档站点工程：`docs/` 为 `Yeow-Docs/zh` 的目录联接，自定义首页与主题；`npm run build` 产出 `/v1/` 站点            |
 | [`yeow-dev`](yeow-dev/)                 | Java 21    | 开发辅助工具：调度器/队列基准（Bench）、Base64 编解码诊断                                                         |

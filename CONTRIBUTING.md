@@ -35,7 +35,7 @@
 
 ### 1. quickjs-java-wrapper（关键依赖）
 
-`yeow-runtime` 依赖 `com.whl.quickjs:quickjs-java-wrapper`（本地 Maven 仓库）。两种获取方式：
+`yeow-runtime` 依赖 `com.whl.quickjs:quickjs-java-wrapper`（本地 Maven 仓库）。该组件由主仓库 [iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper) 维护，本仓库仅镜像。两种获取方式：
 
 **方式 A：使用 CI 发布产物（推荐）**
 
@@ -95,12 +95,16 @@ cp target/yeow-template-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
 
 ## quickjs-wrapper 版本发布流程
 
-1. 修改 C++ / Java 代码
+> **镜像说明**：本仓库中的 `quickjs-wrapper` 目录仅为**镜像副本**，主维护仓库在 [github.com/iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper)。版本标签、多平台 CI 构建与 Release 发布均在该仓库进行，镜像副本不运行任何 CI。
+
+1. 在主仓库（`iYeXin/quickjs-wrapper`）修改 C++ / Java 代码
 2. `CHANGELOG.md` 顶部新增版本条目（`## X.Y.Z *(YYYY-MM-DD)*`）
 3. `git add` + `git commit`（提交信息使用 conventional 风格，如 `fix: ...` / `feat: ...`）
 4. `git tag vX.Y.Z && git push origin main vX.Y.Z` —— 标签触发多平台 CI 构建
-5. 从 Releases 下载 `quickjs-java-wrapper.jar` → `yeow-runtime/lib/` → 执行上面方式 A 的安装
+5. 从 Releases 下载 `quickjs-java-wrapper.jar` → 同步到本仓库 `yeow-runtime/lib/` → 执行上面方式 A 的安装
 6. 重新构建并安装 yeow-runtime（第 2 步）
+
+> 镜像同步：主仓库的代码与 Release 更新后，将 `quickjs-wrapper/` 内容同步到本仓库（不含 `.git`），保持镜像与主仓库一致。
 
 ---
 
