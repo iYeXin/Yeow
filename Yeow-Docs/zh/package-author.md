@@ -92,11 +92,11 @@ npm install --save-dev yeow-api
 
 本包需要在使用者插件的 `yeow.config.json` 中声明（构建后写入 yeow.json）：
 
-\`\`\`json
+```json
 {
     "permissions": ["service:registerNative", "fs:readFile", "http:requestAsync"]
 }
-\`\`\`
+```
 
 | 节点                     | 用途                    |
 | ------------------------ | ----------------------- |
@@ -105,7 +105,6 @@ npm install --save-dev yeow-api
 | `http:requestAsync`      | 下载远程模型（`fetch`） |
 
 缺少声明时对应功能报 `Permission denied` 错误。
-```
 
 > 未注明权限的包：使用者无法预知所需权限，功能会静默/报错失败——这属于包文档缺陷。发布前请对照上文表格逐一核对包内使用的 API，确保权限清单完整。
 
