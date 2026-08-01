@@ -75,6 +75,7 @@ function collectCandidates(root, pkgJson) {
 /**
  * 合并主项目与全部依赖包的权限声明（yeow.config.json 的 permissions）。
  * 主项目在前，依赖包按收集顺序追加，去重保持首个出现顺序。
+ * 通配归一化：存在 `X:*` 时移除其余 `X:xxx` 子节点（通配已覆盖，无需冗余声明）。
  */
 export function readMergedPermissions(root, pkgJson) {
     const merged = [];
@@ -84,7 +85,17 @@ export function readMergedPermissions(root, pkgJson) {
             if (!seen.has(p)) { seen.add(p); merged.push(p); }
         }
     }
-    return merged;
+    const wildcardChannels = new Set();
+    for (const p of merged) {
+        if (p.endsWith(':*')) wildcardChannels.add(p.slice(0, -2));
+    }
+    if (wildcardChannels.size === 0) return merged;
+    return merged.filter(p => {
+        if (p.endsWith(':*')) return true;
+        const idx = p.lastIndexOf(':');
+        if (idx <= 0) return true;
+        return !wildcardChannels.has(p.slice(0, idx));
+    });
 }
 
 // ── id 分配（8 位 hex，不哈希内容，仅保证构建内唯一）──────────

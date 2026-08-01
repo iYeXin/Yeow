@@ -39,6 +39,16 @@ async function main() {
 
     // ── 合并权限（主项目 + 依赖包 yeow.config.json）──
     const mergedPerms = readMergedPermissions(root, pkgJson);
+    // 写回主项目 yeow.config.json，让开发者看清最终生效的权限
+    try {
+        const cfgPath = resolve(root, 'yeow.config.json');
+        const cfgFile = JSON.parse(readFileSync(cfgPath, 'utf-8'));
+        if (JSON.stringify(cfgFile.permissions) !== JSON.stringify(mergedPerms)) {
+            cfgFile.permissions = mergedPerms;
+            writeFileSync(cfgPath, JSON.stringify(cfgFile, null, 4) + '\n');
+            console.log('  \u2713 Permissions written back to yeow.config.json');
+        }
+    } catch (e) { /* 写回失败不阻塞构建 */ }
     if (mergedPerms.length > 0) {
         console.log('  \u2713 Merged permissions (' + mergedPerms.length + '): ' + mergedPerms.join(', '));
     } else {
