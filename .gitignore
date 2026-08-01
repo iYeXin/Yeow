@@ -52,3 +52,7 @@ yeow-doc-website/docs/
 # ── 运行数据 ────────────────────────────────────────────
 plugins/
 *.zip.bak
+
+# ── 本地工具产物 ────────────────────────────────────────
+Yeow-Docs/zh/export-code.js
+Yeow-Docs/zh/exported_files.txt
