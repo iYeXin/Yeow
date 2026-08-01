@@ -27,9 +27,9 @@ npm create yeow@latest [-- options]
   ▸ JavaScript ◂    TypeScript         ← Tab 切换，Enter 确认
 ```
 
-![create-yeow 语言选择](assets/create-yeow.png)
-
 默认 **JavaScript**。TypeScript 项目在构建时自动运行 `tsc --noEmit` 类型检查，可在 `yeow.config.json` 中设置 `"typecheck": false` 关闭。
+
+![创建 Yeow 项目](assets/create-yeow.png)
 
 ### 示例
 

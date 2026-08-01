@@ -1,13 +1,13 @@
 package yeow.profile.warnings;
 
-import yeow.profile.ProfileConfig;
-import yeow.profile.collector.WindowMetrics;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
+
+import yeow.profile.ProfileConfig;
+import yeow.profile.collector.WindowMetrics;
 
 /**
  * 预警引擎：运行注册的检测器，按 (code, plugin) 节流，统一输出双语告警框。
@@ -16,7 +16,7 @@ import java.util.logging.Logger;
 public final class WarningEngine {
 
     private static final Logger LOG = Logger.getLogger("Yeow");
-    private static final String HELP_URL = "http://yeow.yeside.top/v1/docs/runtime-warning";
+    private static final String HELP_URL = "http://yeow.yeside.top/v1/runtime-warning";
 
     private static final String RED    = "\u001b[31m";
     private static final String YELLOW = "\u001b[33m";
