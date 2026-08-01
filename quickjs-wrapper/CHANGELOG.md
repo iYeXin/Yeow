@@ -1,5 +1,23 @@
 # Change Log
 
+## 3.8.0 *(2026-08-01)*
+
+### Breaking Changes
+- **Engine upgrade: QuickJS 2026-06-04** — submodule now points to [iyexin/quickjs](https://github.com/iyexin/quickjs) (upstream [bellard/quickjs](https://github.com/bellard/quickjs) fork) at the 2026-06-04 snapshot. Highlights:
+  - custom malloc for small blocks (11% faster on bench-v8)
+  - micro optimizations (30% faster on bench-v8)
+  - resizable array buffers / `ArrayBuffer.prototype.transfer`
+  - `Iterator` object and methods
+  - set methods, `Atomics.pause`, `Map`/`WeakMap` upsert
+  - `Math.sumPrecise()`, regexp duplicate named groups
+  - base64/hex encodings for `Uint8Array`
+  - misc bug fixes
+
+### Bug Fixes
+- None — wrapper code is API-compatible with the new engine (verified: all C sources and wrapper C++ compile & link cleanly).
+
+---
+
 ## 3.7.0 *(2026-08-01)*
 
 ### Features
