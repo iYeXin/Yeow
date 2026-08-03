@@ -73,9 +73,24 @@ function collectCandidates(root, pkgJson) {
 }
 
 /**
- * 合并主项目与全部依赖包的权限声明（yeow.config.json 的 permissions）。
- * 主项目在前，依赖包按收集顺序追加，去重保持首个出现顺序。
- * 通配归一化：存在 `X:*` 时移除其余 `X:xxx` 子节点（通配已覆盖，无需冗余声明）。
+ * 收集每个权限节点的来源：permission → 声明它的依赖项键集合（主项目 key 在前）。
+ * 仅直接依赖（node_modules 顶层）参与——依赖包的依赖所需权限无需计算。
+ */
+export function collectPermissionsWithSources(root, pkgJson) {
+    const map = new Map(); // perm → Set<key>
+    for (const c of collectCandidates(root, pkgJson)) {
+        for (const p of c.perms) {
+            if (!map.has(p)) map.set(p, new Set());
+            map.get(p).add(c.key);
+        }
+    }
+    return map;
+}
+
+/**
+ * 计算最终生效权限（computedPermissions）：合并主项目与全部依赖包的
+ * 声明（主项目在前、依赖包按收集顺序追加、去重），再做通配归一化——
+ * 存在 `X:*` 时移除其余 `X:xxx` 子节点（通配已覆盖，无需冗余声明）。
  */
 export function readMergedPermissions(root, pkgJson) {
     const merged = [];

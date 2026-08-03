@@ -37,20 +37,20 @@ async function main() {
     // 清空资产输出，避免旧哈希目录残留
     rmSync(assetsOut, { recursive: true, force: true });
 
-    // ── 合并权限（主项目 + 依赖包 yeow.config.json）──
+    // ── 计算最终权限（computedPermissions：合并 + 通配归一化）──
     const mergedPerms = readMergedPermissions(root, pkgJson);
-    // 写回主项目 yeow.config.json，让开发者看清最终生效的权限
+    // 回写 computedPermissions 到主项目 yeow.config.json（开发者声明的 permissions 保持原样）
     try {
         const cfgPath = resolve(root, 'yeow.config.json');
         const cfgFile = JSON.parse(readFileSync(cfgPath, 'utf-8'));
-        if (JSON.stringify(cfgFile.permissions) !== JSON.stringify(mergedPerms)) {
-            cfgFile.permissions = mergedPerms;
+        if (JSON.stringify(cfgFile.computedPermissions) !== JSON.stringify(mergedPerms)) {
+            cfgFile.computedPermissions = mergedPerms;
             writeFileSync(cfgPath, JSON.stringify(cfgFile, null, 4) + '\n');
-            console.log('  \u2713 Permissions written back to yeow.config.json');
+            console.log('  \u2713 computedPermissions written back to yeow.config.json');
         }
     } catch (e) { /* 写回失败不阻塞构建 */ }
     if (mergedPerms.length > 0) {
-        console.log('  \u2713 Merged permissions (' + mergedPerms.length + '): ' + mergedPerms.join(', '));
+        console.log('  \u2713 Computed permissions (' + mergedPerms.length + '): ' + mergedPerms.join(', '));
     } else {
         console.log('  \u2713 No permissions declared');
     }
@@ -106,7 +106,7 @@ async function main() {
         console.log('  \u2713 Assets included (' + files.length + ' files)');
     }
 
-    zip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, permissions: mergedPerms })));
+    zip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, computedPermissions: mergedPerms })));
     const outJar = resolve(root, 'dist', isDev ? 'plugins' : '', name + '-' + version + '.jar');
     mkdirSync(dirname(outJar), { recursive: true });
     zip.writeZip(outJar);
@@ -128,7 +128,7 @@ async function main() {
                 pkgZip.addFile('assets/' + f.replace(/\\/g, '/'), readFileSync(resolve(assetsOut, f)));
             }
         }
-        pkgZip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, permissions: mergedPerms })));
+        pkgZip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, computedPermissions: mergedPerms })));
         const outZip = resolve(root, 'dist', isDev ? 'plugins' : '', name + '-' + version + '.yeow.zip');
         mkdirSync(dirname(outZip), { recursive: true });
         pkgZip.writeZip(outZip);

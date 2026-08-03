@@ -176,6 +176,14 @@ profile:
 
 > 语义提示：HIGH/NORMAL 是实时队列（不应积压）；LOW 是批量队列（允许积压与延迟）。报告与告警均按此口径分析。
 
+## 权限计算
+
+```bash
+npm run permissions
+```
+
+只读计算（会回写 `yeow.config.json` 的 `computedPermissions` 字段）：合并主项目与全部依赖包声明的 `permissions`（去重 + 通配归一化），打印**最终权限**与**来源分布**（每个权限来自哪个包），用于排查权限缺失与冗余。详见 [权限声明](getting-started.md#权限声明)。
+
 ## 构建
 
 ```bash

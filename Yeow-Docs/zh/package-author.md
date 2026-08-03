@@ -196,11 +196,36 @@ const svc = await registerNativeService('my-svc', {
 }
 ```
 
-构建时与主项目的 `permissions` **合并**（主项目在前、依赖包按序追加、自动去重），合并结果写入最终 `yeow.json` 并打印到构建终端——使用者插件加载后即获得合并后的完整权限，无需在包文档中手动列举。缺失 `yeow.config.json` 或 `permissions` 字段的依赖包不贡献任何权限。
+**只计算直接依赖**：构建时扫描 `node_modules` 顶层（含 `@scope/name`），**依赖包的依赖所需权限无需计算**——包只需声明自己的权限。缺失 `yeow.config.json` 或 `permissions` 字段的依赖包不贡献任何权限。
 
-**通配归一化**：合并时若存在 `X:*`（如 `fs:*`），该通道的其余子节点（`fs:readFile` 等）会被自动移除——通配已覆盖，无需冗余声明。
+### 最终权限（computedPermissions）
 
-**写回**：构建时合并后的最终权限会写回主项目的 `yeow.config.json`（保留其他字段），让开发者直接看清插件实际生效的权限；内容未变化时不会重复写回。
+开发者声明的 `permissions` 保持原样，构建时自动计算最终生效权限：
+
+- **合并**：主项目在前、依赖包按序追加、自动去重
+- **通配归一化**：存在 `X:*`（如 `fs:*`）时，该通道其余子节点（`fs:readFile` 等）自动移除——通配已覆盖，无需冗余声明
+- **写回**：结果写入 `yeow.config.json` 的 `computedPermissions` 字段（保留开发者声明的 `permissions`），打包时写入 `yeow.json` 供运行时读取；构建终端同步打印
+
+查看计算过程与权限来源分布：
+
+```bash
+npm run permissions
+```
+
+```
+── Permissions by source ─────────────────────────
+  fs:*                        ← my-plugin-1.0.0
+  fs:readFile                 ← yeow-test-pkg-1.0.0
+  http:*                      ← yeow-test-pkg-1.0.0
+  service:registerNative      ← yeow-test-pkg-1.0.0
+
+── Computed permissions (3) ─────────────────
+  fs:*
+  http:*
+  service:registerNative
+```
+
+每个权限都能看到它声明自哪个包，便于排查权限缺失与冗余。
 
 ---
 

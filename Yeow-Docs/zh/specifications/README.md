@@ -66,7 +66,8 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 | `version`      | 版本（注入 `__plugin.version`）                               |
 | `author`       | 作者（注入 `__plugin.author`）                                |
 | `api` / `java` | 宿主平台要求的 API/Java 版本（其他平台可忽略）                |
-| `permissions`  | 敏感消息节点权限声明，见下文[权限模型](#权限模型)             |
+| `permissions`  | 开发者声明的权限（敏感节点，见下文[权限模型](#权限模型)）     |
+| `computedPermissions` | 构建时计算的最终生效权限（合并 + 通配归一化）；运行时优先读取此字段，缺失时回退 `permissions` |
 
 ### `.yeow/main.js` — 插件代码
 
@@ -125,7 +126,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 ## 权限模型
 
-敏感消息节点**默认拒绝**，插件必须在 `yeow.json` 的 `permissions` 中声明：
+敏感消息节点**默认拒绝**，插件必须在 `yeow.json` 的 `computedPermissions`（旧包为 `permissions`）中声明：
 
 | 节点（可省略） | 覆盖消息操作 |
 | -------------- | ------------ |
@@ -141,6 +142,8 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 - **拒绝行为**：未声明调用返回错误 `Permission denied: <node>`。同步调用直接返回错误 JSON；异步调用（含 `cb`）通过回调投递 `{"err":"Permission denied: <node>"}`，JS 侧表现为 Promise reject
 - **其他通道**（`task`/`timer`/`log`/`now`/`dir`/`debug`/`lifecycle`）不受权限模型约束
 - 权限在插件加载时读取并**固定**（运行时不可变更），加载消息中打印声明内容
+
+**`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:xxx`）写入 `yeow.json` 的 `computedPermissions`。运行时优先读 `computedPermissions`，缺失时回退 `permissions`。运行时只校验通配/节点匹配，无需理解两者差异。
 
 **生命周期消息语义**：
 

@@ -154,7 +154,7 @@ const q = Player.getSync('Notch');
 
 ## 权限声明
 
-Yeow 对**敏感消息节点**实施声明式权限。插件必须在 `yeow.config.json` 中声明所需权限（构建时自动写入 `yeow.json`）：
+Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.json` 的 `permissions` 中声明所需权限（构建时自动计算最终权限并写入 `yeow.json`）：
 
 ```json
 {
@@ -187,6 +187,8 @@ Yeow 对**敏感消息节点**实施声明式权限。插件必须在 `yeow.conf
 > 全局 `fetch` 底层依赖 `http:requestAsync` —— 未声明 http 权限时 `fetch` 会返回 `Permission denied: http:requestAsync`。使用 `fetch` / `request` 前请确保声明了 `"http:*"` 或 `"http:requestAsync"`。
 
 > 修改 `permissions` 后需重新构建并完整重载插件（`/yeow reload` 或重启服务器）；开发模式热重载只重载代码，不更新权限。
+
+> **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:readFile` 等），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
 
 ## 插件管理命令
 

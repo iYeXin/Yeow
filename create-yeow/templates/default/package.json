@@ -4,7 +4,8 @@
     "type": "module",
     "scripts": {
         "build": "node .yeow/build.js",
-        "dev": "node .yeow/dev-server.js"
+        "dev": "node .yeow/dev-server.js",
+        "permissions": "node .yeow/permissions.js"
     },
     "dependencies": {
         "yeow-api": "^0.2.100",
