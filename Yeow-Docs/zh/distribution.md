@@ -79,6 +79,6 @@ npm run build
 
 - [ ] `npm run build` 生成 `.jar` 与 `.yeow.zip`，两者均上传
 - [ ] 项目描述注明前置：Yeow 插件（https://modrinth.com/plugin/yeow）
-- [ ] 说明插件声明的[权限节点](getting-started.md#权限声明)（`fs:*` / `http:*` / `service:registerNative` / `assets:extract` 等）
+- [ ] 说明插件声明的[权限节点](getting-started.md#权限声明)（`fs:server.*` / `fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 等）
 - [ ] 提供 `/yeow install <直链>` 一键安装示例
 - [ ] 说明数据目录位置（`plugins/<name>/`）与备份机制（`plugins/Yeow/.backup/`）

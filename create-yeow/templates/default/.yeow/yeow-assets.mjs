@@ -89,8 +89,9 @@ export function collectPermissionsWithSources(root, pkgJson) {
 
 /**
  * 计算最终生效权限（computedPermissions）：合并主项目与全部依赖包的
- * 声明（主项目在前、依赖包按收集顺序追加、去重），再做通配归一化——
- * 存在 `X:*` 时移除其余 `X:xxx` 子节点（通配已覆盖，无需冗余声明）。
+ * 声明（主项目在前、依赖包按收集顺序追加、去重），再做通配归一化：
+ *   - `X:*`（如 fs:*）覆盖全部 `X:...` 节点（含二级通配与子节点）
+ *   - `X:level.*`（如 fs:server.*）覆盖 `X:level.<op>` 子节点
  */
 export function readMergedPermissions(root, pkgJson) {
     const merged = [];
@@ -100,16 +101,23 @@ export function readMergedPermissions(root, pkgJson) {
             if (!seen.has(p)) { seen.add(p); merged.push(p); }
         }
     }
-    const wildcardChannels = new Set();
+    const channelWildcards = new Set();   // X:*
+    const levelWildcards = new Set();     // X:level.*
     for (const p of merged) {
-        if (p.endsWith(':*')) wildcardChannels.add(p.slice(0, -2));
+        if (p.endsWith(':*')) channelWildcards.add(p.slice(0, -2));
+        else if (p.endsWith('.*')) levelWildcards.add(p.slice(0, -2));
     }
-    if (wildcardChannels.size === 0) return merged;
+    if (channelWildcards.size === 0 && levelWildcards.size === 0) return merged;
     return merged.filter(p => {
         if (p.endsWith(':*')) return true;
-        const idx = p.lastIndexOf(':');
-        if (idx <= 0) return true;
-        return !wildcardChannels.has(p.slice(0, idx));
+        const dot = p.lastIndexOf('.');
+        const levelPrefix = dot > 0 ? p.slice(0, dot) : null;   // fs:server.readFile → fs:server
+        const col = p.indexOf(':');
+        const channel = col > 0 ? p.slice(0, col) : null;       // fs:server.readFile → fs
+        if (p.endsWith('.*')) return channel === null || !channelWildcards.has(channel);
+        if (channel !== null && channelWildcards.has(channel)) return false;
+        if (levelPrefix !== null && levelWildcards.has(levelPrefix)) return false;
+        return true;
     });
 }
 

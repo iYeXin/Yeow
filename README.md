@@ -64,7 +64,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 4. **构建**：`npm run build` → `dist/<name>-<version>.jar` + `.yeow.zip`
 5. **部署**：JAR 放 `plugins/`；或 `.yeow.zip` 放 `plugins/Yeow/` 自动扫描，或 `/yeow install <url>`
 
-插件需要声明敏感权限（`fs:*`、`http:*`、`service:registerNative`、`assets:extract`），见 [权限声明](Yeow-Docs/zh/getting-started.md#权限声明)。
+插件需要声明敏感权限（`fs:server.*`、`http:*`、`service:registerNative`、`assets:extract`），见 [权限声明](Yeow-Docs/zh/getting-started.md#权限声明)。
 
 ---
 

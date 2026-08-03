@@ -56,17 +56,17 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
     "description": "A Yeow plugin",
     "api": "1.18",
     "java": 21,
-    "permissions": ["fs:*", "http:requestAsync", "service:registerNative"]
+    "permissions": ["fs:server.*", "http:requestAsync", "service:registerNative"]
 }
 ```
 
-| 字段           | 说明                                                         |
-| -------------- | ------------------------------------------------------------ |
-| `name`         | 插件名（运行时注入 `__plugin.name`，同一插件名只允许一个实例） |
-| `version`      | 版本（注入 `__plugin.version`）                               |
-| `author`       | 作者（注入 `__plugin.author`）                                |
-| `api` / `java` | 宿主平台要求的 API/Java 版本（其他平台可忽略）                |
-| `permissions`  | 开发者声明的权限（敏感节点，见下文[权限模型](#权限模型)）     |
+| 字段                  | 说明                                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| `name`                | 插件名（运行时注入 `__plugin.name`，同一插件名只允许一个实例）                           |
+| `version`             | 版本（注入 `__plugin.version`）                                                          |
+| `author`              | 作者（注入 `__plugin.author`）                                                           |
+| `api` / `java`        | 宿主平台要求的 API/Java 版本（其他平台可忽略）                                           |
+| `permissions`         | 开发者声明的权限（敏感节点，见下文[权限模型](#权限模型)）                                |
 | `computedPermissions` | 构建时计算的最终生效权限（合并 + 通配归一化）；运行时读取此字段（v0 阶段不兼容旧格式包） |
 
 ### `.yeow/main.js` — 插件代码
@@ -126,24 +126,25 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 ## 权限模型
 
-敏感消息节点**默认拒绝**，插件必须在 `yeow.json` 的 `computedPermissions`（旧包为 `permissions`）中声明：
+敏感消息节点**默认拒绝**，插件必须在 `yeow.json` 的 `computedPermissions` 中声明：
 
-| 节点（可省略） | 覆盖消息操作 |
-| -------------- | ------------ |
-| `fs:*` | fs 通道全部操作（`readFile`/`writeFile`/`delete`/`list`/`readBase64` 等） |
-| `http:*` | http 通道全部操作（`request`/`requestAsync`/`listen`/`respond`/`close`） |
-| `service:registerNative` | service 通道的 `registerNative`（spawn 子进程） |
-| `assets:extract` | assets 通道的 `extract`（解压到磁盘） |
+| 节点（可省略）           | 覆盖消息操作                                                              |
+| ------------------------ | ------------------------------------------------------------------------- |
+| `fs:server.*`            | fs server 级（服务器根目录，如 `server.readFile`）；`fs:plugin.*`（插件数据目录）**免声明，默认允许** |
+| `fs:outer.*`             | fs outer 级（任意路径，如 `outer.readFile`）                              |
+| `http:*`                 | http 通道全部操作（`request`/`requestAsync`/`listen`/`respond`/`close`）  |
+| `service:registerNative` | service 通道的 `registerNative`（spawn 子进程）                           |
+| `assets:extract`         | assets 通道的 `extract`（解压到磁盘）                                     |
 
 规则：
 
-- **节点级**：`fs:readFile` 只授予该操作；**通配级**：`fs:*` 授予整个通道
-- **默认允许**：上述四个类别之外的节点（如 `service:request`、`service:register`、`assets:read`）无需声明
+- **节点级**：`fs:server.readFile` 只授予该操作；**整级通配**：`fs:server.*` 授予该级别全部操作；**通道通配**：`fs:*` 授予 fs 通道全部（含 server/outer）
+- **默认允许**：上述默认拒绝类别之外的节点（如 `service:request`、`service:register`、`assets:read`、`fs:plugin.*`）无需声明
 - **拒绝行为**：未声明调用返回错误 `Permission denied: <node>`。同步调用直接返回错误 JSON；异步调用（含 `cb`）通过回调投递 `{"err":"Permission denied: <node>"}`，JS 侧表现为 Promise reject
 - **其他通道**（`task`/`timer`/`log`/`now`/`dir`/`debug`/`lifecycle`）不受权限模型约束
 - 权限在插件加载时读取并**固定**（运行时不可变更），加载消息中打印声明内容
 
-**`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:xxx`）写入 `yeow.json` 的 `computedPermissions`。运行时读取该字段（v0 阶段不兼容仅含 `permissions` 的旧格式包）。运行时只校验通配/节点匹配，无需理解两者差异。
+**`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:...`、`X:level.*` 覆盖 `X:level.<op>`）写入 `yeow.json` 的 `computedPermissions`。运行时读取该字段。运行时只校验通配/节点匹配，无需理解两者差异。
 
 **生命周期消息语义**：
 
@@ -203,13 +204,13 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 ### 原生层注入（运行时的语言宿主实现）
 
-| 全局                 | 签名                                                      | 说明                                                                           |
-| -------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `$_send`             | `(channel: string, jsonString: string) => string \| null` | **唯一 JS→运行时桥**。同步通道返回结果 JSON；含 `cb` 的异步通道立即返回 `null` |
+| 全局                 | 签名                                                      | 说明                                                                             |
+| -------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `$_send`             | `(channel: string, jsonString: string) => string \| null` | **唯一 JS→运行时桥**。同步通道返回结果 JSON；含 `cb` 的异步通道立即返回 `null`   |
 | `uint8ArrayToBase64` | `(buffer: ArrayBuffer) => string`                         | 二进制 → Base64（**兼容保留**；优先用 ES2026 `Uint8Array.prototype.toBase64()`） |
-| `base64ToUint8Array` | `(base64: string) => ArrayBuffer`                         | Base64 → 二进制（**兼容保留**；优先用 ES2026 `Uint8Array.fromBase64()`）          |
-| `__plugin`           | `{ name, version, author }`                               | 来自 yeow.json，只读                                                           |
-| `$dev`               | `boolean`                                                 | 开发模式标记                                                                   |
+| `base64ToUint8Array` | `(base64: string) => ArrayBuffer`                         | Base64 → 二进制（**兼容保留**；优先用 ES2026 `Uint8Array.fromBase64()`）         |
+| `__plugin`           | `{ name, version, author }`                               | 来自 yeow.json，只读                                                             |
+| `$dev`               | `boolean`                                                 | 开发模式标记                                                                     |
 
 ### 引导脚本层（运行时内置 JS 引导脚本）
 
@@ -377,7 +378,7 @@ JS 端通过 `task` 通道回传补全结果：
 
 - [ ] **包结构解析**：读 ZIP（yeow.json、.yeow/main.js、assets/；可选 dev.json），JAR 与 `.yeow.zip` 同构
 - [ ] **同名唯一**：插件名冲突时拒绝加载并警告（自动扫描 / 命令 / 宿主机制途径一致）
-- [ ] **权限模型**：解析 yeow.json `permissions`；`fs:*`、`http:*`、`service:registerNative`、`assets:extract` 默认拒绝；未声明调用返回 `Permission denied: <node>`
+- [ ] **权限模型**：解析 yeow.json `computedPermissions`；`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 默认拒绝（`fs:plugin.*` 免声明）；未声明调用返回 `Permission denied: <node>`
 - [ ] **加载消息**：插件加载成功时输出加载消息（含插件名、版本、权限声明）
 - [ ] **JS 引擎**：ES2023+，支持 `Promise`/`WeakRef`/`FinalizationRegistry`/`Uint8Array`
 - [ ] **原生注入**：`$_send`、`uint8ArrayToBase64`、`base64ToUint8Array`、`__plugin`、`$dev`

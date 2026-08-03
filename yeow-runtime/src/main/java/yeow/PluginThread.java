@@ -295,19 +295,28 @@ public class PluginThread implements Runnable {
     /**
      * Sensitive-permission check for message channels.
      * Deny-by-default categories (must be declared in yeow.config.json → yeow.json):
-     *   fs:*            — all fs operations
+     *   fs:server.* / fs:outer.* — server/outer level fs operations (fs:plugin.* needs no declaration)
      *   http:*          — all http operations
      *   service:registerNative — spawning native subprocesses
      *   assets:extract  — extracting assets to disk
-     * All other message nodes are allowed by default. Granular nodes (e.g. fs:readFile)
-     * grant a single operation; a `channel:*` node grants the whole channel.
+     * All other message nodes are allowed by default. Granular nodes (e.g. fs:server.readFile)
+     * grant a single operation; a `channel:*` or `channel:level.*` node grants the whole level.
      *
      * @return the denied node (with "Permission denied: " prefix) or null when allowed
      */
     private String checkChannelPermission(String channel, String op) {
         var node = channel + ":" + op;
+        if ("fs".equals(channel)) {
+            var dot = op.indexOf('.');
+            if (dot <= 0) return "Permission denied: " + node;
+            var level = op.substring(0, dot);
+            if ("plugin".equals(level)) return null; // plugin 级免声明（默认允许）
+            if (permissions.contains(node) || permissions.contains(channel + ":*")
+                || permissions.contains(channel + ":" + level + ".*")) return null;
+            return "Permission denied: " + node;
+        }
         if (permissions.contains(node) || permissions.contains(channel + ":*")) return null;
-        if ("fs".equals(channel) || "http".equals(channel)) return "Permission denied: " + node;
+        if ("http".equals(channel)) return "Permission denied: " + node;
         if ("service".equals(channel) && "registerNative".equals(op)) return "Permission denied: " + node;
         if ("assets".equals(channel) && "extract".equals(op)) return "Permission denied: " + node;
         return null;
@@ -316,8 +325,17 @@ public class PluginThread implements Runnable {
     private String handleFs(String pld) {
         try {
             var obj = gson.fromJson(pld, JsonObject.class); var task = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
-            var base = Path.of("plugins", name);
-            return switch (task) {
+            var dot = task.indexOf('.');
+            var level = dot > 0 ? task.substring(0, dot) : "plugin";
+            var op = dot > 0 ? task.substring(dot + 1) : task;
+            // plugin：插件数据目录（免声明）；server：服务器根（工作目录，需 fs:server.*）；
+            // outer：任意路径（相对路径仍基于服务器根计算，需 fs:outer.*）。
+            var base = switch (level) {
+                case "server" -> Path.of("").toAbsolutePath().normalize();
+                case "outer" -> null;
+                default -> Path.of("plugins", name).toAbsolutePath().normalize();
+            };
+            return switch (op) {
                 case "readFile" -> { var path = resolvePath(base, p.get("path").getAsString()); yield gson.toJson(Map.of("data", Files.readString(path))); }
                 case "writeFile" -> { var path = resolvePath(base, p.get("path").getAsString()); Files.writeString(path, p.get("data").getAsString()); yield "true"; }
                 case "appendFile" -> { var path = resolvePath(base, p.get("path").getAsString()); Files.writeString(path, p.get("data").getAsString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND); yield "true"; }
@@ -333,9 +351,10 @@ public class PluginThread implements Runnable {
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
     }
 
+    /** base 为 null（outer 级）时不限制范围；相对路径基于服务器根（工作目录）解析。 */
     private Path resolvePath(Path base, String userPath) throws IOException {
-        var p = base.resolve(userPath).normalize();
-        if (!p.startsWith(base)) throw new SecurityException("Path traversal: " + userPath);
+        var p = (base != null ? base.resolve(userPath) : Path.of(userPath)).normalize();
+        if (base != null && !p.startsWith(base)) throw new SecurityException("Path traversal: " + userPath);
         Files.createDirectories(p.getParent()); return p;
     }
 

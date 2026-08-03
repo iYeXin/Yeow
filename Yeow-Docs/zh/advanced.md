@@ -900,8 +900,8 @@ Paper/Bukkit 的 yeow-runtime 是官方实现的运行时示例。更多插件�
 
 ## 安全
 
-- **路径隔离**：文件系统限制在 `plugins/<插件名>/`，`resolvePath()` 拦截 `../`
+- **路径隔离**：`fs.*`（plugin 级）限制在 `plugins/<插件名>/`，`fs.server.*` 限制在服务器根目录，均拦截 `../` 穿越；`fs.outer.*` 无范围限制（需声明权限）
 - **上下文隔离**：每个插件独立 QuickJSContext，全局对象互不干扰
-- **权限声明**：敏感消息节点（`fs:*`、`http:*`、`service:registerNative`、`assets:extract`）默认拒绝，必须在 `yeow.config.json` 声明（写入 `yeow.json`）；未声明调用返回 `Permission denied: <node>`。粒度支持节点级（`fs:readFile`）与通配级（`fs:*`），其余节点默认允许
+- **权限声明**：敏感消息节点（`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract`）默认拒绝，必须在 `yeow.config.json` 声明（构建时计算进 `computedPermissions`）；未声明调用返回 `Permission denied: <node>`。粒度支持节点级（`fs:server.readFile`）、整级通配（`fs:server.*`）与通道通配（`fs:*`），其余节点默认允许
 - **权限委托**：命令权限由 Bukkit 处理，未授权玩家不执行 executor
 - **同名唯一**：同一插件名只允许一个实例，重复加载（自动扫描 / `/yeow load` / 模板 JAR）均被拒绝并警告

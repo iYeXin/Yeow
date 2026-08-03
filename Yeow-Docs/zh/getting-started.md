@@ -160,7 +160,7 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 {
     "name": "my-plugin",
     "permissions": [
-        "fs:*",
+        "fs:server.*",
         "http:requestAsync",
         "service:registerNative"
     ]
@@ -171,15 +171,16 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 | 权限节点                 | 覆盖范围                                                               |
 | ------------------------ | ---------------------------------------------------------------------- |
-| `fs:*`                   | 文件系统全部操作（`fs:readFile`、`fs:writeFile` 等）                   |
+| `fs:server.*` / `fs:outer.*` | fs 的 server 级（服务器根目录）/ outer 级（任意路径）；**`fs.*`（插件数据目录）免声明** |
 | `http:*`                 | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen` 等） |
 | `service:registerNative` | 注册原生服务（spawn 子进程）                                           |
 | `assets:extract`         | 解压资源到磁盘                                                         |
 
 粒度规则：
 
-- **节点级**：声明 `fs:readFile` 只授予读取权限，其他 fs 操作仍被拒绝
-- **通配级**：声明 `fs:*` 授予该通道全部操作
+- **节点级**：声明 `fs:server.readFile` 只授予 server 级读取，其他 fs 操作仍被拒绝
+- **整级通配**：声明 `fs:server.*` 授予 server 级全部操作
+- **通道通配**：声明 `fs:*` 授予整个 fs 通道（含 server/outer）
 - 未声明而调用 → 返回错误（`Permission denied: <node>`），异步 API 以 Promise reject 呈现
 - 其余消息节点（如 `service:request`、`assets:read`）默认允许，无需声明
 
@@ -188,7 +189,7 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 > 修改 `permissions` 后需重新构建并完整重载插件（`/yeow reload` 或重启服务器）；开发模式热重载只重载代码，不更新权限。
 
-> **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:readFile` 等），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
+> **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:server.*`、`fs:server.readFile` 等；`fs:server.*` 覆盖 `fs:server.readFile`），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
 
 ## 插件管理命令
 

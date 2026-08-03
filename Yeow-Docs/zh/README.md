@@ -22,7 +22,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 - **npm 生态** — 插件逻辑与资源可封装为 npm 包复用（`yeow-api`、`yeow-utils`、自定义包）；`assets/` 资源按依赖项命名空间自动打包
 - **热重载** — 修改 `src/` 或 `assets/` 即自动生效，无需重启服务器；生产环境可用 `/yeow reload/unload` 管理
 - **构建即产物** — `npm run build` 产出**标准 Paper JAR** + **平台无关 `.yeow.zip`**：JAR 放入 `plugins/`，zip 放入 `plugins/Yeow/` 自动加载（或 `/yeow install` 一键安装）
-- **声明式权限** — `fs:*`、`http:*`、`service:registerNative`、`assets:extract` 等敏感消息节点需声明授权，未声明调用返回错误
+- **声明式权限** — `fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 等敏感消息节点需声明授权，未声明调用返回错误
 
 ### 线程分离
 

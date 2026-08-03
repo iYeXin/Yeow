@@ -68,24 +68,24 @@ npm install --save-dev yeow-api
 
 ## 权限声明
 
-敏感消息节点默认拒绝，必须由**依赖此包的主项目**在 `yeow.config.json` 的 `permissions` 字段声明（构建时写入 `yeow.json`）：
+敏感消息节点默认拒绝，必须由**依赖此包的主项目**在 `yeow.config.json` 的 `permissions` 字段声明（构建时自动合并计算进 `computedPermissions`）：
 
-| 需要声明的节点                            | 包内对应能力                                               |
-| ----------------------------------------- | ---------------------------------------------------------- |
-| `fs:*`（或 `fs:readFile` 等节点）         | `fs.*` API（读取/写入/删除等）                             |
-| `http:*`（或 `http:requestAsync` 等节点） | `fetch`、`request`、HTTP 服务器（`createServer`/`listen`） |
-| `service:registerNative`                  | `registerNativeService`（spawn 原生子进程）                |
-| `assets:extract`                          | `assetsExtract` / `assetsExtractSync`（解压资源到磁盘）    |
+| 需要声明的节点                                | 包内对应能力                                               |
+| --------------------------------------------- | ---------------------------------------------------------- |
+| `fs:server.*` / `fs:outer.*`（或 `fs:server.readFile` 等节点） | `fs.server.*` / `fs.outer.*` API（服务器根/任意路径）；`fs.*`（插件数据目录）免声明 |
+| `http:*`（或 `http:requestAsync` 等节点）     | `fetch`、`request`、HTTP 服务器（`createServer`/`listen`） |
+| `service:registerNative`                      | `registerNativeService`（spawn 原生子进程）                |
+| `assets:extract`                              | `assetsExtract` / `assetsExtractSync`（解压资源到磁盘）    |
 
 规则：
 
-- 节点级（`fs:readFile`）与通配级（`fs:*`）均可；未声明调用返回 `Permission denied: <node>`（异步 API 为 Promise reject）
-- 其余节点（`service:request`、`assets:read` 等）默认允许
+- 节点级（`fs:server.readFile`）、整级通配（`fs:server.*`）与通道通配（`fs:*`）均可；未声明调用返回 `Permission denied: <node>`（异步 API 为 Promise reject）
+- 其余节点（`service:request`、`assets:read`、`fs.*` 等）默认允许
 - 权限在插件**加载时**读取并固定；使用者修改 `permissions` 后需重新构建并**完整重载插件**（`/yeow reload` 或重启服务器）才生效——开发模式热重载不更新权限
 
 ### 包作者必须在 README 中说明所需权限
 
-**凡是包内用到上述四类能力，README 必须注明使用者需要声明哪些权限节点**——否则使用者的插件加载后调用会直接返回 `Permission denied`，且加载日志中的权限清单不含对应节点，难以排查。约定格式：
+**凡是包内用到上述敏感能力，README 必须注明使用者需要声明哪些权限节点**——否则使用者的插件加载后调用会直接返回 `Permission denied`，且加载日志中的权限清单不含对应节点，难以排查。约定格式：
 
 ```md
 ## 权限
@@ -94,14 +94,14 @@ npm install --save-dev yeow-api
 
 ```json
 {
-    "permissions": ["service:registerNative", "fs:readFile", "http:requestAsync"]
+    "permissions": ["service:registerNative", "fs:server.readFile", "http:requestAsync"]
 }
 ```
 
 | 节点                     | 用途                    |
 | ------------------------ | ----------------------- |
 | `service:registerNative` | 启动图片处理原生子进程  |
-| `fs:readFile`            | 读取缓存文件            |
+| `fs:server.readFile`     | 读取服务器根目录缓存文件 |
 | `http:requestAsync`      | 下载远程模型（`fetch`） |
 
 缺少声明时对应功能报 `Permission denied` 错误。
@@ -192,7 +192,7 @@ const svc = await registerNativeService('my-svc', {
 
 ```json
 {
-    "permissions": ["fs:readFile", "http:*", "service:registerNative"]
+    "permissions": ["fs:server.readFile", "http:*", "service:registerNative"]
 }
 ```
 
@@ -203,7 +203,7 @@ const svc = await registerNativeService('my-svc', {
 开发者声明的 `permissions` 保持原样，构建时自动计算最终生效权限：
 
 - **合并**：主项目在前、依赖包按序追加、自动去重
-- **通配归一化**：存在 `X:*`（如 `fs:*`）时，该通道其余子节点（`fs:readFile` 等）自动移除——通配已覆盖，无需冗余声明
+- **通配归一化**：存在 `X:*`（如 `fs:*`）时，该通道其余节点（`fs:server.*`、`fs:server.readFile` 等）自动移除；存在 `X:level.*`（如 `fs:server.*`）时，该级别子节点（`fs:server.readFile`）自动移除——通配已覆盖，无需冗余声明
 - **写回**：结果写入 `yeow.config.json` 的 `computedPermissions` 字段（保留开发者声明的 `permissions`），打包时写入 `yeow.json` 供运行时读取；构建终端同步打印
 
 查看计算过程与权限来源分布：
@@ -214,13 +214,13 @@ npm run permissions
 
 ```
 ── Permissions by source ─────────────────────────
-  fs:*                        ← my-plugin-1.0.0
-  fs:readFile                 ← yeow-test-pkg-1.0.0
+  fs:server.*                 ← my-plugin-1.0.0
+  fs:server.readFile          ← yeow-test-pkg-1.0.0
   http:*                      ← yeow-test-pkg-1.0.0
   service:registerNative      ← yeow-test-pkg-1.0.0
 
 ── Computed permissions (3) ─────────────────
-  fs:*
+  fs:server.*
   http:*
   service:registerNative
 ```
