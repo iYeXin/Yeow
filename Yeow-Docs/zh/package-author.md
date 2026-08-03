@@ -272,6 +272,8 @@ export function onBalanceChange(handler: (p: { player: string; balance: number }
 
 包内实现服务方逻辑（纯 JS），入口处尝试注册：**成功 → 本插件成为唯一服务实例；失败（同名 public 服务已存在）→ 降级为调用方**，用 `err.serviceId` 接入既有服务：
 
+> **封装铁律（服务端与客户端隔离）**：一个 service 的封装包括**服务端逻辑**（`onRequest`、`publish`）与**客户端逻辑**（`subscribe`、`request`）。由于 public 服务同一时刻只能存在一个服务端，包内必须先**尝试注册服务端**，再**以客户端身份封装对外接口**；无论注册是否成功，对外暴露的逻辑一致。**绝对不允许暴露任何直接调用服务端能力的接口（最典型是发布事件）**——注册失败时拿不到 `token`，逻辑缺失；即使拿到 `token`，各插件 JS 上下文不同，外部发布也会造成致命的状态不一致。哪怕需求只是单纯发布事件，也应走 `serviceRequest(svcId, '/publishEvent', event)` 由服务端配合。详见 [Service API 自包含设计](../api/service.md#公共服务的自包含设计)。
+
 ```ts
 // yeow-stats —— JS 服务 + 调用方封装
 import { registerService, serviceRequest, servicePublish } from 'yeow-api';
@@ -287,6 +289,11 @@ export async function initStats() {
                 if (_svc) servicePublish(_svc.token, 'record', entry);  // 服务方内部发布
                 return { ok: true };
             }
+            if (path === '/publishEvent') {          // 对外"只发布事件"需求的服务端配合
+                await store.emit(body.event, body.payload);
+                if (_svc) servicePublish(_svc.token, body.event, body.payload);
+                return { ok: true };
+            }
             return { err: 'unknown path' };
         });
         _serviceId = _svc.serviceId;   // 成为服务方，token 留在包内
@@ -298,6 +305,11 @@ export async function initStats() {
 // 对外只暴露调用封装——服务方与调用方走同一代码路径
 export function record(kind: string, value: number) {
     return serviceRequest(_serviceId, '/record', { kind, value });
+}
+
+// 哪怕只是"发布事件"，也不暴露 publish——走 request，由服务端内部发布
+export function publishEvent(event: string, payload: unknown) {
+    return serviceRequest(_serviceId, '/publishEvent', { event, payload });
 }
 ```
 
