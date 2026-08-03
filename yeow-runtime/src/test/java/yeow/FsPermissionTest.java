@@ -66,4 +66,15 @@ class FsPermissionTest {
         assertNull(check(pt, "fs", "outer.readBase64"));
         assertNotNull(check(pt, "fs", "server.readFile"));
     }
+
+    @Test
+    void displayExpandsFsWildcard() throws Exception {
+        var m = YeowRuntime.class.getDeclaredMethod("displayPermissions", java.util.Set.class);
+        m.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        var s = (String) m.invoke(null, new java.util.LinkedHashSet<>(java.util.List.of("fs:*", "http:*", "service:registerNative")));
+        assertEquals("fs:outer.*, fs:server.*, http:*, service:registerNative", s);
+        var s2 = (String) m.invoke(null, new java.util.LinkedHashSet<>(java.util.List.of("fs:server.readFile")));
+        assertEquals("fs:server.readFile", s2);
+    }
 }

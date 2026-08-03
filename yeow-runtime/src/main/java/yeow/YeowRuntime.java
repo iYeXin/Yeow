@@ -243,12 +243,25 @@ public class YeowRuntime extends JavaPlugin {
             if (devMode) LOG.info("Dev mode active for " + name);
             LOG.info("Loaded plugin: " + name + (version.isEmpty() ? "" : " v" + version)
                 + (author.isEmpty() ? "" : " by " + author)
-                + " — permissions: " + perms);
+                + " — permissions: " + displayPermissions(perms));
             return true;
         } catch (Exception e) {
             LOG.severe("Failed to register plugin " + jarPath + ": " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 权限清单的展示形态：`fs:*` 展开为 `fs:outer.*, fs:server.*`（服主对 fs:*
+     * 无感，看不出具体影响范围）。仅影响打印，权限校验仍按原值（fs:*）进行。
+     */
+    private static String displayPermissions(java.util.Set<String> perms) {
+        var out = new java.util.ArrayList<String>();
+        for (var p : perms) {
+            if ("fs:*".equals(p)) { out.add("fs:outer.*"); out.add("fs:server.*"); }
+            else out.add(p);
+        }
+        return String.join(", ", out);
     }
 
     public boolean registerPlugin(String jarPath) { return registerPlugin(jarPath, false); }
