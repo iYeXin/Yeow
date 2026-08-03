@@ -184,14 +184,16 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 - 未声明而调用 → 返回错误（`Permission denied: <node>`），异步 API 以 Promise reject 呈现
 - 其余消息节点（如 `service:request`、`assets:read`）默认允许，无需声明
 
-> **⚠ 权限建议**：直接声明 `fs:*` 是**危险且不专业的**——它把服务器根与任意路径的读写权都交给了插件。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs.*` 为 plugin 级，免声明）。确需访问服务器文件时，**尽可能精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整级或通道通配。
+> **⚠ 权限建议**：直接声明 `fs:*` 是**危险且不专业的**。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs.*` 为 plugin 级，免声明）。确需访问服务器文件时，**尽可能精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整级或通道通配。
 
 > [!WARNING]
 > 全局 `fetch` 底层依赖 `http:requestAsync` —— 未声明 http 权限时 `fetch` 会返回 `Permission denied: http:requestAsync`。使用 `fetch` / `request` 前请确保声明了 `"http:*"` 或 `"http:requestAsync"`。
 
 > 修改 `permissions` 后需重新构建并完整重载插件（`/yeow reload` 或重启服务器）；开发模式热重载只重载代码，不更新权限。
 
-> **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:server.*`、`fs:server.readFile` 等；`fs:server.*` 覆盖 `fs:server.readFile`），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。声明 `fs:*` 会被**自动展开**为 `fs:outer.*, fs:server.*`（语义等价，让影响范围一目了然）。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
+> **控制台核对**：Yeow 运行时加载插件时会把权限清单打印到服务器控制台（`Loaded plugin: <name> ... — permissions: ...`，`fs:*` 展开显示为 `fs:outer.*, fs:server.*`），可直接核对插件实际生效的权限，无需信任包文档。
+
+> **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:server.*`、`fs:server.readFile` 等；`fs:server.*` 覆盖 `fs:server.readFile`），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。声明 `fs:*` 会被**自动展开**为 `fs:outer.*, fs:server.*`。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
 
 ## 插件管理命令
 
