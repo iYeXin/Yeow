@@ -346,6 +346,15 @@ public class PluginThread implements Runnable {
                 case "list" -> { var path = resolvePath(base, p.get("path").getAsString()); try (var s = Files.list(path)) { yield gson.toJson(s.map(Path::toString).toList()); } }
                 case "readBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(Files.readAllBytes(path)))); }
                 case "writeBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); Files.write(path, Base64.getDecoder().decode(p.get("data").getAsString())); yield "true"; }
+                case "systemPaths" -> {
+                    // 仅 outer 级：返回常用系统路径（桌面/临时目录/用户主目录）
+                    if (!"outer".equals(level)) throw new IllegalArgumentException("systemPaths is outer-level only");
+                    var home = System.getProperty("user.home", "");
+                    yield gson.toJson(Map.of(
+                        "home", home,
+                        "desktop", Path.of(home, "Desktop").toString(),
+                        "temp", System.getProperty("java.io.tmpdir", "")));
+                }
                 default -> throw new IllegalArgumentException("Unknown fs: " + task);
             };
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }

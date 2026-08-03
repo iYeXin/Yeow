@@ -99,6 +99,26 @@ fs.server.readFileSync('server.properties')   // server 级
 fs.outer.writeFileSync('/tmp/data.txt', 'x')  // outer 级
 ```
 
+### 系统路径（outer 级）
+
+`fs.outer.systemPaths()` 获取常用系统路径（无需传参）：
+
+```ts
+fs.outer.systemPaths(): Promise<{ home: string; desktop: string; temp: string }>
+fs.outer.systemPathsSync(): { home: string; desktop: string; temp: string }
+// → { home: "C:\\Users\\YeXin", desktop: "C:\\Users\\YeXin\\Desktop", temp: "C:\\Users\\YeXin\\AppData\\Local\\Temp" }
+```
+
+| 字段 | 含义 |
+| ---- | ---- |
+| `home` | 用户主目录 |
+| `desktop` | 桌面目录（`<home>/Desktop`，可能不存在） |
+| `temp` | 系统临时目录 |
+
+`desktop` / `temp` 返回的路径可直接传给 outer 级操作（如 `fs.outer.writeFileSync(path.join(p.temp, 'x.txt'), ...)`）。`systemPaths` 属于 outer 级操作，需要 `fs:outer.*` 或 `fs:outer.systemPaths` 权限。
+
+> **⚠ 权限建议**：直接声明 `fs:*`（整个 fs 通道）是**危险且不专业的**——等于把服务器根与任意路径的读写权交给插件。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs.*` 是 plugin 级，免声明）。确需访问服务器文件时，尽可能**精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整级/通道通配。
+
 ## path 工具
 
 路径拼接与解析（POSIX 风格，与平台无关）：

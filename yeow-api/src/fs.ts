@@ -99,12 +99,21 @@ function _makeFs(level: FsLevel) {
     return _sendFs({ t: t('list'), p: { path } }) as string[];
   }
 
+  async function systemPaths(): Promise<{ home: string; desktop: string; temp: string }> {
+    return await _sendFsAsync({ t: t('systemPaths') }) as { home: string; desktop: string; temp: string };
+  }
+  function systemPathsSync(): { home: string; desktop: string; temp: string } {
+    return _sendFs({ t: t('systemPaths') }) as { home: string; desktop: string; temp: string };
+  }
+
   return {
     readFile, readFileSync, readFileBase64, readFileBase64Sync,
     writeFile, writeFileSync, writeFileBase64, writeFileBase64Sync,
     appendFile, appendFileSync,
     exists, existsSync, isDirectory, isDirectorySync,
     deleteFile, deleteFileSync, mkdir, mkdirSync, list, listSync,
+    // systemPaths 仅 outer 级提供（fs.outer.systemPaths）
+    ...(level === 'outer' ? { systemPaths, systemPathsSync } : {}),
   };
 }
 

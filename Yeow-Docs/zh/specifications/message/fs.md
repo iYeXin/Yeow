@@ -97,6 +97,13 @@
 
 Base64 编码的二进制读写。
 
+### `systemPaths`（仅 outer 级）
+
+- **p**：无需参数
+- **返回**：`{ "home": "<用户主目录>", "desktop": "<桌面路径>", "temp": "<系统临时目录>" }`
+
+获取常用系统路径（JVM 属性，无 IO）。`desktop` = `<home>/Desktop`（可能不存在），`temp` = `java.io.tmpdir`。此操作仅 `outer` 级可用（`outer.systemPaths`），其他级别调用返回错误。
+
 ---
 
 ## 路径安全
