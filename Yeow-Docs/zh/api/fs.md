@@ -117,7 +117,7 @@ fs.outer.systemPathsSync(): { home: string; desktop: string; temp: string }
 
 `desktop` / `temp` 返回的路径可直接传给 outer 级操作（如 `fs.outer.writeFileSync(path.join(p.temp, 'x.txt'), ...)`）。`systemPaths` 属于 outer 级操作，需要 `fs:outer.*` 或 `fs:outer.systemPaths` 权限。
 
-> **⚠ 权限建议**：直接声明 `fs:*`（整个 fs 通道）是**危险且不专业的**——等于把服务器根与任意路径的读写权交给插件。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs.*` 是 plugin 级，免声明）。确需访问服务器文件时，尽可能**精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整级/通道通配。
+> **⚠ 权限建议**：直接声明 `fs:*`（整个 fs 通道）是**危险且不专业的**——等于把服务器根与任意路径的读写权交给插件。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs.*` 是 plugin 级，免声明）。确需访问服务器文件时，尽可能**精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整级/通道通配。声明 `fs:*` 后，构建的 `computedPermissions` 会自动展开为 `fs:outer.*, fs:server.*`，让影响范围一目了然。
 
 ## path 工具
 

@@ -146,7 +146,7 @@ const q = Player.getSync('Notch');
 | 订阅事件                 | `eventOn('playerJoin', handler)`                             | [Event](api/event.md)     |
 | 注册命令 + Tab 补全      | `registerCommand()` 或 `Command.create()`                    | [Command](api/command.md) |
 | 读写插件数据文件         | `fs.readFileSync()` / `fs.writeFileSync()`                   | [FS](api/fs.md)           |
-| 读取打包资源             | `getAssetsPath()`（`yeow-dev`）+ `assetsReadSync()`            | [Assets](api/assets.md)   |
+| 读取打包资源             | `getAssetsPath()`（`yeow-dev`）+ `assetsReadSync()`          | [Assets](api/assets.md)   |
 | 插件间通信 / 原生程序    | `registerService()` / `registerNativeService()`              | [Service](api/service.md) |
 | 日志                     | `log.info()` / `console.log()`                               | [Log](api/log.md)         |
 
@@ -169,12 +169,12 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 **默认需要声明（未声明则调用返回错误）：**
 
-| 权限节点                 | 覆盖范围                                                               |
-| ------------------------ | ---------------------------------------------------------------------- |
+| 权限节点                     | 覆盖范围                                                                                |
+| ---------------------------- | --------------------------------------------------------------------------------------- |
 | `fs:server.*` / `fs:outer.*` | fs 的 server 级（服务器根目录）/ outer 级（任意路径）；**`fs.*`（插件数据目录）免声明** |
-| `http:*`                 | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen` 等） |
-| `service:registerNative` | 注册原生服务（spawn 子进程）                                           |
-| `assets:extract`         | 解压资源到磁盘                                                         |
+| `http:*`                     | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen` 等）                  |
+| `service:registerNative`     | 注册原生服务（spawn 子进程）                                                            |
+| `assets:extract`             | 解压资源到磁盘                                                                          |
 
 粒度规则：
 
@@ -186,14 +186,12 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 > **⚠ 权限建议**：直接声明 `fs:*` 是**危险且不专业的**——它把服务器根与任意路径的读写权都交给了插件。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs.*` 为 plugin 级，免声明）。确需访问服务器文件时，**尽可能精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整级或通道通配。
 
-> 插件加载时控制台打印的权限清单中，`fs:*` 会**展开显示为 `fs:outer.*, fs:server.*`**（仅展示，便于服主理解实际影响范围；权限校验仍按 `fs:*` 原值生效）。
-
 > [!WARNING]
 > 全局 `fetch` 底层依赖 `http:requestAsync` —— 未声明 http 权限时 `fetch` 会返回 `Permission denied: http:requestAsync`。使用 `fetch` / `request` 前请确保声明了 `"http:*"` 或 `"http:requestAsync"`。
 
 > 修改 `permissions` 后需重新构建并完整重载插件（`/yeow reload` 或重启服务器）；开发模式热重载只重载代码，不更新权限。
 
-> **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:server.*`、`fs:server.readFile` 等；`fs:server.*` 覆盖 `fs:server.readFile`），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
+> **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:server.*`、`fs:server.readFile` 等；`fs:server.*` 覆盖 `fs:server.readFile`），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。声明 `fs:*` 会被**自动展开**为 `fs:outer.*, fs:server.*`（语义等价，让影响范围一目了然）。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
 
 ## 插件管理命令
 

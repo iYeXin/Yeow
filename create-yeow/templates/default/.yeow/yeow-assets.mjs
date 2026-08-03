@@ -92,6 +92,8 @@ export function collectPermissionsWithSources(root, pkgJson) {
  * 声明（主项目在前、依赖包按收集顺序追加、去重），再做通配归一化：
  *   - `X:*`（如 fs:*）覆盖全部 `X:...` 节点（含二级通配与子节点）
  *   - `X:level.*`（如 fs:server.*）覆盖 `X:level.<op>` 子节点
+ * 最后把 `fs:*` 展开为 `fs:outer.*, fs:server.*`——权限语义等价
+ * （plugin 级免声明），但让开发者/服主对实际影响范围有明确感知。
  */
 export function readMergedPermissions(root, pkgJson) {
     const merged = [];
@@ -107,18 +109,30 @@ export function readMergedPermissions(root, pkgJson) {
         if (p.endsWith(':*')) channelWildcards.add(p.slice(0, -2));
         else if (p.endsWith('.*')) levelWildcards.add(p.slice(0, -2));
     }
-    if (channelWildcards.size === 0 && levelWildcards.size === 0) return merged;
-    return merged.filter(p => {
-        if (p.endsWith(':*')) return true;
-        const dot = p.lastIndexOf('.');
-        const levelPrefix = dot > 0 ? p.slice(0, dot) : null;   // fs:server.readFile → fs:server
-        const col = p.indexOf(':');
-        const channel = col > 0 ? p.slice(0, col) : null;       // fs:server.readFile → fs
-        if (p.endsWith('.*')) return channel === null || !channelWildcards.has(channel);
-        if (channel !== null && channelWildcards.has(channel)) return false;
-        if (levelPrefix !== null && levelWildcards.has(levelPrefix)) return false;
-        return true;
-    });
+    let normalized = merged;
+    if (channelWildcards.size > 0 || levelWildcards.size > 0) {
+        normalized = merged.filter(p => {
+            if (p.endsWith(':*')) return true;
+            const dot = p.lastIndexOf('.');
+            const levelPrefix = dot > 0 ? p.slice(0, dot) : null;   // fs:server.readFile → fs:server
+            const col = p.indexOf(':');
+            const channel = col > 0 ? p.slice(0, col) : null;       // fs:server.readFile → fs
+            if (p.endsWith('.*')) return channel === null || !channelWildcards.has(channel);
+            if (channel !== null && channelWildcards.has(channel)) return false;
+            if (levelPrefix !== null && levelWildcards.has(levelPrefix)) return false;
+            return true;
+        });
+    }
+    // fs:* 展开（语义等价：fs:outer.* + fs:server.* 覆盖各自级别，plugin 级免声明）
+    if (normalized.includes('fs:*')) {
+        const out = [];
+        for (const p of normalized) {
+            if (p === 'fs:*') { out.push('fs:outer.*', 'fs:server.*'); }
+            else out.push(p);
+        }
+        return out;
+    }
+    return normalized;
 }
 
 // ── id 分配（8 位 hex，不哈希内容，仅保证构建内唯一）──────────

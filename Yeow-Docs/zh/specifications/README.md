@@ -138,13 +138,13 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 规则：
 
-- **节点级**：`fs:server.readFile` 只授予该操作；**整级通配**：`fs:server.*` 授予该级别全部操作；**通道通配**：`fs:*` 授予 fs 通道全部（含 server/outer）
+- **节点级**：`fs:server.readFile` 只授予该操作；**整级通配**：`fs:server.*` 授予该级别全部操作；**通道通配**：`fs:*` 授予 fs 通道全部（含 server/outer）——构建时 `fs:*` 在 `computedPermissions` 中**自动展开**为 `fs:outer.*, fs:server.*`（语义等价）
 - **默认允许**：上述默认拒绝类别之外的节点（如 `service:request`、`service:register`、`assets:read`、`fs:plugin.*`）无需声明
 - **拒绝行为**：未声明调用返回错误 `Permission denied: <node>`。同步调用直接返回错误 JSON；异步调用（含 `cb`）通过回调投递 `{"err":"Permission denied: <node>"}`，JS 侧表现为 Promise reject
 - **其他通道**（`task`/`timer`/`log`/`now`/`dir`/`debug`/`lifecycle`）不受权限模型约束
 - 权限在插件加载时读取并**固定**（运行时不可变更），加载消息中打印声明内容——打印时 `fs:*` 会**展开为 `fs:outer.*, fs:server.*`**（仅展示，便于服主理解影响范围；权限校验仍按原值 `fs:*`）
 
-**`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:...`、`X:level.*` 覆盖 `X:level.<op>`）写入 `yeow.json` 的 `computedPermissions`。运行时读取该字段。运行时只校验通配/节点匹配，无需理解两者差异。
+**`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:...`、`X:level.*` 覆盖 `X:level.<op>`；`fs:*` 展开为 `fs:outer.*, fs:server.*`）写入 `yeow.json` 的 `computedPermissions`。运行时读取该字段。运行时只校验通配/节点匹配，无需理解两者差异。
 
 **生命周期消息语义**：
 

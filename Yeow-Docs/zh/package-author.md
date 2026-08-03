@@ -204,6 +204,7 @@ const svc = await registerNativeService('my-svc', {
 
 - **合并**：主项目在前、依赖包按序追加、自动去重
 - **通配归一化**：存在 `X:*`（如 `fs:*`）时，该通道其余节点（`fs:server.*`、`fs:server.readFile` 等）自动移除；存在 `X:level.*`（如 `fs:server.*`）时，该级别子节点（`fs:server.readFile`）自动移除——通配已覆盖，无需冗余声明
+- **`fs:*` 展开**：声明 `fs:*` 后，computedPermissions 中自动展开为 `fs:outer.*, fs:server.*`（权限语义等价——plugin 级免声明，server/outer 由各自通配覆盖）——让开发者与服主对实际影响范围（任意路径 + 服务器根）有明确感知
 - **写回**：结果写入 `yeow.config.json` 的 `computedPermissions` 字段（保留开发者声明的 `permissions`），打包时写入 `yeow.json` 供运行时读取；构建终端同步打印
 
 查看计算过程与权限来源分布：
