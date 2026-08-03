@@ -196,7 +196,7 @@ const svc = await registerNativeService('my-svc', {
 }
 ```
 
-**只计算直接依赖**：构建时扫描 `node_modules` 顶层（含 `@scope/name`），**依赖包的依赖所需权限无需计算**——包只需声明自己的权限。缺失 `yeow.config.json` 或 `permissions` 字段的依赖包不贡献任何权限。
+**每个包只需声明自己的权限**——npm/pnpm 的包是扁平分布的，node_modules 顶层的包（直接依赖与被提升的传递依赖）都会参与计算，但**包无需考虑（也不建议考虑）其依赖所需的权限**：权限由使用者的插件构建时统一汇总，依赖包只要把自己的权限声明清楚即可。缺失 `yeow.config.json` 或 `permissions` 字段的依赖包不贡献任何权限。
 
 ### 最终权限（computedPermissions）
 

@@ -201,11 +201,10 @@ public class YeowRuntime extends JavaPlugin {
                 if (obj.has("name")) name = obj.get("name").getAsString();
                 if (obj.has("version")) version = obj.get("version").getAsString();
                 if (obj.has("author")) author = obj.get("author").getAsString();
-                // 优先 computedPermissions（构建时合并计算的最终权限），
-                // 兼容旧包回退到 permissions。
-                var permField = obj.has("computedPermissions") ? "computedPermissions" : "permissions";
-                if (obj.has(permField) && obj.get(permField).isJsonArray()) {
-                    for (var el : obj.getAsJsonArray(permField)) perms.add(el.getAsString());
+                // 最终权限由构建器计算（合并依赖包声明 + 通配归一化）写入 computedPermissions。
+                // v0 阶段不做旧包兼容——旧格式包（仅 permissions）视为无权限。
+                if (obj.has("computedPermissions") && obj.get("computedPermissions").isJsonArray()) {
+                    for (var el : obj.getAsJsonArray("computedPermissions")) perms.add(el.getAsString());
                 }
             }
 
