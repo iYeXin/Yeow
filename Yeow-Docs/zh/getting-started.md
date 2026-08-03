@@ -186,6 +186,8 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 > **⚠ 权限建议**：直接声明 `fs:*` 是**危险且不专业的**——它把服务器根与任意路径的读写权都交给了插件。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs.*` 为 plugin 级，免声明）。确需访问服务器文件时，**尽可能精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整级或通道通配。
 
+> 插件加载时控制台打印的权限清单中，`fs:*` 会**展开显示为 `fs:outer.*, fs:server.*`**（仅展示，便于服主理解实际影响范围；权限校验仍按 `fs:*` 原值生效）。
+
 > [!WARNING]
 > 全局 `fetch` 底层依赖 `http:requestAsync` —— 未声明 http 权限时 `fetch` 会返回 `Permission denied: http:requestAsync`。使用 `fetch` / `request` 前请确保声明了 `"http:*"` 或 `"http:requestAsync"`。
 
