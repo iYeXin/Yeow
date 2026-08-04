@@ -4,12 +4,7 @@
 
 ## 更完善的 API 和事件覆盖面
 
-扩展 yeow-api 与运行时任务/事件桥的能力边界：
-
-- **API 覆盖**：补充 Inventory 操作（点击模拟、槽位拖拽）、完整实体属性（AI/寻路、装备、Boss 属性）、世界生成器接口、容器方块交互、计分板边栏等高频需求
-- **事件覆盖**：增加更多 Bukkit 事件类型（如 `blockFromTo`、`entityChangeBlock`、`vehicle*`、`worldLoad`/`worldSave`、`playerEditBook` 等），对齐主流 Bukkit 事件面
-- **事件粒度**：事件订阅条件（按实体类型/世界过滤）、事件修改结果（`mods` 扩展更多可写字段）
-- 覆盖情况以 [事件规范](specifications/event/index.md) 与 [任务规范](specifications/task/index.md) 为准逐步补齐
+扩展 yeow-api 与运行时任务/事件桥的能力边界
 
 ## 开发调试工具
 
