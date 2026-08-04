@@ -10,6 +10,11 @@ Yeow v1 的多语言支持暂不完善，我们推荐使用 JavaScript/TypeScrip
 
 - **Yeow-Python**（Java Paper 插件，内置 CPython 动态库）：自行设计 Python 插件包结构、读取插件包、封装 Python 适配器后注册
 - **TCP 适配器**：把插件实体映射为远端进程或网络服务
+- **WASM 适配器**（Java 插件，内置 WASM 运行时，如 wasmtime-java / GraalWasm）：插件以 WebAssembly 模块（`.wasm`）打包，适配器负责加载模块、建立宿主 API 桥接（`postMessage` → 导入函数调用、`submitTask` 结果回投）与 `ping()` 探测。典型好处：
+  - **跨平台**：WASM 模块一次编译，可在任意支持 WASM 的宿主上运行，与 Java 平台无绑定
+  - **性能高**：接近原生执行速度（AOT/JIT 编译），无解释器开销
+  - **沙箱可控性强**：WASM 线性内存与导入/导出边界天然隔离，插件无法逃逸出宿主授予的能力（无文件系统/网络访问除非显式导入），安全模型清晰
+  - **资源占用较轻**：内存上限可配置（线性内存 + 栈），无完整 VM/解释器驻留开销；一个服务器可承载大量 WASM 插件实例
 
 ## 插件实体接口（PluginEntity）
 
