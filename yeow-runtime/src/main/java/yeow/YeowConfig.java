@@ -4,6 +4,7 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.io.File;
 
 public class YeowConfig {
+    private final File dataFolder;
     private final int tickBudgetMs;
     private final double[] priorityRatios;
     private final boolean autoDemote;
@@ -26,8 +27,10 @@ public class YeowConfig {
     private final boolean profileScalerEnabled;
     private final double profileScalerFactor;
     private final double profileScalerMax;
+    private final boolean requireNativeApproval;
 
     public YeowConfig(File dataFolder) {
+        this.dataFolder = dataFolder;
         dataFolder.mkdirs();
         var runtimeDir = new File(dataFolder, "runtime");
         runtimeDir.mkdirs();
@@ -55,6 +58,9 @@ public class YeowConfig {
         def.set("profile.scaler.enabled", true);
         def.set("profile.scaler.expansion-factor", 1.3);
         def.set("profile.scaler.max-multiplier", 3.0);
+        // 原生服务批准：默认要求批准（全部原生服务视为不安全，需 /yeow approve <plugin>）。
+        // 内存是唯一信任源——运行期间修改本文件不生效（视为无效篡改），关闭时按内存合并写回。
+        def.set("native-service-require-approval", true);
 
         var cfg = YamlConfiguration.loadConfiguration(file);
         cfg.setDefaults(def);
@@ -82,6 +88,7 @@ public class YeowConfig {
         this.profileScalerEnabled = cfg.getBoolean("profile.scaler.enabled", true);
         this.profileScalerFactor = cfg.getDouble("profile.scaler.expansion-factor", 1.3);
         this.profileScalerMax = cfg.getDouble("profile.scaler.max-multiplier", 3.0);
+        this.requireNativeApproval = cfg.getBoolean("native-service-require-approval", true);
 
         var ratios = cfg.getDoubleList("priority-ratios");
         this.priorityRatios = ratios.size() == 3
@@ -111,4 +118,20 @@ public class YeowConfig {
     public boolean profileScalerEnabled() { return profileScalerEnabled; }
     public double profileScalerFactor() { return profileScalerFactor; }
     public double profileScalerMax() { return profileScalerMax; }
+
+    /** 原生服务是否需要批准（默认 true；false = 默认批准）。内存为唯一信任源。 */
+    public boolean requireNativeApproval() { return requireNativeApproval; }
+
+    /**
+     * 按内存值合并写回 config.yml 的 native-service-require-approval 项
+     * （服务器关闭、插件卸载完成后调用；只覆盖该项，保留用户其他配置）。
+     */
+    public void saveRequireApproval() {
+        try {
+            var file = new File(new File(dataFolder, "runtime"), "config.yml");
+            var cfg = YamlConfiguration.loadConfiguration(file);
+            cfg.set("native-service-require-approval", requireNativeApproval);
+            cfg.save(file);
+        } catch (Exception ignored) { /* 写回失败不影响关闭流程 */ }
+    }
 }

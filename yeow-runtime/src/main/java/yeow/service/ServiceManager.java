@@ -163,9 +163,10 @@ public class ServiceManager {
             var execFile = extractNativeBinary(platformEl, svcDir, jarPath, devAssetsDir);
             if (execFile == null) return gson.toJson(Map.of("err", "Failed to extract native binary"));
 
-            // 可信性校验：打包后路径（getAssetsPath 结果，assets/<id>/...）→ yeow.json native 声明的 SHA-256
+            // 可信性校验：打包后路径（getAssetsPath 结果，assets/<id>/...）→ yeow.json native 声明的 SHA-256。
+            // 仅单文件模式（string / {file}）参与；目录模式（{dir, entry}）暂不支持可信性声明。
             var packagedPath = packagedPathFor(platformEl);
-            var expected = nativeHashes != null ? nativeHashes.get(packagedPath) : null;
+            var expected = (packagedPath != null && nativeHashes != null) ? nativeHashes.get(packagedPath) : null;
             if (expected != null) {
                 var actual = sha256(execFile.toFile());
                 if (!expected.equalsIgnoreCase(actual)) {
@@ -173,12 +174,27 @@ public class ServiceManager {
                         + " (declared " + expected + ", actual " + actual + ")");
                     cleanDir(svcDir);
                     return gson.toJson(Map.of("err", "Native service hash mismatch for " + packagedPath
-                        + " — refused to load (plugin '" + pluginName + "' declares a different SHA-256)"));
+                        + " — refused to load (plugin '" + pluginName + "' declares a different SHA-256;"
+                        + " the executable may have been tampered with)"));
                 }
                 LOG.info("Native service " + id + ": SHA-256 verified (" + packagedPath + ")");
+            } else if (packagedPath == null) {
+                LOG.warning("Native service " + id + " (" + pluginName + "): directory-mode native services"
+                    + " do not support trust declarations yet — treat as untrusted.");
             } else {
                 LOG.warning("Native service " + id + " (" + pluginName + "): no trusted SHA-256 declaration for "
                     + packagedPath + " — treat as untrusted. Declare 'native' in yeow.config.json to pin hashes.");
+            }
+
+            // 批准检查：默认情况下不安全原生服务需要 /yeow approve <plugin>（内存唯一信任源）。
+            var rt = yeow.YeowRuntime.inst();
+            if (rt != null && rt.requireNativeApproval() && !rt.isNativeApproved(pluginName)) {
+                LOG.warning("Native service " + id + " (" + pluginName + ") not approved —"
+                    + " run /yeow approve " + pluginName + " then /yeow reload " + pluginName);
+                cleanDir(svcDir);
+                return gson.toJson(Map.of("err",
+                    "Native service " + id + " not approved — run /yeow approve " + pluginName
+                        + " then /yeow reload " + pluginName + " to load it"));
             }
 
             execFile.toFile().setExecutable(true);
@@ -231,19 +247,14 @@ public class ServiceManager {
 
     /**
      * 计算 platform 配置对应的打包后路径（getAssetsPath 结果，`assets/<id>/...`）：
-     * string / {file} → 值本身；{dir, entry} → dir（去尾斜杠）+ "/" + entry。
+     * string / {file} → 值本身；{dir, entry} → 返回 null（目录模式暂不支持可信性声明）。
      * 与构建器 native manifest 中的 key 对齐。
      */
     private static String packagedPathFor(JsonElement platformEl) {
         if (platformEl.isJsonPrimitive()) return platformEl.getAsString();
         var cfg = platformEl.getAsJsonObject();
         if (cfg.has("file")) return cfg.get("file").getAsString();
-        if (cfg.has("dir") && cfg.has("entry")) {
-            var dir = cfg.get("dir").getAsString();
-            while (dir.endsWith("/") || dir.endsWith("\\")) dir = dir.substring(0, dir.length() - 1);
-            return dir + "/" + cfg.get("entry").getAsString();
-        }
-        return "";
+        return null; // {dir, entry}：目录模式暂不支持
     }
 
     /** 文件 SHA-256（hex）。 */

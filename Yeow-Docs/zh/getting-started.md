@@ -222,8 +222,52 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 - 有声明且匹配 → 正常加载（日志显示校验通过）
 - 有声明但不匹配（文件被替换/篡改）→ **拒绝加载服务**，`registerNativeService` 的 Promise reject
 - **无论是否声明**，加载原生服务时都会打印风险日志：未声明 → 警告"无可信 SHA-256 声明，视为不可信"；已声明 → 提示校验结果
+- **可信性声明只对单文件模式有效**（`string` / `{file}`）；目录模式（`{dir, entry}`）暂不支持声明与校验
 
-> **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险。
+### 批准（默认需要）
+
+**默认情况下，加载原生服务需要批准**（目前全部原生服务均视为不安全，即使有哈希声明）：
+
+```
+/yeow approve <plugin>    # 批准插件（内存修改，服务器关闭时写回）
+/yeow reload <plugin>     # 重新加载，使批准生效
+```
+
+- 未批准 → `registerNativeService` 的 Promise reject，错误信息包含 `/yeow approve <plugin>` 指引
+- **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-require-approval`（默认 `true`；`false` = 默认批准）。**该配置只能在服务器关闭时修改**——内存是唯一信任源，运行期间直接编辑文件视为无效篡改，不生效（关闭时按内存合并写回）
+- **批准存储**：`plugins/Yeow/approve.json`（插件名 → 批准时间戳）。同样只读一次进入内存，运行期修改不生效，关闭时写回
+
+### 开发者引导：错误处理与降级
+
+```js
+import { registerNativeService, getAssetsPath } from 'yeow-api';
+import { getAssetsPath as g } from 'yeow-dev';
+
+try {
+    const { serviceId, ready } = await registerNativeService('iyexin.image-svc.v1', {
+        windows: g('native/win/image-svc.exe'),
+    });
+    await ready();
+} catch (e) {
+    const msg = e.message;
+    if (msg.includes('Service already registered')) {
+        // 服务已存在：用 err.serviceId 以调用方身份接入既有服务（无需批准，正常降级）
+        const sid = e.serviceId;
+        await serviceRequest(sid, '/ping', {});
+    } else if (msg.includes('hash mismatch')) {
+        // 可执行文件被篡改（声明与实际 SHA-256 不一致）：拒绝使用，检查二进制来源
+        log.error('Native binary tampered — refusing to load');
+    } else if (msg.includes('not approved')) {
+        // 用户未批准：提示管理员批准后 reload
+        log.warn('Native service requires approval — run /yeow approve <plugin> then /yeow reload <plugin>');
+        // 降级：切换到纯 JS 实现 / 禁用相关功能
+    } else {
+        log.error('Native service failed:', msg);
+    }
+}
+```
+
+> **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险、无需批准。
 
 ## 插件管理命令
 
@@ -239,7 +283,8 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 | `/yeow unload <plugin\|all>`             | 卸载插件（与热重载相同的卸载逻辑，5s 强制终止）                                                                                                                                      |
 | `/yeow uninstall <plugin>`               | 卸载并把 `plugins/Yeow/` 下对应 `.yeow.zip` 移入 `plugins/Yeow/.backup/`（数据目录 `plugins/<plugin>/` 需手动清理）                                                                  |
 | `/yeow reload <plugin\|all> [path\|url]` | 重新加载。`<plugin>` 可选 `path` 或 `url` 从新来源加载（URL 为临时，不持久化）；`all` 按原路径全部重载                                                                               |
-| `/yeow profile`                          | 性能快照（需 `profile.enabled: true` 开启全量分析）                                                                                                                                  |
+| `/yeow approve <plugin>`                 | 批准插件的原生服务（默认需要批准才可加载；内存修改，关闭时写回 `approve.json`，需 `reload` 生效）                                                                                          |
+| `/yeow profile`                          | 性能快照（需 `profile.enabled: true` 开启全量分析）                                                                                                                                          |
 | `/yeow track <plugin> <seconds>`         | 单插件深度追踪（需 `profile.enabled: true`）                                                                                                                                         |
 
 ```bash
@@ -264,6 +309,10 @@ priority-ratios: [0.5, 0.3, 0.2] # 三级优先级比例
 auto-demote: true                # 自动降级
 demote-threshold: 200            # 降级阈值（次/秒）
 idle-spin-us: 100                # 空闲自旋（us），0 关闭
+
+native-service-require-approval: true  # 原生服务需要批准（默认 true；false = 默认批准）。
+                                       # 只能在服务器关闭时修改——内存是唯一信任源，
+                                       # 运行期间编辑不生效（关闭时按内存合并写回）。
 
 profile:
   enabled: false                 # 全量性能分析（逐任务采集），默认关闭

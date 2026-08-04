@@ -37,6 +37,7 @@ public class YeowRuntime extends JavaPlugin {
     private WebSocket devWs;
     private yeow.service.ServiceManager serviceManager;
     private yeow.profile.Profiler profiler;
+    private ApprovalStore approvals;
 
     public PluginEntity getPlugin(String name) { return plugins.get(name); }
     public Scheduler getScheduler() { return scheduler; }
@@ -44,6 +45,17 @@ public class YeowRuntime extends JavaPlugin {
     public yeow.service.ServiceManager getServiceManager() { return serviceManager; }
     public YeowConfig getYeowConfig() { return config; }
     public yeow.profile.Profiler getProfiler() { return profiler; }
+
+    /** 原生服务是否需要批准（config.yml，内存唯一信任源）。 */
+    public boolean requireNativeApproval() { return config.requireNativeApproval(); }
+
+    /** 插件是否已批准原生服务（approve.json，内存唯一信任源）。 */
+    public boolean isNativeApproved(String plugin) { return approvals != null && approvals.isApproved(plugin); }
+
+    /** 批准插件的原生服务（内存修改；服务器关闭时写回 approve.json）。 */
+    public void approveNativePlugin(String plugin) {
+        if (approvals != null) approvals.approve(plugin);
+    }
 
     public static YeowRuntime inst() { return instance; }
 
@@ -53,6 +65,7 @@ public class YeowRuntime extends JavaPlugin {
         this.config = new YeowConfig(getDataFolder());
         this.scheduler = new Scheduler(config);
         this.serviceManager = new yeow.service.ServiceManager();
+        this.approvals = new ApprovalStore(getDataFolder());
         var pc = yeow.profile.ProfileConfig.from(config);
         profiler = yeow.profile.Profiler.create(pc);
         scheduler.setProfileSink(profiler.sink());
@@ -89,6 +102,9 @@ public class YeowRuntime extends JavaPlugin {
         plugins.values().forEach(PluginEntity::stopAndWait);
         scheduler.shutdown();
         if (serviceManager != null) serviceManager.shutdown();
+        // 所有 Yeow 插件卸载完成后，把内存中的批准与配置写回文件（内存是唯一信任源）
+        if (approvals != null) approvals.save();
+        config.saveRequireApproval();
         instance = null;
     }
 
@@ -657,12 +673,22 @@ public class YeowRuntime extends JavaPlugin {
                         catch (NumberFormatException e) { s.sendMessage("Invalid seconds: " + a[2]); }
                         yield true;
                     }
+                    case "approve" -> {
+                        if (!s.hasPermission("yeow.admin")) { s.sendMessage("No permission."); yield true; }
+                        if (a.length < 2) { s.sendMessage("Usage: /yeow approve <plugin>"); yield true; }
+                        var pn = a[1];
+                        if (!plugins.containsKey(pn)) { s.sendMessage("Plugin not loaded: " + pn); yield true; }
+                        approveNativePlugin(pn);
+                        s.sendMessage("Approved native services for " + pn
+                            + " — run /yeow reload " + pn + " to load them (persisted on server shutdown)");
+                        yield true;
+                    }
                     default -> { usage(s); yield true; }
                 };
             }
 
             private void usage(CommandSender s) {
-                s.sendMessage("Usage: /yeow load <path|url> | /yeow install <url> | /yeow update <url> | /yeow unload <plugin|all> | /yeow uninstall <plugin> | /yeow reload <plugin|all> [path|url] | /yeow profile | /yeow track <plugin> <seconds>");
+                s.sendMessage("Usage: /yeow load <path|url> | /yeow install <url> | /yeow update <url> | /yeow unload <plugin|all> | /yeow uninstall <plugin> | /yeow reload <plugin|all> [path|url] | /yeow approve <plugin> | /yeow profile | /yeow track <plugin> <seconds>");
             }
 
             @Override
@@ -670,10 +696,10 @@ public class YeowRuntime extends JavaPlugin {
                 var out = new java.util.ArrayList<String>();
                 if (a.length <= 1) {
                     out.add("load"); out.add("install"); out.add("update"); out.add("unload"); out.add("uninstall"); out.add("reload");
-                    out.add("profile"); out.add("track");
+                    out.add("approve"); out.add("profile"); out.add("track");
                 } else if (a.length == 2) {
                     switch (a[0]) {
-                        case "unload", "reload" -> { out.add("all"); out.addAll(plugins.keySet()); }
+                        case "unload", "reload", "approve" -> { out.add("all"); out.addAll(plugins.keySet()); }
                         case "uninstall" -> out.addAll(plugins.keySet());
                         case "load" -> out.addAll(pluginFileCandidates());
                         case "track" -> out.addAll(plugins.keySet());

@@ -170,7 +170,13 @@ const { serviceId, ready } = await registerNativeService('myNative', {
 }, true);
 ```
 
-> **可信性校验**：插件（或依赖包）在 `yeow.config.json` 声明 `native` 字段后，构建时计算二进制 SHA-256 写入 `yeow.json`。运行时注册原生服务时校验所选二进制的哈希：**不匹配 → 拒绝加载，`ready()` Promise reject**（错误信息含声明/实际哈希）。无论是否声明，加载时都会打印风险日志（未声明 → 警告视为不可信）。详见 [原生服务可信性声明](../getting-started.md#原生服务可信性声明)。
+> **可信性校验与批准**：插件（或依赖包）在 `yeow.config.json` 声明 `native` 字段后，构建时计算二进制 SHA-256 写入 `yeow.json`。运行时注册原生服务时：哈希不匹配（可执行文件被篡改）→ **拒绝加载**；**默认情况下未批准的原生服务同样拒绝**（`/yeow approve <plugin>` 批准后 `reload`）。错误原因可从 `ready()` 的 reject 消息区分：
+>
+> - `Service already registered: <id>` — 服务已存在（用 `err.serviceId` 降级接入，无需批准）
+> - `hash mismatch ... refused to load` — 可执行文件被篡改
+> - `not approved — run /yeow approve <plugin>` — 用户未批准
+>
+> 完整 try-catch 降级示例见 [原生服务可信性声明](../getting-started.md#原生服务可信性声明)。
 
 **支持平台**：key 支持 `操作系统` 或 `操作系统-架构` 两种粒度。**精确匹配（含架构）优先，找不到则回退到操作系统**：
 
