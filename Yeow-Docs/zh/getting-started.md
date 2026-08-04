@@ -237,35 +237,7 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 - **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-require-approval`（默认 `true`；`false` = 默认批准）。**该配置只能在服务器关闭时修改**——内存是唯一信任源，运行期间直接编辑文件视为无效篡改，不生效（关闭时按内存合并写回）
 - **批准存储**：`plugins/Yeow/approve.json`（插件名 → 批准时间戳）。同样只读一次进入内存，运行期修改不生效，关闭时写回
 
-### 开发者引导：错误处理与降级
-
-```js
-import { registerNativeService, getAssetsPath } from 'yeow-api';
-import { getAssetsPath as g } from 'yeow-dev';
-
-try {
-    const { serviceId, ready } = await registerNativeService('iyexin.image-svc.v1', {
-        windows: g('native/win/image-svc.exe'),
-    });
-    await ready();
-} catch (e) {
-    const msg = e.message;
-    if (msg.includes('Service already registered')) {
-        // 服务已存在：用 err.serviceId 以调用方身份接入既有服务（无需批准，正常降级）
-        const sid = e.serviceId;
-        await serviceRequest(sid, '/ping', {});
-    } else if (msg.includes('hash mismatch')) {
-        // 可执行文件被篡改（声明与实际 SHA-256 不一致）：拒绝使用，检查二进制来源
-        log.error('Native binary tampered — refusing to load');
-    } else if (msg.includes('not approved')) {
-        // 用户未批准：提示管理员批准后 reload
-        log.warn('Native service requires approval — run /yeow approve <plugin> then /yeow reload <plugin>');
-        // 降级：切换到纯 JS 实现 / 禁用相关功能
-    } else {
-        log.error('Native service failed:', msg);
-    }
-}
-```
+> **开发者**：错误处理与降级示例（区分"服务已存在 / 可执行文件被篡改 / 用户未批准"）见 [Service API](api/service.md) 与 [编写依赖包](package-author.md)。
 
 > **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险、无需批准。
 

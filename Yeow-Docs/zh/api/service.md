@@ -341,3 +341,35 @@ try {
 
 const result = await serviceRequest(serviceId, '/render', { width: 1024, height: 1024 });
 ```
+
+### 错误处理与降级（registerNativeService）
+
+`ready()` 可能因多种原因 reject，按错误消息区分并降级：
+
+```js
+import { registerNativeService, serviceRequest, log } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';
+
+try {
+    const { serviceId, ready } = await registerNativeService('iyexin.image-svc.v1', {
+        windows: getAssetsPath('native/win/image-svc.exe'),
+    });
+    await ready();
+} catch (e) {
+    const msg = e.message;
+    if (msg.includes('Service already registered')) {
+        // 服务已存在：用 err.serviceId 以调用方身份接入既有服务（无需批准，正常降级）
+        const sid = e.serviceId;
+        await serviceRequest(sid, '/ping', {});
+    } else if (msg.includes('hash mismatch')) {
+        // 可执行文件被篡改（声明与实际 SHA-256 不一致）：拒绝使用，检查二进制来源
+        log.error('Native binary tampered — refusing to load');
+    } else if (msg.includes('not approved')) {
+        // 用户未批准：提示管理员批准后 reload（/yeow approve <plugin>）
+        log.warn('Native service requires approval — run /yeow approve <plugin> then /yeow reload <plugin>');
+        // 降级：切换到纯 JS 实现 / 禁用相关功能
+    } else {
+        log.error('Native service failed:', msg);
+    }
+}
+```

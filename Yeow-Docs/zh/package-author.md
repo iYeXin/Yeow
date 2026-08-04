@@ -374,6 +374,45 @@ export async function initRenderer(): Promise<ImageRenderer> {
 - `onTerminate` 只在**服务方**侧有意义（子进程是服务方启动的；降级为调用方后不触发）
 - 完整示例见下文「完整示例」
 
+#### 原生服务的错误处理与降级
+
+`registerNativeService` / `ready()` 的 reject 原因需要区分（服务已存在 / 可执行文件被篡改 / 用户未批准），包内封装时应统一处理并降级：
+
+```ts
+import { registerNativeService, serviceRequest, log } from 'yeow-api';
+import { getAssetsPath } from 'yeow-dev';
+
+export async function initRenderer(): Promise<ImageRenderer | null> {
+    try {
+        const { serviceId, ready } = await registerNativeService(IMAGE_SERVICE, {
+            'windows-x64': getAssetsPath('native/windows-x64/image-svc.exe'),
+            'linux-x64':   getAssetsPath('native/linux-x64/image-svc'),
+        });
+        await ready();
+        return { render: (w, h, px) => serviceRequest(serviceId, '/imageRender', { width: w, height: h, base64: px.toBase64() }) };
+    } catch (e) {
+        const msg = (e as Error).message;
+        if (msg.includes('Service already registered')) {
+            // 服务已存在：以调用方身份接入既有服务（正常降级）
+            const sid = (e as any).serviceId as string;
+            return { render: (w, h, px) => serviceRequest(sid, '/imageRender', { width: w, height: h, base64: px.toBase64() }) };
+        }
+        if (msg.includes('hash mismatch')) {
+            // 可执行文件被篡改（声明与实际 SHA-256 不一致）：拒绝使用
+            log.error('Native binary tampered — refusing to load');
+            return null;
+        }
+        if (msg.includes('not approved')) {
+            // 用户未批准：提示管理员 /yeow approve <plugin> 后 reload；包内可降级到纯 JS 实现
+            log.warn('Native service requires approval — run /yeow approve <plugin> then /yeow reload <plugin>');
+            return fallbackJsRenderer();   // 降级：切换到纯 JS 实现 / 禁用相关功能
+        }
+        log.error('Native service failed:', msg);
+        return null;
+    }
+}
+```
+
 ### 组合 —— JS 门面 + 原生引擎（类型 2 + 3）
 
 JS 服务作为门面（对外路径约定、事件发布），原生子进程作为引擎（重计算）。包同时承担服务方（注册 JS 服务）与子进程管理者两个角色：
