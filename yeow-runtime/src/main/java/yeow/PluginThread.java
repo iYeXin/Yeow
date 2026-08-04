@@ -14,7 +14,7 @@ import java.util.zip.*;
 import javax.net.ssl.*;
 import java.net.*;
 
-public class PluginThread implements Runnable {
+public class PluginThread implements Runnable, PluginEntity {
     static final Gson gson = new Gson();
 
     public final String name;
@@ -31,18 +31,49 @@ public class PluginThread implements Runnable {
     private ExecutorService ioExecutor;
     private final List<ScheduledFuture<?>> timerFutures = Collections.synchronizedList(new ArrayList<>());
     private volatile String devAssetsDir;
-    private volatile Consumer<Long> pongHandler;
     private volatile boolean devMode;
     private final ConcurrentHashMap<String, com.sun.net.httpserver.HttpServer> httpServers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, HttpConn> httpPending = new ConcurrentHashMap<>();
+    private volatile CompletableFuture<Long> pendingPing;
+    private volatile long pendingPingSentAt;
 
     record HttpConn(String serverId, com.sun.net.httpserver.HttpExchange exchange) {}
 
     public void setDevAssetsDir(String d) { devAssetsDir = d; }
-    public void setPongHandler(Consumer<Long> h) { this.pongHandler = h; }
     public String getDevAssetsDir() { return devAssetsDir; }
     public void setDevMode(boolean m) { devMode = m; }
     public boolean isDevMode() { return devMode; }
+
+    // ── PluginEntity ──────────────────────────────────────────
+    @Override public String name() { return name; }
+    @Override public String source() { return jarPath; }
+    @Override public boolean isVirtual() { return false; }
+    @Override public void postMessage(String json) { queue.sendJs(json); }
+
+    @Override
+    public CompletableFuture<Long> ping() {
+        synchronized (this) {
+            if (pendingPing != null) return null; // in-flight，不重复发起
+            var fut = new CompletableFuture<Long>();
+            pendingPing = fut;
+            pendingPingSentAt = System.nanoTime();
+            queue.sendJs("{\"t\":\"DEBUG\",\"p\":\"ping\"}");
+            return fut;
+        }
+    }
+
+    /** pong 到达：完成 in-flight ping future（往返纳秒）。 */
+    private void onPong() {
+        CompletableFuture<Long> fut;
+        long sentAt;
+        synchronized (this) {
+            fut = pendingPing;
+            pendingPing = null;
+            sentAt = pendingPingSentAt;
+        }
+        if (fut != null) fut.complete(System.nanoTime() - sentAt);
+    }
+    // ──────────────────────────────────────────────────────────
 
     public PluginThread(String name, String jarPath, String initCode, String userCode, Scheduler scheduler, Set<String> permissions) {
         this.name = name; this.jarPath = jarPath; this.initCode = initCode; this.userCode = userCode; this.scheduler = scheduler;
@@ -256,7 +287,7 @@ public class PluginThread implements Runnable {
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var dt = obj.get("t").getAsString();
                     if ("reportError".equals(dt)) { handleJSReport(gson.toJson(obj.get("p"))); }
-                    else if ("pong".equals(dt) && pongHandler != null) { pongHandler.accept(System.nanoTime()); }
+                    else if ("pong".equals(dt)) { onPong(); }
                     return null;
                 } else if ("log".equals(channel)) {
                     var o = gson.fromJson(pld, JsonObject.class); org.bukkit.Bukkit.getLogger().info(o.has("message") ? o.get("message").getAsString() : pld); return null;

@@ -3,7 +3,7 @@ package yeow.service;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import yeow.PluginThread;
+import yeow.PluginEntity;
 import yeow.YeowRuntime;
 
 import java.io.*;
@@ -321,7 +321,7 @@ public class ServiceManager {
         var reqJson = gson.toJson(reqPayload);
         // Send to service owner plugin via JS callback
         // The owner plugin's onRequestCb receives the request and should respond via service.response
-        pt.queue.sendJs(gson.toJson(Map.of(
+        pt.postMessage(gson.toJson(Map.of(
             "t", "cb", "p", entry.onRequestCb,
             "r", Map.of("_svc", "request", "requestId", requestId, "consumer", consumerPlugin, "path", path, "body", reqJson)
         )));
@@ -386,7 +386,7 @@ public class ServiceManager {
         var rt = YeowRuntime.inst();
         var pt = rt.getPlugin(consumerPlugin);
         if (pt != null) {
-            pt.queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(requestId, result));
+            pt.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(requestId, result));
         }
     }
 
@@ -430,7 +430,7 @@ public class ServiceManager {
             if (pt != null) {
                 var payload = Map.of("serviceId", serviceId, "eventPath", eventPath,
                     "body", (Object)(body != null ? gson.fromJson(body.toString(), Object.class) : null));
-                pt.queue.sendJs(gson.toJson(Map.of("t", "cb", "p", sub.subscriberCb, "r", payload)));
+                pt.postMessage(gson.toJson(Map.of("t", "cb", "p", sub.subscriberCb, "r", payload)));
             }
         }
     }
@@ -542,7 +542,7 @@ public class ServiceManager {
             try { if (!e.nativeProc.isAlive()) payload.put("exitCode", e.nativeProc.exitValue()); } catch (Exception ignored) {}
         }
         if (e.outputLog != null && e.outputLog.length() > 0) payload.put("output", e.outputLog.toString().trim());
-        pt.queue.sendJs(gson.toJson(Map.of("t", "cb", "p", cb, "r", payload)));
+        pt.postMessage(gson.toJson(Map.of("t", "cb", "p", cb, "r", payload)));
     }
 
     private void failPendingRequests(String serviceId, String reason) {

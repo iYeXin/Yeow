@@ -1,6 +1,7 @@
 package yeow.profile;
 
 import org.bukkit.command.CommandSender;
+import yeow.PluginEntity;
 import yeow.PluginThread;
 import yeow.profile.collector.WindowCollector;
 import yeow.profile.collector.WindowMetrics;
@@ -46,7 +47,7 @@ public final class Profiler implements AutoCloseable {
     private final WindowCollector collector;
     private final Deque<WindowMetrics> ring = new ArrayDeque<>();
     private final CompositeSink sink = new CompositeSink();
-    private final Map<String, PluginThread> plugins = new ConcurrentHashMap<>();
+    private final Map<String, PluginEntity> plugins = new ConcurrentHashMap<>();
     private volatile TrackSession track;
 
     private Profiler(ProfileConfig cfg) {
@@ -76,10 +77,9 @@ public final class Profiler implements AutoCloseable {
         return cfg.warningsEnabled();
     }
 
-    /** 插件线程启动后注册：接入心跳 pong。 */
-    public void registerPlugin(PluginThread pt) {
-        plugins.put(pt.name, pt);
-        pt.setPongHandler(ns -> onPong(pt.name, ns));
+    /** 插件线程启动后注册：接入心跳探测（插件实体负责协议，Profiler 只拿往返指标）。 */
+    public void registerPlugin(PluginEntity pt) {
+        plugins.put(pt.name(), pt);
     }
 
     /** 插件卸载时注销。 */
@@ -93,26 +93,24 @@ public final class Profiler implements AutoCloseable {
         while (ring.size() > RING_CAPACITY) ring.removeFirst();
         if (cfg.warningsEnabled()) warnings.process(w);
 
-        // 发送下一轮心跳 ping（上一个 ping 未返回的插件不再发送，避免死循环下消息堆积；
-        // 仍标记期望响应，维持挂起检测）
-        long now = System.nanoTime();
+        // 心跳探测：插件实体管理 in-flight（ping() 返回 null 表示已有未返回的 ping），
+        // Profiler 只标记期望响应并收集往返指标。
         for (var e : plugins.entrySet()) {
-            if (collector.hasPendingPing(e.getKey())) {
+            var fut = e.getValue().ping();
+            if (fut == null) {
                 collector.noteExpected(e.getKey());
                 continue;
             }
-            collector.notePingSent(e.getKey(), now);
-            e.getValue().queue.sendJs("{\"t\":\"DEBUG\",\"p\":\"ping\"}");
+            collector.notePingSent(e.getKey());
+            fut.whenComplete((rt, err) -> {
+                if (rt == null) return;
+                sink.onJsPing(new JsPingMetric(e.getKey(), rt));
+                var t = track;
+                if (t != null) t.recordJsPing(rt);
+            });
         }
         var t = track;
         if (t != null && t.expired(System.currentTimeMillis())) finishTrack();
-    }
-
-    private void onPong(String plugin, long pongNs) {
-        long rt = collector.roundTrip(plugin, pongNs);
-        if (rt >= 0) sink.onJsPing(new JsPingMetric(plugin, rt));
-        var t = track;
-        if (t != null) t.recordJsPing(rt >= 0 ? rt : 0);
     }
 
     public boolean handleProfile(CommandSender sender) {

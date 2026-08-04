@@ -132,7 +132,7 @@ public class EventBridge implements Listener {
             try {
                 long t0 = System.nanoTime();
                 var pend = SyncCallbackHelper.register(cb);
-                pt.queue.sendJs(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
+                pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
                 long timeout = timeoutMs;
                 var deadline = System.nanoTime() + timeout * 1_000_000;
                 while (System.nanoTime() < deadline && !pend.isDone()) {
@@ -160,7 +160,7 @@ public class EventBridge implements Listener {
             var pt = runtime.getPlugin(pn); if (pt == null) { latch.countDown(); continue; }
             startNs.put(cb, System.nanoTime());
             SyncCallbackHelper.register(cb, latch::countDown);
-            pt.queue.sendJs(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
+            pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
         }
         long timeout = timeoutMs;
         var deadline = System.nanoTime() + timeout * 1_000_000;

@@ -35,10 +35,7 @@ public final class WindowCollector implements ProfileSink {
     private final ProfileConfig cfg;
     private final Listener listener;
 
-    private final Map<String, Long> lastPingAtNs = new HashMap<>();
     private final Set<String> pingedThisWindow = new LinkedHashSet<>();
-    /** plugin → 发送时间：上一个 ping 尚未返回（pong 未到）。有 in-flight ping 时不再发送下一个。 */
-    private final Map<String, Long> pendingPings = new HashMap<>();
 
     // 窗口累加器（synchronized 保护）
     private long windowStartMs;
@@ -118,35 +115,18 @@ public final class WindowCollector implements ProfileSink {
         jsPings.put(m.plugin(), m.roundTripNs());
     }
 
-    /** 记录一次 ping 发送（由 Profiler 在窗口回调中调用）。 */
-    public synchronized void notePingSent(String plugin, long sentAtNs) {
-        lastPingAtNs.put(plugin, sentAtNs);
-        pendingPings.put(plugin, sentAtNs);
+    /** 记录一次 ping 发起（由 Profiler 在窗口回调中调用）；in-flight 管理在插件实体（PluginEntity.ping）。 */
+    public synchronized void notePingSent(String plugin) {
         pingedThisWindow.add(plugin);
     }
 
-    /** 标记期望响应（已有 in-flight ping、未发送新 ping 时使用），维持挂起检测的期望集合。 */
+    /** 标记期望响应（已有 in-flight ping、未发起新 ping 时使用），维持挂起检测的期望集合。 */
     public synchronized void noteExpected(String plugin) {
         pingedThisWindow.add(plugin);
     }
 
-    /** 上一个 ping 是否尚未返回（有 in-flight ping 时不应再发送下一个）。 */
-    public synchronized boolean hasPendingPing(String plugin) {
-        return pendingPings.containsKey(plugin);
-    }
-
-    /** 计算一次 pong 的往返；无对应 ping 时返回 -1。 */
-    public synchronized long roundTrip(String plugin, long pongAtNs) {
-        var sent = lastPingAtNs.get(plugin);
-        if (sent == null || pongAtNs < sent) return -1;
-        pendingPings.remove(plugin);
-        return pongAtNs - sent;
-    }
-
     /** 清除某插件的全部跟踪状态（插件卸载时）。 */
     public synchronized void removePlugin(String plugin) {
-        lastPingAtNs.remove(plugin);
-        pendingPings.remove(plugin);
         jsPings.remove(plugin);
         pingedThisWindow.remove(plugin);
         plugins.remove(plugin);

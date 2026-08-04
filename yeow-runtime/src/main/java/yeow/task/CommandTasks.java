@@ -39,19 +39,19 @@ public class CommandTasks {
                 if (perm != null && !s.hasPermission(perm)) { s.sendMessage("No permission."); return true; }
                 var payload = Map.of("sender",Map.of("name",s.getName(),"uuid",s instanceof Player pl?pl.getUniqueId().toString():"CONSOLE","isPlayer",s instanceof Player),"args",List.of(a),"label",l);
                 if (cbId != null && !cbId.isEmpty()) {
-                    var pt = YeowRef.getPluginThread(pluginName);
-                    if (pt != null) pt.queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",payload)));
+                    var pt = YeowRef.getPlugin(pluginName);
+                    if (pt != null) pt.postMessage(gson.toJson(Map.of("t","cb","p",cbId,"r",payload)));
                 }
                 return true;
             }
 
             @Override public java.util.List<String> tabComplete(CommandSender s, String l, String[] a) {
                 if (compCbId == null || compCbId.isEmpty()) return super.tabComplete(s, l, a);
-                var pt = YeowRef.getPluginThread(pluginName);
+                var pt = YeowRef.getPlugin(pluginName);
                 if (pt == null) return super.tabComplete(s, l, a);
                 long t0 = System.nanoTime();
                 var pend = yeow.channel.SyncCallbackHelper.register(compCbId);
-                pt.queue.sendJs(gson.toJson(Map.of("t","cb","p",compCbId,"r",Map.of(
+                pt.postMessage(gson.toJson(Map.of("t","cb","p",compCbId,"r",Map.of(
                     "sender", Map.of("name",s.getName(),"uuid",s instanceof Player p?p.getUniqueId().toString():"CONSOLE","isPlayer",s instanceof Player),
                     "args", List.of(a)))));
                 long timeout = timeoutMs;

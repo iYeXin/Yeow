@@ -29,7 +29,7 @@ public class YeowRuntime extends JavaPlugin {
 
     private YeowConfig config;
     private Scheduler scheduler;
-    private final java.util.concurrent.ConcurrentHashMap<String, PluginThread> plugins = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.concurrent.ConcurrentHashMap<String, PluginEntity> plugins = new java.util.concurrent.ConcurrentHashMap<>();
     private final EventBridge eventBridge = new EventBridge(this);
     private String initCode;
     private boolean devMode = false;
@@ -37,7 +37,7 @@ public class YeowRuntime extends JavaPlugin {
     private yeow.service.ServiceManager serviceManager;
     private yeow.profile.Profiler profiler;
 
-    public PluginThread getPlugin(String name) { return plugins.get(name); }
+    public PluginEntity getPlugin(String name) { return plugins.get(name); }
     public Scheduler getScheduler() { return scheduler; }
     public EventBridge getEventBridge() { return eventBridge; }
     public yeow.service.ServiceManager getServiceManager() { return serviceManager; }
@@ -78,14 +78,14 @@ public class YeowRuntime extends JavaPlugin {
         registerYeowCommand();
 
         for (var pt : plugins.values()) {
-            pt.queue.sendJs(new com.google.gson.Gson().toJson(Map.of("t","LOAD")));
+            pt.postMessage(new com.google.gson.Gson().toJson(Map.of("t","LOAD")));
         }
     }
 
     @Override public void onDisable() {
         if (devWs != null) try { devWs.sendClose(1000, "shutdown"); } catch (Exception ignored) {}
         if (profiler != null) profiler.close();
-        plugins.values().forEach(PluginThread::stopAndWait);
+        plugins.values().forEach(PluginEntity::stopAndWait);
         scheduler.shutdown();
         if (serviceManager != null) serviceManager.shutdown();
         instance = null;
@@ -140,10 +140,10 @@ public class YeowRuntime extends JavaPlugin {
                                 eventBridge.unsubscribeAll(pname);
                                 if (serviceManager != null) serviceManager.purgePluginServices(pname);
                                 if (obj.has("assetsDir") && !obj.get("assetsDir").isJsonNull()) {
-                                    pt.setDevAssetsDir(obj.get("assetsDir").getAsString());
+                                    if (pt instanceof PluginThread t) t.setDevAssetsDir(obj.get("assetsDir").getAsString());
                                 }
                                 pt.reload(code);
-                                pt.queue.sendJs(gson.toJson(Map.of("t","LOAD")));
+                                pt.postMessage(gson.toJson(Map.of("t","LOAD")));
                                 yeow.task.CommandTasks.syncCommands();
                                 LOG.info("Hot reload complete for " + pname);
                             } else if ("build-error".equals(type)) {
@@ -297,7 +297,7 @@ public class YeowRuntime extends JavaPlugin {
     public boolean reloadPlugin(String name, String path) {
         var pt = plugins.get(name);
         if (pt == null) return false;
-        var source = path != null ? path : pt.jarPath;
+        var source = path != null ? path : pt.source();
         if (isHttpUrl(source)) {
             var cache = downloadPluginZip(source);
             if (cache == null) return false;

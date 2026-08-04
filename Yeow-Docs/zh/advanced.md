@@ -98,9 +98,17 @@ PluginThread.run()
 消息队列（MsgQueue）：
 
 ```
-Java → JS: queue.sendJs(msg) → JS 线程 pollJs(50ms) 读取
+Java → JS: postMessage(msg) → JS 线程 pollJs(50ms) 读取
 JS  → Java: queue.sendJava(msg) → Scheduler tick() 处理 game 消息
 ```
+
+## 插件实体抽象
+
+运行时以 **`PluginEntity`** 接口看待每个插件：可接收消息（`postMessage`）、有生命周期（`start` / `stopAndWait` / `reload`）与行为指标（`ping()` 心跳往返）。JS 的特殊性（QuickJS 上下文、`$hm` 消息协议、init.js）只存在于 JS 适配器（`PluginThread`）内；调度器 / 事件桥 / 命令桥 / Service / Profile 均只依赖该接口：
+
+- **调度器**只认插件名（提交任务、回复回调），不感知执行引擎
+- **Profile** 通过 `ping()` 统一采集响应延迟，in-flight 管理由适配器负责
+- **虚拟插件**（预留）：实现 `PluginEntity` 的 Worker 实体（Worker API / 多语言适配器）可接入全链路；`isVirtual()` 标记用于性能统计与告警的区分
 
 ## 调度器
 
