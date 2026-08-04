@@ -20,15 +20,7 @@ Yeow 是一个面向 Minecraft Paper 服务器的插件开发框架：用 **Type
 | **依赖包开发者** | 封装可复用的 npm 包                | [编写依赖包](package-author.md) 资源封装、三类 Service 包（SDK / JS 服务 / 原生服务）与权限声明                                                 |
 | **插件使用者**   | 服务器管理员：安装与管理插件       | [构建与分发](distribution.md) 部署方式与一键安装；[快速开始 - 插件管理命令](getting-started.md#插件管理命令)（`/yeow load/install/update/...`） |
 | **平台实现者**   | 实现 Yeow 兼容运行时               | [平台规范](specifications/README.md) 包结构、消息协议、任务/事件/运行时环境标准                                                                 |
-| **适配器开发者** | 让其他语言/引擎接入 Yeow           | [适配器规范](specifications/adapter/index.md) `PluginEntity` 接口、注册 API 与消息契约（多语言支持，见下文）                                    |
-
-## 适配器开发者
-
-Yeow 的**标准开发语言是 JavaScript**。其他语言（Python、Rust 等）通过**社区适配器**支持——适配器是**平台相关的**（如为 NeoForge 服务端提供适配器时需自行适应其模组结构），但工作量可控：实现 `PluginEntity` 接口、设计包结构、读取插件包，然后调用 `YeowRuntime.registerPluginEntity(entity)` 注册即可接入调度器 / 事件桥 / 命令桥 / Profile 全链路。
-
-- **共有接口**：`PluginEntity`（消息投递、生命周期、心跳指标）与 `submitTask`（游戏任务提交）——其余通道与权限模型是 JS 插件特有的，适配器根据自身情况处理（如 CPython 自带标准库）
-- **实验性**：多语言支持在 **Yeow v1 为实验性**——接口与协议可能随 v1 演进调整，适配器开发者应跟踪规范变更
-- 详见[适配器规范](specifications/adapter/index.md)
+| **适配器开发者** | 让其他语言/引擎接入 Yeow           | [适配器规范](specifications/adapter/index.md) `PluginEntity` 接口、注册 API 与消息契约                                                          |
 
 ## 文档地图
 
