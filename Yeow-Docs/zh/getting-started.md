@@ -197,6 +197,34 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 > **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:server.*`、`fs:server.readFile` 等；`fs:server.*` 覆盖 `fs:server.readFile`），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。声明 `fs:*` 会被**自动展开**为 `fs:outer.*, fs:server.*`。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
 
+## 原生服务可信性声明
+
+插件（或依赖包）可在 `yeow.config.json` 声明 `native` 字段，**固定原生服务二进制的 SHA-256**——构建时自动计算打包后的哈希并写入 `yeow.json`；运行时注册原生服务时校验，哈希不匹配则**拒绝加载**（Promise reject）。
+
+```json
+{
+    "native": [
+        {
+            "serviceId": "iyexin.image-svc.v1",
+            "files": ["native/win/image-svc.exe"],
+            "source": "https://github.com/iyexin/image-svc"
+        }
+    ]
+}
+```
+
+- `serviceId`：注册 `registerNativeService` 时的服务名；`files`：本包 `assets/` 下的二进制原始路径；`source`：来源链接（可选）
+- 主项目与依赖包均可声明；**相同 `serviceId` 在构建时合并**到一项（files 归并）
+- 构建产物 `yeow.json` 的 `native` 格式：`[{ "serviceId": "...", "files": [{ "<打包后路径>": "<sha256>" }, ...], "source": "..." }]`
+
+**运行时行为**：
+
+- 有声明且匹配 → 正常加载（日志显示校验通过）
+- 有声明但不匹配（文件被替换/篡改）→ **拒绝加载服务**，`registerNativeService` 的 Promise reject
+- **无论是否声明**，加载原生服务时都会打印风险日志：未声明 → 警告"无可信 SHA-256 声明，视为不可信"；已声明 → 提示校验结果
+
+> **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险。
+
 ## 插件管理命令
 
 运行时提供 `/yeow` 命令，支持 Tab 补全：

@@ -131,7 +131,7 @@ public class ServiceManager {
         return gson.toJson(Map.of("serviceId", id, "token", token));
     }
 
-    public String registerNativeService(String refName, String pluginName, JsonObject platforms, boolean isPublic, String jarPath, String devAssetsDir) {
+    public String registerNativeService(String refName, String pluginName, JsonObject platforms, boolean isPublic, String jarPath, String devAssetsDir, Map<String, String> nativeHashes) {
         var id = allocateId(refName, isPublic);
         if (isPublic && registry.containsKey(id)) {
             return gson.toJson(Map.of("err", "Service already registered: " + id, "serviceId", id));
@@ -162,6 +162,24 @@ public class ServiceManager {
 
             var execFile = extractNativeBinary(platformEl, svcDir, jarPath, devAssetsDir);
             if (execFile == null) return gson.toJson(Map.of("err", "Failed to extract native binary"));
+
+            // 可信性校验：打包后路径（getAssetsPath 结果，assets/<id>/...）→ yeow.json native 声明的 SHA-256
+            var packagedPath = packagedPathFor(platformEl);
+            var expected = nativeHashes != null ? nativeHashes.get(packagedPath) : null;
+            if (expected != null) {
+                var actual = sha256(execFile.toFile());
+                if (!expected.equalsIgnoreCase(actual)) {
+                    LOG.severe("Native service " + id + " refused: SHA-256 mismatch for " + packagedPath
+                        + " (declared " + expected + ", actual " + actual + ")");
+                    cleanDir(svcDir);
+                    return gson.toJson(Map.of("err", "Native service hash mismatch for " + packagedPath
+                        + " — refused to load (plugin '" + pluginName + "' declares a different SHA-256)"));
+                }
+                LOG.info("Native service " + id + ": SHA-256 verified (" + packagedPath + ")");
+            } else {
+                LOG.warning("Native service " + id + " (" + pluginName + "): no trusted SHA-256 declaration for "
+                    + packagedPath + " — treat as untrusted. Declare 'native' in yeow.config.json to pin hashes.");
+            }
 
             execFile.toFile().setExecutable(true);
 
@@ -211,7 +229,41 @@ public class ServiceManager {
         }
     }
 
-    private Path extractNativeBinary(JsonElement platformEl, Path svcDir, String jarPath, String devAssetsDir) throws Exception {
+    /**
+     * 计算 platform 配置对应的打包后路径（getAssetsPath 结果，`assets/<id>/...`）：
+     * string / {file} → 值本身；{dir, entry} → dir（去尾斜杠）+ "/" + entry。
+     * 与构建器 native manifest 中的 key 对齐。
+     */
+    private static String packagedPathFor(JsonElement platformEl) {
+        if (platformEl.isJsonPrimitive()) return platformEl.getAsString();
+        var cfg = platformEl.getAsJsonObject();
+        if (cfg.has("file")) return cfg.get("file").getAsString();
+        if (cfg.has("dir") && cfg.has("entry")) {
+            var dir = cfg.get("dir").getAsString();
+            while (dir.endsWith("/") || dir.endsWith("\\")) dir = dir.substring(0, dir.length() - 1);
+            return dir + "/" + cfg.get("entry").getAsString();
+        }
+        return "";
+    }
+
+    /** 文件 SHA-256（hex）。 */
+    private static String sha256(File f) {
+        try {
+            var md = java.security.MessageDigest.getInstance("SHA-256");
+            try (var in = new java.io.FileInputStream(f)) {
+                var buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+            }
+            var sb = new StringBuilder();
+            for (var b : md.digest()) sb.append(String.format("%02x", b));
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private static Path extractNativeBinary(JsonElement platformEl, Path svcDir, String jarPath, String devAssetsDir) throws Exception {
         String assetDir = null, entryFile = null, extractFile = null;
 
         if (platformEl.isJsonPrimitive()) {

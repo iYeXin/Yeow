@@ -228,6 +228,26 @@ npm run permissions
 
 每个权限都能看到它声明自哪个包，便于排查权限缺失与冗余。
 
+### 原生服务可信性声明（native）
+
+依赖包携带原生服务二进制时，建议在 `yeow.config.json` 声明 `native` 字段固定 SHA-256：
+
+```json
+{
+    "native": [
+        {
+            "serviceId": "iyexin.image-svc.v1",
+            "files": ["native/win/image-svc.exe"],
+            "source": "https://github.com/iyexin/image-svc"
+        }
+    ]
+}
+```
+
+- `files` 为**本包** `assets/` 下的二进制原始路径（与 `getAssetsPath` 使用的路径一致）
+- 构建时自动映射为打包后路径（`assets/<id>/...`）并计算 SHA-256，写入 `yeow.json` 的 `native` 字段；主项目与依赖包声明相同 `serviceId` 时合并（files 归并）
+- 运行时注册该原生服务时校验哈希：不匹配 → 拒绝加载（Promise reject）；无论是否声明都会打印风险日志。详见[快速开始 - 原生服务可信性声明](../getting-started.md#原生服务可信性声明)
+
 ---
 
 ## 封装 Service 的包（三种类型）

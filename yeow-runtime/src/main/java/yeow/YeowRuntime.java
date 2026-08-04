@@ -196,6 +196,7 @@ public class YeowRuntime extends JavaPlugin {
             var version = "";
             var author = "";
             var perms = new java.util.LinkedHashSet<String>();
+            var nativeHashes = new java.util.HashMap<String, String>(); // 打包后路径 → SHA-256
             if (metaEntry != null) {
                 var meta = new String(zip.getInputStream(metaEntry).readAllBytes(), StandardCharsets.UTF_8);
                 var obj = new Gson().fromJson(meta, JsonObject.class);
@@ -206,6 +207,20 @@ public class YeowRuntime extends JavaPlugin {
                 // v0 阶段不做旧包兼容——旧格式包（仅 permissions）视为无权限。
                 if (obj.has("computedPermissions") && obj.get("computedPermissions").isJsonArray()) {
                     for (var el : obj.getAsJsonArray("computedPermissions")) perms.add(el.getAsString());
+                }
+                // 原生服务可信性声明（构建时计算 SHA-256 写入）：打包后路径 → hash
+                if (obj.has("native") && obj.get("native").isJsonArray()) {
+                    for (var el : obj.getAsJsonArray("native")) {
+                        if (!el.isJsonObject()) continue;
+                        var e = el.getAsJsonObject();
+                        if (e.has("files") && e.get("files").isJsonArray()) {
+                            for (var f : e.getAsJsonArray("files")) {
+                                if (!f.isJsonObject()) continue;
+                                var fo = f.getAsJsonObject();
+                                for (var entry2 : fo.entrySet()) nativeHashes.put(entry2.getKey(), entry2.getValue().getAsString());
+                            }
+                        }
+                    }
                 }
             }
 
@@ -235,7 +250,7 @@ public class YeowRuntime extends JavaPlugin {
                 userCode = new String(zip.getInputStream(codeEntry).readAllBytes(), StandardCharsets.UTF_8);
             }
 
-            var pt = new PluginThread(name, jarPath, initCode, userCode, scheduler, perms);
+            var pt = new PluginThread(name, jarPath, initCode, userCode, scheduler, perms, nativeHashes);
             if (devAssetsDir != null) pt.setDevAssetsDir(devAssetsDir);
             if (devMode) pt.setDevMode(true);
             if (!registerPluginEntity(pt, sendLoad)) return false;

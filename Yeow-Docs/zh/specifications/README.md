@@ -67,8 +67,9 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 | `version`             | 版本（注入 `__plugin.version`）                                                          |
 | `author`              | 作者（注入 `__plugin.author`）                                                           |
 | `api` / `java`        | 宿主平台要求的 API/Java 版本（其他平台可忽略）                                           |
-| `permissions`         | 开发者声明的权限（敏感节点，见下文[权限模型](#权限模型)）                                |
+| `permissions`  | 开发者声明的权限（敏感节点，见下文[权限模型](#权限模型)）     |
 | `computedPermissions` | 构建时计算的最终生效权限（合并 + 通配归一化）；运行时读取此字段（v0 阶段不兼容旧格式包） |
+| `native` | 原生服务可信性声明（构建时计算 SHA-256）：`[{ "serviceId": "...", "files": [{ "<打包后路径>": "<sha256>" }, ...], "source": "..." }]` |
 
 ### `.yeow/main.js` — 插件代码
 

@@ -147,7 +147,6 @@ Yeow-Runtime 是多路复用中转站：插件通过 `request` / `subscribe` / `
 ## 打包与部署
 
 可执行文件放置在插件的 `assets/` 目录下。注册时通过 `platforms` 参数指定各平台配置：
-
 **单文件模式（file/string）：**
 ```json
 { "windows": "native/win/my-svc.exe" }
@@ -163,3 +162,14 @@ Yeow-Runtime 是多路复用中转站：插件通过 `request` / `subscribe` / `
 **提取目录：`<TEMP>/yeow-native-services/<serviceId>/`**
 - 每次 Runtime 启动时自动清理该目录
 - 插件热重载时自动清理并重新提取
+
+## 可信性声明（SHA-256）
+
+插件或依赖包可在 `yeow.config.json` 声明 `native` 字段固定二进制哈希（构建时计算打包后路径的 SHA-256 写入 `yeow.json` 的 `native` 字段）。运行时注册原生服务时：
+
+- 校验**选中平台配置对应**的二进制（`string`/`{file}` → 路径本身；`{dir, entry}` → `dir + "/" + entry`，均为打包后路径）
+- 哈希与声明一致 → 正常加载（日志提示校验通过）
+- 声明存在但不匹配 → **拒绝加载**，`ready()` reject（错误含声明/实际哈希）
+- 未声明 → 打印风险警告（视为不可信），照常加载
+
+未来 Yeow 官方或社区可能维护一份已知安全 SHA-256 列表：命中列表的二进制在插件发布时可能被标记为安全，加载时无提醒。

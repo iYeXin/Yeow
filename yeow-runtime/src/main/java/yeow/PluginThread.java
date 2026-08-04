@@ -24,6 +24,7 @@ public class PluginThread implements Runnable, PluginEntity {
     private volatile String userCode;
     private final Scheduler scheduler;
     private final Set<String> permissions;
+    private final Map<String, String> nativeHashes; // 打包后路径(assets/<id>/...) → SHA-256（yeow.json native 声明）
     private volatile QuickJSContext ctx;
     private volatile boolean running = false;
     private Thread thread;
@@ -79,9 +80,10 @@ public class PluginThread implements Runnable, PluginEntity {
     }
     // ──────────────────────────────────────────────────────────
 
-    public PluginThread(String name, String jarPath, String initCode, String userCode, Scheduler scheduler, Set<String> permissions) {
+    public PluginThread(String name, String jarPath, String initCode, String userCode, Scheduler scheduler, Set<String> permissions, Map<String, String> nativeHashes) {
         this.name = name; this.jarPath = jarPath; this.initCode = initCode; this.userCode = userCode; this.scheduler = scheduler;
         this.permissions = permissions != null ? Set.copyOf(permissions) : Set.of();
+        this.nativeHashes = nativeHashes != null ? Map.copyOf(nativeHashes) : Map.of();
     }
 
     public void start() { running = true; thread = new Thread(this, "yeow-" + name); thread.start(); }
@@ -550,7 +552,7 @@ public class PluginThread implements Runnable, PluginEntity {
             var sm = yeow.YeowRuntime.inst().getServiceManager();
             return switch (t) {
                 case "register" -> { var refName = obj.get("refName").getAsString(); var onReq = obj.get("onRequest").getAsString(); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerPluginService(refName, name, onReq, isPublic); }
-                case "registerNative" -> { var refName = obj.get("refName").getAsString(); var platforms = obj.getAsJsonObject("platforms"); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerNativeService(refName, name, platforms, isPublic, jarPath, devAssetsDir); }
+                case "registerNative" -> { var refName = obj.get("refName").getAsString(); var platforms = obj.getAsJsonObject("platforms"); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerNativeService(refName, name, platforms, isPublic, jarPath, devAssetsDir, nativeHashes); }
                 case "registerNativeTerminate" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.registerTerminateCb(svcId, cbId, name); yield "true"; }
                 case "request" -> { var svcId = obj.get("serviceId").getAsString(); var path = obj.has("path") ? obj.get("path").getAsString() : "/"; var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); var reqId = obj.get("requestId").getAsString(); sm.trackRequestConsumer(reqId, name, svcId); sm.request(svcId, path, body, reqId, name); yield null; }
                 case "awaitReady" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.awaitReady(svcId, cbId, name); yield null; }

@@ -14,7 +14,7 @@ class FsPermissionTest {
     private static PluginThread pt(Set<String> perms) {
         var cfg = new YeowConfig(new File("target/test-data"));
         var sched = new Scheduler(cfg);
-        return new PluginThread("t", "x.jar", "init", "code", sched, perms);
+        return new PluginThread("t", "x.jar", "init", "code", sched, perms, java.util.Map.of());
     }
 
     private static String check(PluginThread pt, String channel, String op) throws Exception {

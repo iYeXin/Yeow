@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, existsSync, statSync, mkdirSync, copyFileSync, realpathSync } from 'fs';
 import { resolve } from 'path';
 import { createRequire } from 'module';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 
 const require = createRequire(import.meta.url);
 
@@ -14,6 +14,15 @@ function readPerms(configPath) {
         const j = JSON.parse(readFileSync(configPath, 'utf-8'));
         if (Array.isArray(j.permissions)) return j.permissions.filter(x => typeof x === 'string');
     } catch { /* 无 yeow.config.json 或解析失败 */ }
+    return [];
+}
+
+/** 读取 yeow.config.json 的 native 可信性声明（[{serviceId, files[], source}]）。 */
+function readNatives(configPath) {
+    try {
+        const j = JSON.parse(readFileSync(configPath, 'utf-8'));
+        if (Array.isArray(j.native)) return j.native;
+    } catch { /* 无声明 */ }
     return [];
 }
 
@@ -34,6 +43,7 @@ function collectCandidates(root, pkgJson) {
         absSrc: ownAssets,
         hasAssets: existsSync(ownAssets),
         perms: readPerms(resolve(root, 'yeow.config.json')),
+        natives: readNatives(resolve(root, 'yeow.config.json')),
     });
 
     const nm = resolve(root, 'node_modules');
@@ -66,6 +76,7 @@ function collectCandidates(root, pkgJson) {
                 absSrc: pkgAssets,
                 hasAssets: true,
                 perms: readPerms(resolve(pkgDir, 'yeow.config.json')),
+                natives: readNatives(resolve(pkgDir, 'yeow.config.json')),
             });
         }
     }
@@ -169,18 +180,68 @@ function deployAll(candidates, assetsOutDir) {
     }
 }
 
+// ── 资产准备（收集 + id 分配 + 部署）──────────────────────────
+// 供 build.js 与 esbuild 插件共享——id 分配一次，保证打包路径（assets/<id>/...）
+// 在 yeow.json（native manifest）与插件内注入的 getAssetsPath 中一致。
+export function prepareAssets(root, pkgJson, outDir) {
+    const candidates = collectCandidates(root, pkgJson);
+    const ids = assignIds(candidates);
+    const assetsOutDir = resolve(outDir, '.assets');
+    deployAll(candidates, assetsOutDir);
+    return { candidates, ids, rootId: ids.get(normKey(root)), assetsOutDir };
+}
+
+// ── 原生服务可信性声明（native manifest）───────────────────────
+// 依赖包 / 主项目在 yeow.config.json 声明 native：[{serviceId, files[], source}]；
+// 构建时把 files 映射为打包后路径（assets/<id>/...）并计算 SHA-256，
+// 相同 serviceId 合并（files 归并到一项）。产物写入 yeow.json 的 native 字段：
+//   [{ "serviceId": "...", "files": [{ "<打包后路径>": "<sha256>" }, ...], "source": "..." }]
+export function computeNativeManifest(prepared) {
+    const merged = new Map(); // serviceId → { files: Map<path, {abs, packaged}>, source }
+    for (const c of prepared.candidates) {
+        for (const n of c.natives || []) {
+            const sid = n.serviceId;
+            if (!sid) continue;
+            let e = merged.get(sid);
+            if (!e) { e = { files: new Map(), source: n.source || '' }; merged.set(sid, e); }
+            else if (!e.source && n.source) e.source = n.source;
+            for (const f of n.files || []) {
+                const raw = String(f).replace(/\\/g, '/').replace(/^\/+/, '');
+                const packaged = 'assets/' + c.id + '/' + raw;
+                if (!e.files.has(packaged)) {
+                    e.files.set(packaged, resolve(prepared.assetsOutDir, c.id, raw));
+                }
+            }
+        }
+    }
+    const out = [];
+    for (const [sid, e] of merged) {
+        const files = [];
+        for (const [packaged, abs] of e.files) {
+            let hash = null;
+            try { hash = createHash('sha256').update(readFileSync(abs)).digest('hex'); }
+            catch (err) { console.warn('  ! native file not found (skipped from manifest): ' + packaged); }
+            if (hash) files.push({ [packaged]: hash });
+        }
+        if (files.length === 0) continue;
+        out.push({ serviceId: sid, files, ...(e.source ? { source: e.source } : {}) });
+    }
+    return out;
+}
+
 // ── esbuild 插件：yeow-dev 虚拟模块 ────────────────────────────
 // yeow-dev 是构建期模块（发布为空包）：getAssetsPath 由构建器按
 // importer 所属依赖项注入对应命名空间 id，运行时无需任何改动。
-export function makeAssetPlugin({ root, pkgJson, outDir }) {
+export function makeAssetPlugin({ root, pkgJson, outDir, prepared }) {
     const assetsOutDir = resolve(outDir, '.assets');
     return {
         name: 'yeow-assets',
         setup(build) {
-            const candidates = collectCandidates(root, pkgJson);
-            const ids = assignIds(candidates);
-            const rootId = ids.get(normKey(root));
-            deployAll(candidates, assetsOutDir);
+            const p = prepared ?? prepareAssets(root, pkgJson, outDir);
+            const candidates = p.candidates;
+            const ids = p.ids;
+            const rootId = p.rootId;
+            if (!prepared) deployAll(candidates, assetsOutDir); // prepared 时已由 build.js 部署
 
             // importer → 所属依赖项 id（最长路径前缀匹配；未匹配归主项目）
             const idForImporter = importer => {

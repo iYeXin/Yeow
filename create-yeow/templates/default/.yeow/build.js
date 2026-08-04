@@ -4,7 +4,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import { execSync } from 'child_process';
-import { makeAssetPlugin, makeDedupePlugin, assetsOutDirFor, readMergedPermissions } from './yeow-assets.mjs';
+import { makeAssetPlugin, makeDedupePlugin, assetsOutDirFor, readMergedPermissions, prepareAssets, computeNativeManifest } from './yeow-assets.mjs';
 
 const root = resolve(fileURLToPath(import.meta.url), '..', '..');
 const cfg = JSON.parse(readFileSync(resolve(root, 'yeow.config.json'), 'utf-8'));
@@ -55,6 +55,16 @@ async function main() {
         console.log('  \u2713 No permissions declared');
     }
 
+    // ── 资产准备（id 分配 + 部署；与插件共享，保证路径一致）──
+    const prepared = prepareAssets(root, pkgJson, outDir);
+
+    // ── 原生服务可信性声明（native manifest：打包后路径 → SHA-256）──
+    const nativeManifest = computeNativeManifest(prepared);
+    if (nativeManifest.length > 0) {
+        const fileCount = nativeManifest.reduce((n, e) => n + e.files.length, 0);
+        console.log('  \u2713 Native manifest (' + nativeManifest.length + ' services, ' + fileCount + ' files, SHA-256)');
+    }
+
     // ── 打包 ──
     await esbuild.build({
         entryPoints: [resolve(root, entry)],
@@ -70,7 +80,7 @@ async function main() {
         sourcemap: isDev ? 'linked' : false,
         plugins: [
             makeDedupePlugin(root),
-            makeAssetPlugin({ root, pkgJson, outDir }),
+            makeAssetPlugin({ root, pkgJson, outDir, prepared }),
         ],
     });
     console.log('  \u2713 Bundled (' + (statSync(resolve(outDir, 'main.js')).size / 1024).toFixed(1) + ' KB)');
@@ -106,7 +116,7 @@ async function main() {
         console.log('  \u2713 Assets included (' + files.length + ' files)');
     }
 
-    zip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, computedPermissions: mergedPerms })));
+    zip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, computedPermissions: mergedPerms, native: nativeManifest })));
     const outJar = resolve(root, 'dist', isDev ? 'plugins' : '', name + '-' + version + '.jar');
     mkdirSync(dirname(outJar), { recursive: true });
     zip.writeZip(outJar);
@@ -128,7 +138,7 @@ async function main() {
                 pkgZip.addFile('assets/' + f.replace(/\\/g, '/'), readFileSync(resolve(assetsOut, f)));
             }
         }
-        pkgZip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, computedPermissions: mergedPerms })));
+        pkgZip.addFile('yeow.json', Buffer.from(JSON.stringify({ ...cfg, computedPermissions: mergedPerms, native: nativeManifest })));
         const outZip = resolve(root, 'dist', isDev ? 'plugins' : '', name + '-' + version + '.yeow.zip');
         mkdirSync(dirname(outZip), { recursive: true });
         pkgZip.writeZip(outZip);
