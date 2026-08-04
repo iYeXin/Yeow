@@ -53,15 +53,6 @@ public interface PluginEntity {
     void postMessage(String json);
 
     /**
-     * 插件声明的权限节点（如 `fs:server.*`）。运行时经
-     * {@link yeow.YeowRuntime#submitMessage} 提交 service 等敏感通道时做节点匹配；
-     * 适配器实体默认无权限约束（权限由适配器自行管理，可覆写以接入统一权限模型）。
-     */
-    default java.util.Set<String> declaredPermissions() {
-        return java.util.Set.of();
-    }
-
-    /**
      * 发起一次心跳探测，返回往返耗时（纳秒）的 future。
      * 若已有未返回的 ping（in-flight）则返回 {@code null}，调用方不应重复发起。
      * future 在 pong 到达时完成；插件无响应时保持 pending。

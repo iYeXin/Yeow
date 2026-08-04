@@ -295,102 +295,47 @@ public class YeowRuntime extends JavaPlugin {
     }
 
     /**
-     * 运行时级消息提交——适配器提交 Yeow 消息的统一入口（等价于 JS 的 `$_send`）。
+     * 运行时级游戏任务提交——适配器提交游戏任务的统一入口（等价于 JS 的 `$_send('task', ...)`）。
      *
-     * 通用通道由运行时处理：`task`（调度器）、`service`、`log`、`now`、`dir`；
-     * `timer` / `fs` / `http` / `assets` / `debug` / `lifecycle` 为执行单元/协议
-     * 绑定通道（依赖 JS 适配器的定时器、文件、HTTP、错误上报与退出语义），
-     * 适配器按需自行实现。
+     * 只有 task 通道是共有的；其他通道（service / fs / http / timer / log / debug 等）与
+     * 权限模型都是 JS 插件特有的，适配器根据自身情况处理（如 CPython 自带标准库，
+     * 无需运行时提供 log / fs 等辅助）。
      *
      * 回调约定：payload 含 `cb` 字段时异步执行（立即返回 null），结果经
      * {@link PluginEntity#postMessage} 回投 `{"t":"cb","p":"<cbId>","r":<data>}`；
-     * 无 `cb` 时同步阻塞返回结果 JSON。
+     * 无 `cb` 时同步阻塞返回结果 JSON。`cbId` 由适配器自行生成与管理。
      *
-     * @param entity  提交方实体（注册表中的插件）
-     * @param channel 通道名
-     * @param json    消息 JSON（等价 $_send 的 jsonString）
-     * @return 结果 JSON（同步）或 null（异步 / 未支持通道）
+     * @param entity 提交方实体（注册表中的插件）
+     * @param json   任务消息 JSON：`{"type":"player.get","params":{...},"cb":"<id>","priority":"high"}`
+     * @return 结果 JSON（同步）或 null（异步）
      */
-    public String submitMessage(PluginEntity entity, String channel, String json) {
+    public String submitTask(PluginEntity entity, String json) {
         if (entity == null) return gson.toJson(Map.of("err", "unknown plugin entity"));
         try {
-            return switch (channel) {
-                case "task" -> submitTask(entity, json);
-                case "service" -> submitService(entity, json);
-                case "log" -> {
-                    var o = gson.fromJson(json.isEmpty() ? "{}" : json, JsonObject.class);
-                    LOG.info(o.has("message") ? o.get("message").getAsString() : json);
-                    yield null;
-                }
-                case "now" -> String.valueOf(System.nanoTime());
-                case "dir" -> "plugins/" + entity.name();
-                default -> null; // timer/fs/http/assets/debug/lifecycle：适配器自行实现
-            };
+            var obj = gson.fromJson(json.isEmpty() ? "{}" : json, JsonObject.class);
+            var taskType = obj.get("type").getAsString();
+            var params = obj.has("params") ? obj.getAsJsonObject("params") : new JsonObject();
+            params.addProperty("_plugin", entity.name()); // ownership for per-plugin cleanup (gui/bossbar etc.)
+            var hasCb = obj.has("cb");
+            var priority = parsePriority(obj.has("priority") ? obj.get("priority").getAsString() : null);
+            if (hasCb) {
+                var cbId = obj.get("cb").getAsString();
+                scheduler.submitGameAsync(taskType, params, r -> entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, r)), priority, entity.name());
+                return null;
+            }
+            var future = new java.util.concurrent.CompletableFuture<String>();
+            scheduler.submitGameSync(taskType, params, future, priority, entity.name());
+            try { return future.get(5, TimeUnit.SECONDS); }
+            catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
         } catch (Exception e) {
             return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
         }
-    }
-
-    private String submitTask(PluginEntity entity, String json) {
-        var obj = gson.fromJson(json.isEmpty() ? "{}" : json, JsonObject.class);
-        var taskType = obj.get("type").getAsString();
-        var params = obj.has("params") ? obj.getAsJsonObject("params") : new JsonObject();
-        params.addProperty("_plugin", entity.name()); // ownership for per-plugin cleanup (gui/bossbar etc.)
-        var hasCb = obj.has("cb");
-        var priority = parsePriority(obj.has("priority") ? obj.get("priority").getAsString() : null);
-        if (hasCb) {
-            var cbId = obj.get("cb").getAsString();
-            scheduler.submitGameAsync(taskType, params, r -> entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, r)), priority, entity.name());
-            return null;
-        }
-        var future = new java.util.concurrent.CompletableFuture<String>();
-        scheduler.submitGameSync(taskType, params, future, priority, entity.name());
-        try { return future.get(5, TimeUnit.SECONDS); }
-        catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
-    }
-
-    private String submitService(PluginEntity entity, String json) {
-        var obj = gson.fromJson(json.isEmpty() ? "{}" : json, JsonObject.class);
-        var t = obj.get("t").getAsString();
-        var sm = serviceManager;
-        if (sm == null) return gson.toJson(Map.of("err", "service manager unavailable"));
-        var name = entity.name();
-        var denied = checkChannelPermission(entity.declaredPermissions(), "service", t);
-        if (denied != null) return gson.toJson(Map.of("err", denied));
-        return switch (t) {
-            case "register" -> { var refName = obj.get("refName").getAsString(); var onReq = obj.get("onRequest").getAsString(); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerPluginService(refName, name, onReq, isPublic); }
-            case "registerNative" -> { var refName = obj.get("refName").getAsString(); var platforms = obj.getAsJsonObject("platforms"); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerNativeService(refName, name, platforms, isPublic, entity.source(), entity instanceof PluginThread pt ? pt.getDevAssetsDir() : null); }
-            case "registerNativeTerminate" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.registerTerminateCb(svcId, cbId, name); yield "true"; }
-            case "request" -> { var svcId = obj.get("serviceId").getAsString(); var path = obj.has("path") ? obj.get("path").getAsString() : "/"; var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); var reqId = obj.get("requestId").getAsString(); sm.trackRequestConsumer(reqId, name, svcId); sm.request(svcId, path, body, reqId, name); yield null; }
-            case "awaitReady" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.awaitReady(svcId, cbId, name); yield null; }
-            case "response" -> { var reqId = obj.get("requestId").getAsString(); var result = obj.has("body") ? gson.fromJson(obj.get("body").toString(), Object.class) : null; sm.respond(reqId, name, result); yield null; }
-            case "subscribe" -> { var svcId = obj.get("serviceId").getAsString(); var eventPath = obj.get("eventPath").getAsString(); var cbId = obj.get("cb").getAsString(); sm.subscribe(svcId, eventPath, cbId, name); yield "true"; }
-            case "unsubscribe" -> { var svcId = obj.get("serviceId").getAsString(); var eventPath = obj.get("eventPath").getAsString(); sm.unsubscribe(svcId, eventPath, name); yield "true"; }
-            case "publish" -> { var token = obj.get("token").getAsString(); var eventPath = obj.get("eventPath").getAsString(); var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); sm.publish(token, eventPath, body); yield "true"; }
-            default -> gson.toJson(Map.of("err", "Unknown service op: " + t));
-        };
     }
 
     private static Scheduler.Priority parsePriority(String s) {
         if (s == null) return Scheduler.Priority.NORMAL;
         return switch (s.toLowerCase()) { case "high" -> Scheduler.Priority.HIGH; case "low" -> Scheduler.Priority.LOW; default -> Scheduler.Priority.NORMAL; };
     }
-
-    /** 节点匹配权限检查（与 JS 适配器一致的默认拒绝策略）。 */
-    static String checkChannelPermission(java.util.Set<String> permissions, String channel, String op) {
-        var node = channel + ":" + op;
-        if (permissions.contains(node) || permissions.contains(channel + ":*")) return null;
-        var dot = op.indexOf('.');
-        if (dot > 0 && permissions.contains(channel + ":" + op.substring(0, dot) + ".*")) return null;
-        for (var denied : DEFAULT_DENIED_NODES) {
-            if (node.startsWith(denied)) return "Permission denied: " + node;
-        }
-        return null;
-    }
-
-    private static final String[] DEFAULT_DENIED_NODES = {
-        "fs:server.", "fs:outer.", "http:", "service:registerNative", "assets:extract",
-    };
 
     /**
      * 权限清单的展示形态：`fs:*` 展开为 `fs:outer.*, fs:server.*`（服主对 fs:*
