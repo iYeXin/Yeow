@@ -1,5 +1,12 @@
 import { call, post } from './task.js';
 
+// ES2026 引擎能力（QuickJS 2026-06-04）：TS 库类型尚未收录
+declare global {
+  interface Uint8ArrayConstructor {
+    fromBase64(b64: string): Uint8Array;
+  }
+}
+
 export interface ChunkData {
   x: number;
   z: number;
@@ -23,12 +30,12 @@ function ensureBlocksSync(): string[] {
   return blocks;
 }
 
-/** base64(big-endian short[]) → Uint16Array。 */
+/** base64(big-endian short[]) → Uint16Array。引擎无 atob，用 ES2026 `Uint8Array.fromBase64`。 */
 function decodeShortArray(b64: string): Uint16Array {
-  const bin = atob(b64);
-  const out = new Uint16Array(bin.length / 2);
+  const bytes = Uint8Array.fromBase64(b64);
+  const out = new Uint16Array(bytes.length / 2);
   for (let i = 0; i < out.length; i++) {
-    out[i] = (bin.charCodeAt(i * 2) << 8) | bin.charCodeAt(i * 2 + 1);
+    out[i] = (bytes[i * 2] << 8) | bytes[i * 2 + 1];
   }
   return out;
 }
