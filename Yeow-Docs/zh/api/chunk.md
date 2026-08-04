@@ -20,12 +20,12 @@ const chunk2 = world.getChunkAtSync(0, 0);
 快照中每个方块表示为**类型索引**（`number`，0-65535）：
 
 - 索引 = [`getBlocks()`](server.md) 返回数组的**下标**（如 `blocks[0]` = 列表第一个方块 key）
-- 索引由运行时构建（`Registry.MATERIAL` 顺序），**仅当前运行时内有效**——重启服务器后索引可能变化，**快照数据不可持久化**，需在本次会话内使用
+- 索引由运行时构建（`Registry.MATERIAL` 顺序），**仅当前运行时内有效**——重启服务器后索引可能变化，**快照数据不可持久化**，需在本次会话内使用。如需持久化，需要同时保存 `getBlocks()` 的结果。
 - 反向映射：`const blocks = await getBlocks(); blocks[snap.getBlockIndex(x, y, z)]`
 
 ## ChunkSnapshot（完整快照，3D）
 
-`chunk.getSnapshot()` 返回整个区块（16×16×世界高度，1.21.4 为 384 层）的方块索引：
+`chunk.getSnapshot()` 返回整个区块（16×16×世界高度，如 384 层）的方块索引：
 
 ```ts
 const snap = await chunk.getSnapshot();   // ChunkSnapshot
@@ -57,19 +57,19 @@ top.data                                   // Uint16Array（256 元素）
 
 ## 示例：地图画
 
+地图画是 2D 渲染，每列只需一个方块——使用 `getTopSnapshot` 即可（一次请求拿到整区块最高方块层）：
+
 ```js
 import { World, getBlocks } from 'yeow-api';
 
 const world = await World.get('world');
 const blocks = await getBlocks();            // 索引 → key 映射
-const snap = await world.getChunkAt(0, 0).getSnapshot();
+const top = await world.getChunkAt(0, 0).getTopSnapshot();
 
-// 遍历区块（绝对高度 64 层）
-for (let y = 64; y < 96; y++) {
-  for (let z = 0; z < 16; z++) {
-    for (let x = 0; x < 16; x++) {
-      const key = snap.getBlock(x, y, z);    // 方块 key，可直接用于 world.setBlock
-    }
+// 遍历区块（16×16）
+for (let z = 0; z < 16; z++) {
+  for (let x = 0; x < 16; x++) {
+    const key = top.getTop(x, z);            // 方块 key，可直接用于 world.setBlock
   }
 }
 ```
