@@ -15,6 +15,36 @@ const chunk2 = world.getChunkAtSync(0, 0);
 
 `Chunk` 本身不承载方块数据——方块数据通过快照获取。
 
+### Chunk 数据（位置）
+
+`Chunk` 携带区块的位置信息，可用于定位与区域计算：
+
+| 字段 | 类型 | 说明 |
+| ---- | ---- | ---- |
+| `chunk.x` | `number` | 区块 X 坐标（世界坐标 `>> 4`，即 `Math.floor(wx / 16)`） |
+| `chunk.z` | `number` | 区块 Z 坐标 |
+| `chunk.world` | `string` | 所属世界名（可用于 `World.get()` 取回世界对象） |
+
+```ts
+// 区块 ↔ 世界坐标换算
+const wx = chunk.x * 16 + 0, wz = chunk.z * 16 + 0;  // 区块西北角
+const cx = Math.floor(wx / 16), cz = Math.floor(wz / 16);  // 世界坐标 → 区块
+```
+
+### 副作用：区块加载
+
+**`getChunkAt` / `getSnapshot` / `getTopSnapshot` 都会加载未加载的区块**——底层是 Bukkit 的 `World.getChunkAt(x, z)`，若目标区块不在内存中会强制加载（甚至触发生成）。副作用：
+
+- 在未探索区域调用会**触发区块生成**（磁盘 IO / 主线程负载）
+- 加载的区块保持驻留，直到被正常卸载
+- **只读检查请用 `isChunkLoaded`**：未加载时自行决定是否 `loadChunk` / 跳过
+
+```ts
+if (!world.isChunkLoadedSync(cx, cz)) {
+  // 自行决定：跳过、loadChunk 或 getChunkAt（强制加载）
+}
+```
+
 ## 方块类型索引
 
 快照中每个方块表示为**类型索引**（`number`，0-65535）：
@@ -38,7 +68,7 @@ snap.minY / snap.height                   // 世界最低高度 / 层数
 - **遍历顺序**：`y` 外层 → `z` 中层 → `x` 内层；偏移量 = `((y - minY) * 16 + z) * 16 + x`
 - `y` 为**世界绝对高度**
 - 越界坐标与未知索引回退 `'minecraft:air'`
-- **操作较重**：单次快照约 10 万次索引（任务层通过 base64 打包传输，约 255 KB），但比使用 `world.getBlock()` 遍历高效的多。
+- **操作较重**：单次快照约 10 万次索引（任务层通过 base64 打包传输，约 255 KB），但比使用 `world.getBlock()` 遍历高效得多。
 
 ## ChunkTopSnapshot（顶部快照，2D）
 
