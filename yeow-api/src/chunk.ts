@@ -1,12 +1,5 @@
 import { call, post } from './task.js';
 
-// ES2026 引擎能力（QuickJS 2026-06-04）：TS 库类型尚未收录
-declare global {
-  interface Uint8ArrayConstructor {
-    fromBase64(b64: string): Uint8Array;
-  }
-}
-
 export interface ChunkData {
   x: number;
   z: number;
