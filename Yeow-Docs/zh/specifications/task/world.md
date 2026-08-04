@@ -68,6 +68,17 @@
 |------|------|------|
 | `world.getBiome` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `string` (命名空间 key，如 `minecraft:plains`) |
 | `world.getHighestBlockY` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `number` |
+| `world.getBlockLightLevel` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `number` (0-15，方块光源等级) |
+| `world.getSkyLightLevel` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `number` (0-15，天空光照等级) |
+
+### 区块
+
+| 任务 | 请求 | 返回 |
+|------|------|------|
+| `world.getChunkAt` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `{ "x": <int>, "z": <int> }`（取区块，可能触发加载） |
+| `world.isChunkLoaded` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean` |
+| `world.loadChunk` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean`（强制加载） |
+| `world.unloadChunk` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean` |
 
 ### 方块
 

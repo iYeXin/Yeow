@@ -26,6 +26,9 @@ public class PlayerTasks {
     public static Object setAllowFlight(JsonObject p) { player(p).setAllowFlight(p.get("value").getAsBoolean()); return true; }
     public static Object getFlying(JsonObject p) { return player(p).isFlying(); }
     public static Object setFlying(JsonObject p) { player(p).setFlying(p.get("value").getAsBoolean()); return true; }
+    public static Object isSneaking(JsonObject p) { return player(p).isSneaking(); }
+    public static Object isSprinting(JsonObject p) { return player(p).isSprinting(); }
+    public static Object getBedLocation(JsonObject p) { var l = player(p).getBedSpawnLocation(); return l != null ? Map.of("x",l.getX(),"y",l.getY(),"z",l.getZ(),"yaw",(double)l.getYaw(),"pitch",(double)l.getPitch(),"world",l.getWorld().getName()) : null; }
     public static Object getWalkSpeed(JsonObject p) { return (double)player(p).getWalkSpeed(); }
     public static Object setWalkSpeed(JsonObject p) { player(p).setWalkSpeed(p.get("value").getAsFloat()); return true; }
     public static Object getFlySpeed(JsonObject p) { return (double)player(p).getFlySpeed(); }

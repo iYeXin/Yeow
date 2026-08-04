@@ -43,6 +43,42 @@ export class World {
   getHighestBlockYSync(x: number, z: number): number {
     return call<number>('world.getHighestBlockY', { world: this.name, x, z });
   }
+  getChunkAt(x: number, z: number): Promise<{ x: number; z: number }> {
+    return post('world.getChunkAt', { world: this.name, x, z });
+  }
+  getChunkAtSync(x: number, z: number): { x: number; z: number } {
+    return call('world.getChunkAt', { world: this.name, x, z });
+  }
+  isChunkLoaded(x: number, z: number): Promise<boolean> {
+    return post<boolean>('world.isChunkLoaded', { world: this.name, x, z });
+  }
+  isChunkLoadedSync(x: number, z: number): boolean {
+    return call<boolean>('world.isChunkLoaded', { world: this.name, x, z });
+  }
+  loadChunk(x: number, z: number): Promise<boolean> {
+    return post<boolean>('world.loadChunk', { world: this.name, x, z });
+  }
+  loadChunkSync(x: number, z: number): boolean {
+    return call<boolean>('world.loadChunk', { world: this.name, x, z });
+  }
+  unloadChunk(x: number, z: number): Promise<boolean> {
+    return post<boolean>('world.unloadChunk', { world: this.name, x, z });
+  }
+  unloadChunkSync(x: number, z: number): boolean {
+    return call<boolean>('world.unloadChunk', { world: this.name, x, z });
+  }
+  getBlockLightLevel(x: number, y: number, z: number): Promise<number> {
+    return post<number>('world.getBlockLightLevel', { world: this.name, x, y, z });
+  }
+  getBlockLightLevelSync(x: number, y: number, z: number): number {
+    return call<number>('world.getBlockLightLevel', { world: this.name, x, y, z });
+  }
+  getSkyLightLevel(x: number, y: number, z: number): Promise<number> {
+    return post<number>('world.getSkyLightLevel', { world: this.name, x, y, z });
+  }
+  getSkyLightLevelSync(x: number, y: number, z: number): number {
+    return call<number>('world.getSkyLightLevel', { world: this.name, x, y, z });
+  }
   getGameRule(rule: string): Promise<string | null> {
     return post<string | null>('world.getGameRule', { world: this.name, rule });
   }

@@ -5,6 +5,7 @@ export { Location } from './location.js';
 export { Player } from './player.js';
 export { World } from './world.js';
 export { Entity, LivingEntity } from './entity.js';
+export type { BoundingBox } from './entity.js';
 export { Block } from './block.js';
 export { Inventory } from './inventory.js';
 export { registerCommand } from './command.js';
@@ -14,6 +15,7 @@ export type {
     PlayerJoinEvent, PlayerQuitEvent, PlayerChatEvent, PlayerMoveEvent,
     PlayerInteractEvent, PlayerCommandEvent, PlayerDeathEvent, PlayerRespawnEvent,
     PlayerTeleportEvent, PlayerItemConsumeEvent,
+    PlayerAdvancementDoneEvent, PlayerToggleSneakEvent, PlayerToggleFlightEvent,
     PlayerDropItemEvent, PlayerPickupItemEvent, PlayerBucketFillEvent, PlayerBucketEmptyEvent,
     PlayerExpChangeEvent, PlayerLevelChangeEvent, PlayerGameModeChangeEvent, FoodLevelChangeEvent,
     EntityDamageEvent, EntityDeathEvent, EntitySpawnEvent, EntityExplodeEvent,

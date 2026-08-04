@@ -61,13 +61,30 @@ block.breakNaturallySync(tool?): boolean
 
 `tool` 为可选的 `ItemStack`，用于模拟特定工具的挖掘效果（如 `{ type: 'minecraft:diamond_pickaxe', meta: { enchantments: { fortune: 3 } } }`）。
 
-### 生物群系
+### 生物群系与光照
 
 ```js
 world.getBiome(x, y, z)             // Promise<string> 如 "minecraft:plains"
 world.getBiomeSync(x, y, z)         // string
 world.getHighestBlockY(x, z)        // Promise<number>
 world.getHighestBlockYSync(x, z)    // number
+world.getBlockLightLevel(x, y, z)   // Promise<number> (0-15)
+world.getBlockLightLevelSync(x, y, z)
+world.getSkyLightLevel(x, y, z)     // Promise<number> (0-15)
+world.getSkyLightLevelSync(x, y, z)
+```
+
+### 区块
+
+```js
+world.getChunkAt(x, z)              // Promise<{ x, z }>（取区块，可能触发加载）
+world.getChunkAtSync(x, z)
+world.isChunkLoaded(x, z)           // Promise<boolean>
+world.isChunkLoadedSync(x, z)       // boolean
+world.loadChunk(x, z)               // Promise<boolean>（强制加载）
+world.loadChunkSync(x, z)           // boolean
+world.unloadChunk(x, z)             // Promise<boolean>
+world.unloadChunkSync(x, z)         // boolean
 ```
 
 ### 实体查询

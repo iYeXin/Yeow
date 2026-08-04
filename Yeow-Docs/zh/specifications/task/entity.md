@@ -53,7 +53,8 @@
 | 任务 | 请求 | 返回 |
 |------|------|------|
 | `entity.getPassengers` | `{ "uuid": "<uuid>" }` | `string[]` (UUID 数组) |
-| `entity.getVehicle` | `{ "uuid": "<uuid>" }` | `string` | `null` (骑乘的实体 UUID) |
+| `entity.getVehicle` | `{ "uuid": "<uuid>" }` | `string` \| `null` (骑乘的实体 UUID) |
+| `entity.getBoundingBox` | `{ "uuid": "<uuid>" }` | `{ "minX","minY","minZ","maxX","maxY","maxZ" }` (double) |
 
 ### 生命操作
 

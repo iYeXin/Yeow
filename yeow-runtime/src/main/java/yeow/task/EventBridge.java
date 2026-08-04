@@ -54,6 +54,9 @@ public class EventBridge implements Listener {
         EVENTS.put("playerExpChange", PlayerExpChangeEvent.class);
         EVENTS.put("playerLevelChange", PlayerLevelChangeEvent.class);
         EVENTS.put("playerGameModeChange", PlayerGameModeChangeEvent.class);
+        EVENTS.put("playerAdvancementDone", PlayerAdvancementDoneEvent.class);
+        EVENTS.put("playerToggleSneak", PlayerToggleSneakEvent.class);
+        EVENTS.put("playerToggleFlight", PlayerToggleFlightEvent.class);
         EVENTS.put("foodLevelChange", FoodLevelChangeEvent.class);
         EVENTS.put("entityDamage", EntityDamageEvent.class);
         EVENTS.put("entityDeath", EntityDeathEvent.class);
@@ -210,6 +213,9 @@ public class EventBridge implements Listener {
             case "playerExpChange":{ var e=(PlayerExpChangeEvent)ev; putP(m,e.getPlayer()); m.put("amount",e.getAmount()); break; }
             case "playerLevelChange":{ var e=(PlayerLevelChangeEvent)ev; putP(m,e.getPlayer()); m.put("oldLevel",e.getOldLevel()); m.put("newLevel",e.getNewLevel()); break; }
             case "playerGameModeChange":{ var e=(PlayerGameModeChangeEvent)ev; putP(m,e.getPlayer()); m.put("newGameMode",e.getNewGameMode().name()); break; }
+            case "playerAdvancementDone":{ var e=(PlayerAdvancementDoneEvent)ev; putP(m,e.getPlayer()); m.put("advancement",e.getAdvancement().getKey().toString()); break; }
+            case "playerToggleSneak":{ var e=(PlayerToggleSneakEvent)ev; putP(m,e.getPlayer()); m.put("sneaking",e.isSneaking()); break; }
+            case "playerToggleFlight":{ var e=(PlayerToggleFlightEvent)ev; putP(m,e.getPlayer()); m.put("flying",e.isFlying()); break; }
             case "foodLevelChange":{ var e=(FoodLevelChangeEvent)ev; putP(m,(org.bukkit.entity.Player)e.getEntity()); m.put("oldFoodLevel",e.getEntity().getFoodLevel()); m.put("newFoodLevel",e.getFoodLevel()); break; }
             case "entityDamage":{ var e=(EntityDamageEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString()); m.put("damage",e.getDamage());
                 m.put("cause",e.getCause().name()); m.put("entityType",e.getEntityType().name()); break; }

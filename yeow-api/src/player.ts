@@ -65,6 +65,19 @@ export class Player {
   isFlyingAsync(): Promise<boolean> { return post<boolean>('player.isFlying', { uuid: this.uuid }); }
   setFlying(v: boolean): Promise<void> { return post('player.setFlying', { uuid: this.uuid, value: v }); }
 
+  get isSneaking(): boolean { return call<boolean>('player.isSneaking', { uuid: this.uuid }); }
+  isSneakingAsync(): Promise<boolean> { return post<boolean>('player.isSneaking', { uuid: this.uuid }); }
+  get isSprinting(): boolean { return call<boolean>('player.isSprinting', { uuid: this.uuid }); }
+  isSprintingAsync(): Promise<boolean> { return post<boolean>('player.isSprinting', { uuid: this.uuid }); }
+
+  get bedLocation(): Location | null {
+    const r = call<LocationData>('player.getBedLocation', { uuid: this.uuid });
+    return r ? Location.from(r) : null;
+  }
+  getBedLocation(): Promise<Location | null> {
+    return post<LocationData>('player.getBedLocation', { uuid: this.uuid }).then((r) => (r ? Location.from(r) : null));
+  }
+
   get allowFlight(): boolean { return call<boolean>('player.getAllowFlight', { uuid: this.uuid }); }
   set allowFlight(v: boolean) { call('player.setAllowFlight', { uuid: this.uuid, value: v }); }
   getAllowFlight(): Promise<boolean> { return post<boolean>('player.getAllowFlight', { uuid: this.uuid }); }

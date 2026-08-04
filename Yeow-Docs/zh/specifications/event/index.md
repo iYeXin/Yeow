@@ -43,6 +43,9 @@ Yeow 事件系统是运行时向插件投递游戏事件的机制。插件通过
 | `playerExpChange`          | 玩家   | 否     | 玩家经验值变化   |
 | `playerLevelChange`        | 玩家   | 否     | 玩家等级变化     |
 | `playerGameModeChange`     | 玩家   | 否     | 玩家游戏模式变化 |
+| `playerAdvancementDone`    | 玩家   | 否     | 玩家完成进度     |
+| `playerToggleSneak`        | 玩家   | 否     | 玩家切换潜行     |
+| `playerToggleFlight`       | 玩家   | 否     | 玩家切换飞行     |
 | `foodLevelChange`          | 玩家   | 是     | 玩家饥饿值变化   |
 | `entityDamage`             | 实体   | 是     | 实体受伤         |
 | `entityDeath`              | 实体   | 否     | 实体死亡         |
@@ -71,7 +74,7 @@ Yeow 事件系统是运行时向插件投递游戏事件的机制。插件通过
 
 | 模块                                    | 说明                          |
 | --------------------------------------- | ----------------------------- |
-| [player-events](player-events.md)       | 18 个玩家事件                 |
+| [player-events](player-events.md)       | 21 个玩家事件                 |
 | [entity-events](entity-events.md)       | 6 个实体事件 + 2 个弹射物事件 |
 | [block-events](block-events.md)         | 6 个方块事件                  |
 | [inventory-events](inventory-events.md) | 3 个库存事件                  |

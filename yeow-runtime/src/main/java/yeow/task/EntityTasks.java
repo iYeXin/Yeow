@@ -24,6 +24,7 @@ public class EntityTasks {
     public static Object setGravity(JsonObject p) { entity(p).setGravity(p.get("value").getAsBoolean()); return true; }
     public static Object getPassengers(JsonObject p) { return entity(p).getPassengers().stream().map(e -> e.getUniqueId().toString()).toList(); }
     public static Object getVehicle(JsonObject p) { var v = entity(p).getVehicle(); return v != null ? v.getUniqueId().toString() : null; }
+    public static Object getBoundingBox(JsonObject p) { var b = entity(p).getBoundingBox(); return Map.of("minX",b.getMinX(),"minY",b.getMinY(),"minZ",b.getMinZ(),"maxX",b.getMaxX(),"maxY",b.getMaxY(),"maxZ",b.getMaxZ()); }
     public static Object getHealth(JsonObject p) { return ((LivingEntity)entity(p)).getHealth(); }
     public static Object setHealth(JsonObject p) { ((LivingEntity)entity(p)).setHealth(p.get("value").getAsDouble()); return true; }
     public static Object getMaxHealth(JsonObject p) { return ((LivingEntity)entity(p)).getMaxHealth(); }

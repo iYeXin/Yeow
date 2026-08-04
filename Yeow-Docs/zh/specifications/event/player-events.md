@@ -129,6 +129,27 @@
 | `player` | string (UUID) | 玩家 |
 | `newGameMode` | string | 新模式（`CREATIVE`、`SURVIVAL`、`ADVENTURE`、`SPECTATOR`） |
 
+## `playerAdvancementDone`
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `player` | string (UUID) | 玩家 |
+| `advancement` | string | 进度命名空间 key（如 `minecraft:story/root`） |
+
+## `playerToggleSneak`
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `player` | string (UUID) | 玩家 |
+| `sneaking` | boolean | 是否进入潜行状态 |
+
+## `playerToggleFlight`
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `player` | string (UUID) | 玩家 |
+| `flying` | boolean | 是否进入飞行状态 |
+
 ## `foodLevelChange`
 
 | 字段 | 类型 | 说明 |

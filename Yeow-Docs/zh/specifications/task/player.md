@@ -52,6 +52,9 @@
 | `player.isOnline` | `{ "uuid": "<uuid>" }` | `boolean` |
 | `player.isFlying` | `{ "uuid": "<uuid>" }` | `boolean` |
 | `player.setFlying` | `{ "uuid": "<uuid>", "value": <boolean> }` | `true` |
+| `player.isSneaking` | `{ "uuid": "<uuid>" }` | `boolean` |
+| `player.isSprinting` | `{ "uuid": "<uuid>" }` | `boolean` |
+| `player.getBedLocation` | `{ "uuid": "<uuid>" }` | `{ "x","y","z","yaw","pitch","world" }` \| `null` |
 | `player.getAllowFlight` | `{ "uuid": "<uuid>" }` | `boolean` |
 | `player.setAllowFlight` | `{ "uuid": "<uuid>", "value": <boolean> }` | `true` |
 

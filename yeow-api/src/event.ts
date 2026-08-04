@@ -168,6 +168,18 @@ export interface PlayerItemConsumeEvent {
   itemType: string;
   cancelled?: boolean;
 }
+export interface PlayerAdvancementDoneEvent {
+  player: Player;
+  advancement: string;
+}
+export interface PlayerToggleSneakEvent {
+  player: Player;
+  sneaking: boolean;
+}
+export interface PlayerToggleFlightEvent {
+  player: Player;
+  flying: boolean;
+}
 export interface EntityExplodeEvent {
   entity: string;
   entityType: string;
@@ -268,6 +280,9 @@ type EventMap = {
   playerExpChange: PlayerExpChangeEvent;
   playerLevelChange: PlayerLevelChangeEvent;
   playerGameModeChange: PlayerGameModeChangeEvent;
+  playerAdvancementDone: PlayerAdvancementDoneEvent;
+  playerToggleSneak: PlayerToggleSneakEvent;
+  playerToggleFlight: PlayerToggleFlightEvent;
   foodLevelChange: FoodLevelChangeEvent;
   entityDamage: EntityDamageEvent;
   entityDeath: EntityDeathEvent;

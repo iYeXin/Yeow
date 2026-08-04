@@ -27,6 +27,9 @@ public class Tasks {
             case "player.setAllowFlight"-> PlayerTasks.setAllowFlight(p);
             case "player.isFlying"   -> PlayerTasks.getFlying(p);
             case "player.setFlying"  -> PlayerTasks.setFlying(p);
+            case "player.isSneaking" -> PlayerTasks.isSneaking(p);
+            case "player.isSprinting" -> PlayerTasks.isSprinting(p);
+            case "player.getBedLocation" -> PlayerTasks.getBedLocation(p);
             case "player.getWalkSpeed"-> PlayerTasks.getWalkSpeed(p);
             case "player.setWalkSpeed"-> PlayerTasks.setWalkSpeed(p);
             case "player.getFlySpeed" -> PlayerTasks.getFlySpeed(p);
@@ -72,6 +75,7 @@ public class Tasks {
             case "entity.setGravity"   -> EntityTasks.setGravity(p);
             case "entity.getPassengers"-> EntityTasks.getPassengers(p);
             case "entity.getVehicle"   -> EntityTasks.getVehicle(p);
+            case "entity.getBoundingBox" -> EntityTasks.getBoundingBox(p);
             case "entity.getHealth"    -> EntityTasks.getHealth(p);
             case "entity.setHealth"    -> EntityTasks.setHealth(p);
             case "entity.getMaxHealth" -> EntityTasks.getMaxHealth(p);
@@ -106,6 +110,12 @@ public class Tasks {
             case "world.setGameRule"   -> WorldTasks.setGameRule(p);
             case "world.getBiome"      -> WorldTasks.getBiome(p);
             case "world.getHighestBlockY" -> WorldTasks.getHighestBlockY(p);
+            case "world.getChunkAt"      -> WorldTasks.getChunkAt(p);
+            case "world.isChunkLoaded"   -> WorldTasks.isChunkLoaded(p);
+            case "world.loadChunk"       -> WorldTasks.loadChunk(p);
+            case "world.unloadChunk"     -> WorldTasks.unloadChunk(p);
+            case "world.getBlockLightLevel" -> WorldTasks.getBlockLightLevel(p);
+            case "world.getSkyLightLevel"   -> WorldTasks.getSkyLightLevel(p);
             case "world.getBlock"      -> WorldTasks.getBlock(p);
             case "world.setBlock"      -> WorldTasks.setBlock(p);
             case "world.getEntities"   -> WorldTasks.getEntities(p);

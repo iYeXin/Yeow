@@ -34,6 +34,9 @@ import { Player } from 'yeow-api';
 | `level` | `number` | 读写 | 经验等级 |
 | `allowFlight` | `boolean` | 读写 | 允许飞行 |
 | `isFlying` | `boolean` | 读写 | 正在飞行 |
+| `isSneaking` | `boolean` | 只读 | 正在潜行 |
+| `isSprinting` | `boolean` | 只读 | 正在疾跑 |
+| `bedLocation` | `Location \| null` | 只读 | 床的重生点 |
 | `walkSpeed` | `number` | 读写 | 行走速度 0-1 |
 | `flySpeed` | `number` | 读写 | 飞行速度 0-1 |
 | `isOp` | `boolean` | 只读 | 是否 OP |
@@ -130,6 +133,9 @@ player.sendResourcePack(url, hash?, prompt?, force?)  // Promise
 | `player.online` | `player.getOnline()` | `Promise<boolean>` |
 | `player.isFlying` | `player.isFlyingAsync()` | `Promise<boolean>` |
 | `player.allowFlight` | `player.getAllowFlight()` | `Promise<boolean>` |
+| `player.isSneaking` | `player.isSneakingAsync()` | `Promise<boolean>` |
+| `player.isSprinting` | `player.isSprintingAsync()` | `Promise<boolean>` |
+| `player.bedLocation` | `player.getBedLocation()` | `Promise<Location \| null>` |
 | `player.walkSpeed` | `player.getWalkSpeed()` | `Promise<number>` |
 | `player.flySpeed` | `player.getFlySpeed()` | `Promise<number>` |
 

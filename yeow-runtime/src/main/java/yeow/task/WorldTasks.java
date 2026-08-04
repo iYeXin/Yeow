@@ -25,6 +25,12 @@ public class WorldTasks {
     public static Object setGameRule(JsonObject p) { try { var r = (GameRule) GameRule.class.getField(p.get("rule").getAsString().toUpperCase()).get(null); world(p).setGameRule(r, p.get("value")); } catch(Exception e) { /* ignore */ } return true; }
     public static Object getBiome(JsonObject p) { return world(p).getBiome(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getKey().toString(); }
     public static Object getHighestBlockY(JsonObject p) { return world(p).getHighestBlockYAt(p.get("x").getAsInt(), p.get("z").getAsInt()); }
+    public static Object getChunkAt(JsonObject p) { var c = world(p).getChunkAt(p.get("x").getAsInt(), p.get("z").getAsInt()); return Map.of("x", c.getX(), "z", c.getZ()); }
+    public static Object isChunkLoaded(JsonObject p) { return world(p).isChunkLoaded(p.get("x").getAsInt(), p.get("z").getAsInt()); }
+    public static Object loadChunk(JsonObject p) { return world(p).loadChunk(p.get("x").getAsInt(), p.get("z").getAsInt(), true); }
+    public static Object unloadChunk(JsonObject p) { return world(p).unloadChunk(p.get("x").getAsInt(), p.get("z").getAsInt()); }
+    public static Object getBlockLightLevel(JsonObject p) { return world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getLightFromBlocks(); }
+    public static Object getSkyLightLevel(JsonObject p) { return world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getLightFromSky(); }
     public static Object getBlock(JsonObject p) { var b = world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()); return Map.of("type",b.getType().getKey().toString(),"x",b.getX(),"y",b.getY(),"z",b.getZ()); }
     public static Object setBlock(JsonObject p) { world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).setType(Material.matchMaterial(p.get("blockType").getAsString())); return true; }
     public static Object getEntities(JsonObject p) { return world(p).getEntities().stream().map(e -> e.getUniqueId().toString()).toList(); }

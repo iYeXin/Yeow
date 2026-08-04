@@ -1,6 +1,15 @@
 import { call, post } from './task.js';
 import { Location, LocationData } from './location.js';
 
+export interface BoundingBox {
+  minX: number;
+  minY: number;
+  minZ: number;
+  maxX: number;
+  maxY: number;
+  maxZ: number;
+}
+
 export class Entity {
   static get(uuid: string): Promise<Entity | null> {
     return post<{ uuid: string }>('entity.get', { uuid }).then((d) => (d ? new Entity(d.uuid) : null));
@@ -66,6 +75,11 @@ export class Entity {
 
   get vehicle(): string | null { return call<string | null>('entity.getVehicle', { uuid: this.uuid }); }
   getVehicle(): Promise<string | null> { return post<string | null>('entity.getVehicle', { uuid: this.uuid }); }
+
+  get boundingBox(): BoundingBox {
+    return call<BoundingBox>('entity.getBoundingBox', { uuid: this.uuid });
+  }
+  getBoundingBox(): Promise<BoundingBox> { return post<BoundingBox>('entity.getBoundingBox', { uuid: this.uuid }); }
 
   remove(): Promise<void> { return post('entity.remove', { uuid: this.uuid }); }
   removeSync(): void { call('entity.remove', { uuid: this.uuid }); }

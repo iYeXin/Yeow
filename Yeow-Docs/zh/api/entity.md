@@ -60,6 +60,7 @@ entity.teleportSync(loc)
 | `entity.hasGravity` | `entity.hasGravityAsync()` | `Promise<boolean>` |
 | `entity.passengers` | `entity.getPassengers()` | `Promise<string[]>` |
 | `entity.vehicle` | `entity.getVehicle()` | `Promise<string \| null>` |
+| `entity.boundingBox` | `entity.getBoundingBox()` | `Promise<BoundingBox>`（`{ minX, minY, minZ, maxX, maxY, maxZ }`） |
 
 异步 setter（同步 setter 即属性赋值）：
 
