@@ -176,7 +176,7 @@ const lines = [
     color: var(--vp-c-text-1);
 }
 .grad {
-    background: var(--yeow-grad);
+    background: var(--yeow-grad-text);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -209,7 +209,7 @@ const lines = [
 }
 .btn.primary {
     color: #04140c;
-    background: var(--yeow-grad);
+    background: var(--yeow-grad-btn);
     box-shadow: 0 4px 18px var(--vp-c-brand-soft);
 }
 .btn.primary:hover {

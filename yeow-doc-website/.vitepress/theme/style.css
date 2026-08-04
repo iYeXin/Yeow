@@ -9,7 +9,8 @@
     --vp-c-brand-2-active: #0b8a5f;
     --vp-c-brand-3-active: #0a7a54;
 
-    --yeow-grad: linear-gradient(120deg, #0d9f6e 20%, #0284c7 100%);
+    --yeow-grad-text: linear-gradient(120deg, #0d7a54 20%, #0369a1 100%);
+    --yeow-grad-btn: linear-gradient(120deg, #34d399 20%, #7dd3fc 100%);
 
     --vp-home-hero-name-color: transparent;
     --vp-home-hero-name-background: linear-gradient(120deg, #0d9f6e 20%, #38bdf8 100%);
@@ -30,7 +31,8 @@
     --vp-c-brand-2-active: #2bbf83;
     --vp-c-brand-3-active: #1fa872;
 
-    --yeow-grad: linear-gradient(120deg, #3ddc97 20%, #7dd3fc 100%);
+    --yeow-grad-text: linear-gradient(120deg, #3ddc97 20%, #7dd3fc 100%);
+    --yeow-grad-btn: linear-gradient(120deg, #3ddc97 20%, #7dd3fc 100%);
 
     --vp-home-hero-name-background: linear-gradient(120deg, #3ddc97 20%, #7dd3fc 100%);
     --vp-home-hero-image-background-image: linear-gradient(-45deg, #3ddc9766 30%, #7dd3fc66 60%);
