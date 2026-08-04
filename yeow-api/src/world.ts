@@ -1,6 +1,7 @@
 import { call, post } from './task.js';
 import { Location, LocationData } from './location.js';
 import { Block } from './block.js';
+import { Chunk, ChunkData } from './chunk.js';
 
 interface WorldData {
   name: string;
@@ -43,11 +44,11 @@ export class World {
   getHighestBlockYSync(x: number, z: number): number {
     return call<number>('world.getHighestBlockY', { world: this.name, x, z });
   }
-  getChunkAt(x: number, z: number): Promise<{ x: number; z: number }> {
-    return post('world.getChunkAt', { world: this.name, x, z });
+  getChunkAt(x: number, z: number): Promise<Chunk> {
+    return post<ChunkData>('world.getChunkAt', { world: this.name, x, z }).then((d) => Chunk.from(d));
   }
-  getChunkAtSync(x: number, z: number): { x: number; z: number } {
-    return call('world.getChunkAt', { world: this.name, x, z });
+  getChunkAtSync(x: number, z: number): Chunk {
+    return Chunk.from(call<ChunkData>('world.getChunkAt', { world: this.name, x, z }));
   }
   isChunkLoaded(x: number, z: number): Promise<boolean> {
     return post<boolean>('world.isChunkLoaded', { world: this.name, x, z });

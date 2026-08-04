@@ -14,6 +14,7 @@
 | 文档 | 说明 |
 |------|------|
 | ⭐ [World](world.md) | 世界：时间、天气、方块、实体、爆炸 |
+| [Chunk](chunk.md) | 区块快照（批量方块索引，进阶性能工具） |
 | ⭐ [Location](location.md) | 坐标与朝向 |
 | [Block](block.md) | 方块：类型、固体/液体、自然破坏 |
 | [Material](material.md) | 材料/方块/物品枚举查询 |

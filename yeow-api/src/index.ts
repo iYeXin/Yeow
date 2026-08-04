@@ -4,6 +4,8 @@ export { call } from './task.js';
 export { Location } from './location.js';
 export { Player } from './player.js';
 export { World } from './world.js';
+export { Chunk, ChunkSnapshot, ChunkTopSnapshot } from './chunk.js';
+export type { ChunkData } from './chunk.js';
 export { Entity, LivingEntity } from './entity.js';
 export type { BoundingBox } from './entity.js';
 export { Block } from './block.js';

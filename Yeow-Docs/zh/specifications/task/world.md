@@ -75,10 +75,22 @@
 
 | 任务 | 请求 | 返回 |
 |------|------|------|
-| `world.getChunkAt` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `{ "x": <int>, "z": <int> }`（取区块，可能触发加载） |
+| `world.getChunkAt` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `{ "x": <int>, "z": <int>, "world": "<name>" }`（取区块，可能触发加载） |
 | `world.isChunkLoaded` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean` |
 | `world.loadChunk` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean`（强制加载） |
 | `world.unloadChunk` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean` |
+
+### 区块快照
+
+| 任务 | 请求 | 返回 |
+|------|------|------|
+| `chunk.getSnapshot` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `{ "data": "<base64>", "minY": <int>, "height": <int> }` |
+| `chunk.getTopSnapshot` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `{ "data": "<base64>" }` |
+
+- `data` 为**方块类型索引数组**的 base64 编码：`short[]` 大端序（每元素 2 字节）
+- **索引基准**：方块类型索引 = `server.getBlocks` 返回数组的下标（见 [server 规范](server.md)）；索引仅当前运行时内有效，不可持久化
+- `chunk.getSnapshot`：完整区块，长度 `16×16×height`（`height = maxHeight - minY`），遍历顺序 **y 外层 → z 中层 → x 内层**；偏移量 `((y - minY) * 16 + z) * 16 + x`，`y` 为世界绝对高度
+- `chunk.getTopSnapshot`：每列最高非空气方块，长度 256，遍历顺序 **z 外层 → x 内层**；偏移量 `z * 16 + x`；虚空列回退 air 索引；底层用 `World.getHighestBlockYAt`（世界坐标）查询
 
 ### 方块
 

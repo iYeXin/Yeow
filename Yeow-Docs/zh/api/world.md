@@ -77,8 +77,8 @@ world.getSkyLightLevelSync(x, y, z)
 ### 区块
 
 ```js
-world.getChunkAt(x, z)              // Promise<{ x, z }>（取区块，可能触发加载）
-world.getChunkAtSync(x, z)
+world.getChunkAt(x, z)              // Promise<Chunk>（取区块，可能触发加载；含 x/z/world）
+world.getChunkAtSync(x, z)          // Chunk
 world.isChunkLoaded(x, z)           // Promise<boolean>
 world.isChunkLoadedSync(x, z)       // boolean
 world.loadChunk(x, z)               // Promise<boolean>（强制加载）
@@ -86,6 +86,8 @@ world.loadChunkSync(x, z)           // boolean
 world.unloadChunk(x, z)             // Promise<boolean>
 world.unloadChunkSync(x, z)         // boolean
 ```
+
+Chunk 对象的方块数据快照（批量读取，进阶场景）见 [Chunk API](chunk.md)。
 
 ### 实体查询
 

@@ -40,7 +40,9 @@
 - **请求**：`{}`
 - **返回**：`["minecraft:stone", "minecraft:dirt", ...]`
 
-仅包含 `isBlock()` 为 `true` 的 Material 的命名空间 key。
+仅包含 `isBlock()` 为 `true` 的 Material 的命名空间 key（`Registry.MATERIAL` 迭代顺序，运行时内稳定）。
+
+> **方块类型索引基准**：本数组的**下标**即[区块快照](world.md#区块快照)使用的方块类型索引（`chunk.getSnapshot` / `chunk.getTopSnapshot` 的 `data` 值）——`blocks[index]` 即可还原方块 key。索引仅当前运行时内有效，不可持久化。
 
 ### `server.getItems`
 

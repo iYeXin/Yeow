@@ -116,6 +116,9 @@ public class Tasks {
             case "world.unloadChunk"     -> WorldTasks.unloadChunk(p);
             case "world.getBlockLightLevel" -> WorldTasks.getBlockLightLevel(p);
             case "world.getSkyLightLevel"   -> WorldTasks.getSkyLightLevel(p);
+            // Chunk
+            case "chunk.getSnapshot"     -> ChunkTasks.getSnapshot(p);
+            case "chunk.getTopSnapshot"  -> ChunkTasks.getTopSnapshot(p);
             case "world.getBlock"      -> WorldTasks.getBlock(p);
             case "world.setBlock"      -> WorldTasks.setBlock(p);
             case "world.getEntities"   -> WorldTasks.getEntities(p);
