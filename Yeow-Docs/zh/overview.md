@@ -31,6 +31,7 @@ API 参考      api/README.md           按模块分组的完整索引（Player 
 构建与分发    distribution.md         .jar 与 .yeow.zip 两种格式、一键安装
 编写依赖包    package-author.md       资源与 Service 封装、权限声明
 运行时警告    runtime-warning.md      告警类型、原因、解决方案
+路线图        todo.md                 开发调试工具 / Folia 支持 / Worker API（v1 规划）
 平台规范      specifications/          协议层（包结构、消息、任务、事件、运行时）
 ```
 
