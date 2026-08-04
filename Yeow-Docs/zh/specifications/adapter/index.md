@@ -2,12 +2,14 @@
 
 Yeow 的**标准开发语言是 JavaScript**（官方 JS 适配器）。其他语言通过**社区适配器**支持——适配器是**平台相关的**：为某个宿主平台（如 NeoForge 服务端）提供适配器时，需自行适应其模组/插件结构，但适配器本身的工作量可控：在 Java 平台上，只需实现 `PluginEntity` 接口并注册。
 
-下面是 Yeow 在 Paper/Bukkit 平台上的插件适配器规范。如果其他平台也实现了 Yeow 运行时，请参考他们的规范。
+Yeow v1 的多语言支持暂不完善，我们推荐使用 JavaScript/TypeScript。如果使用其他语言进行开发，开发者体验、用户体验、性能、资源占用以及插件安全模型的可靠性，高度依赖于语言本身的特性、适配器作者的设计以及适配器的实现质量。Yeow v1 不对其他开发方案的可用性做任何保证。
+
+下面是 Yeow 在 Paper/Bukkit 平台上的插件适配器规范。如果其他平台也实现了 Yeow 运行时，请适配器作者参考他们的规范进行开发。
 
 典型适配器形态：
 
-- **Yeow-Python**（Java Paper 插件，内置 CPython）：自行设计 Python 插件包结构、读取插件包、封装 Python 适配器后注册
-- **TCP 适配器**：把插件实体映射为远端进程
+- **Yeow-Python**（Java Paper 插件，内置 CPython 动态库）：自行设计 Python 插件包结构、读取插件包、封装 Python 适配器后注册
+- **TCP 适配器**：把插件实体映射为远端进程或网络服务
 
 ## 插件实体接口（PluginEntity）
 
@@ -48,7 +50,7 @@ String result = YeowRuntime.inst().submitTask(entity, json);
 - 含 `cb` → 异步（立即返回 null），结果经 `postMessage` 回投 `{"t":"cb","p":"<cbId>","r":<data>}`；`cbId` 由适配器自行生成与管理
 - 无 `cb` → 同步阻塞返回结果 JSON
 
-**其他通道与权限模型都是 JS 插件特有的**（`service` / `fs` / `http` / `timer` / `log` / `debug` / `lifecycle` 及声明式权限）——适配器根据自身情况处理：例如 CPython 自带庞大的标准库，无需运行时提供 log / fs 等辅助；需要插件间服务时可自行实现 service 通道语义。
+**其他通道与权限模型都是 JS 插件特有的**（`service` / `fs` / `http` / `timer` / `log` / `debug` / `lifecycle` 及声明式权限）——适配器根据自身情况处理：例如 CPython 自带庞大的标准库，无需运行时提供 log / fs 等辅助，但同时，安全模型也更依赖适配器作者的设计。
 
 ## 注册 API
 
