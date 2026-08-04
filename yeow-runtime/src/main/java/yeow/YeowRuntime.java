@@ -237,9 +237,7 @@ public class YeowRuntime extends JavaPlugin {
             var pt = new PluginThread(name, jarPath, initCode, userCode, scheduler, perms);
             if (devAssetsDir != null) pt.setDevAssetsDir(devAssetsDir);
             if (devMode) pt.setDevMode(true);
-            plugins.put(name, pt);
-            pt.start();
-            if (sendLoad) pt.queue.sendJs(new Gson().toJson(Map.of("t","LOAD")));
+            if (!registerPluginEntity(pt, sendLoad)) return false;
             if (devMode) LOG.info("Dev mode active for " + name);
             LOG.info("Loaded plugin: " + name + (version.isEmpty() ? "" : " v" + version)
                 + (author.isEmpty() ? "" : " by " + author)
@@ -249,6 +247,50 @@ public class YeowRuntime extends JavaPlugin {
             LOG.severe("Failed to register plugin " + jarPath + ": " + e.getMessage());
             return false;
         }
+    }
+
+    /**
+     * 公开的插件实体注册接口——第三方适配器（Yeow-Python、Worker、TCP 适配器等）
+     * 构造好自己的 {@link PluginEntity} 后调用，接入与普通插件一致的运行时链路：
+     * 同名唯一检查、Profile 指标、生命周期（start + LOAD）。
+     *
+     * 适配器负责：包结构解析、引擎封装（postMessage 消化消息契约）、ping 实现；
+     * 运行时负责：注册、去重、启动、卸载清理（/yeow unload、服务/事件清理）、指标采集。
+     *
+     * @param entity    已构造的插件实体（未启动；name() 必须非空且全局唯一）
+     * @param sendLoad  是否立即发送 LOAD 生命周期消息
+     * @return true 注册成功；false 同名冲突或参数非法
+     */
+    public boolean registerPluginEntity(PluginEntity entity, boolean sendLoad) {
+        if (entity == null || entity.name() == null || entity.name().isEmpty()) {
+            LOG.severe("Plugin entity registration rejected: name is required");
+            return false;
+        }
+        var name = entity.name();
+        if (plugins.containsKey(name)) {
+            LOG.warning("Duplicate plugin load rejected: " + name + " is already loaded");
+            return false;
+        }
+        plugins.put(name, entity);
+        if (profiler != null) profiler.registerPlugin(entity);
+        entity.start();
+        if (sendLoad) entity.postMessage(new Gson().toJson(Map.of("t", "LOAD")));
+        LOG.info("Loaded plugin (entity): " + name + " (" + entity.type() + ")"
+            + (entity.isVirtual() ? " [virtual]" : "")
+            + (entity.source() != null ? " — source: " + entity.source() : ""));
+        return true;
+    }
+
+    /**
+     * 注册插件实体并立即发送 LOAD 生命周期消息。
+     * 适配器（Yeow-Python、Worker、TCP 适配器等）构造 {@link PluginEntity} 后
+     * 调用此方法接入运行时：同名唯一、Profile 指标、生命周期管理均由运行时负责。
+     *
+     * @param entity 已构造的插件实体（未启动；name() 非空且全局唯一）
+     * @return true 注册成功；false 同名冲突或参数非法
+     */
+    public boolean registerPluginEntity(PluginEntity entity) {
+        return registerPluginEntity(entity, true);
     }
 
     /**

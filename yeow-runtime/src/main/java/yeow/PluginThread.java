@@ -47,6 +47,7 @@ public class PluginThread implements Runnable, PluginEntity {
     // ── PluginEntity ──────────────────────────────────────────
     @Override public String name() { return name; }
     @Override public String source() { return jarPath; }
+    @Override public String type() { return "js"; }
     @Override public boolean isVirtual() { return false; }
     @Override public void postMessage(String json) { queue.sendJs(json); }
 

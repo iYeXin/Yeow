@@ -15,6 +15,7 @@
 | [event](event/index.md)                   | 事件订阅机制与各类事件的数据字段                                          |
 | [native-service](native-service/index.md) | Native Service 子进程协议（TCP JSON line）                                |
 | [runtime](runtime/index.md)               | 运行时机制（JS 环境、回调系统、全局变量、事件循环）                       |
+| [adapter](adapter/index.md)               | 插件适配器规范（多语言 / 社区适配器实现 PluginEntity 并注册）             |
 
 ---
 
