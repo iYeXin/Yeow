@@ -171,20 +171,22 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 | 权限节点                     | 覆盖范围                                                                                |
 | ---------------------------- | --------------------------------------------------------------------------------------- |
-| `fs:server.*` / `fs:outer.*` | fs 的 server 级（服务器根目录）/ outer 级（任意路径）；**`fs.*`（插件数据目录）免声明** |
+| `fs:server.*` / `fs:outer.*` | fs 通道 `server` / `outer` 前缀节点（服务器根 / 任意路径）；`fs:plugin.*` 节点（插件数据目录）免声明 |
 | `http:*`                     | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen` 等）                  |
 | `service:registerNative`     | 注册原生服务（spawn 子进程）                                                            |
 | `assets:extract`             | 解压资源到磁盘                                                                          |
 
+> **节点概念**：权限只按**消息节点**考虑（如 `fs:plugin.readFile`、`fs:server.readFile`）。节点名中的段（`plugin` / `server` / `outer`、`task:player.get` 的 `player`）是业务/访问范围命名，**不是层级**——权限匹配不看命名段含义。
+
 粒度规则：
 
-- **节点级**：声明 `fs:server.readFile` 只授予 server 级读取，其他 fs 操作仍被拒绝
-- **整级通配**：声明 `fs:server.*` 授予 server 级全部操作
+- **节点级**：声明 `fs:server.readFile` 只授予该节点，其他 fs 节点仍被拒绝
+- **整组通配**：声明 `fs:server.*` 授予 `server` 前缀全部节点
 - **通道通配**：声明 `fs:*` 授予整个 fs 通道（含 server/outer）
 - 未声明而调用 → 返回错误（`Permission denied: <node>`），异步 API 以 Promise reject 呈现
 - 其余消息节点（如 `service:request`、`assets:read`）默认允许，无需声明
 
-> **⚠ 权限建议**：直接声明 `fs:*` 是**危险且不专业的**。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs.*` 为 plugin 级，免声明）。确需访问服务器文件时，**尽可能精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整级或通道通配。
+> **⚠ 权限建议**：直接声明 `fs:*` 是**危险且不专业的**。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs:plugin.*` 节点默认允许）。确需访问服务器文件时，**尽可能精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整组或通道通配。
 
 > [!WARNING]
 > 全局 `fetch` 底层依赖 `http:requestAsync` —— 未声明 http 权限时 `fetch` 会返回 `Permission denied: http:requestAsync`。使用 `fetch` / `request` 前请确保声明了 `"http:*"` 或 `"http:requestAsync"`。

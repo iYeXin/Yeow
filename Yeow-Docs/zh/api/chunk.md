@@ -1,6 +1,6 @@
 # Chunk API
 
-**进阶性能工具**——用于需要批量读取区块方块数据的场景（如地图画插件渲染）。日常开发使用 [World API](world.md) 即可。
+**进阶性能工具**——用于需要批量读取区块方块数据的场景。日常开发使用 [World API](world.md) 即可。
 
 ```js
 import { World, Chunk, ChunkSnapshot, ChunkTopSnapshot } from 'yeow-api';
@@ -19,11 +19,11 @@ const chunk2 = world.getChunkAtSync(0, 0);
 
 `Chunk` 携带区块的位置信息，可用于定位与区域计算：
 
-| 字段 | 类型 | 说明 |
-| ---- | ---- | ---- |
-| `chunk.x` | `number` | 区块 X 坐标（世界坐标 `>> 4`，即 `Math.floor(wx / 16)`） |
-| `chunk.z` | `number` | 区块 Z 坐标 |
-| `chunk.world` | `string` | 所属世界名（可用于 `World.get()` 取回世界对象） |
+| 字段          | 类型     | 说明                                                     |
+| ------------- | -------- | -------------------------------------------------------- |
+| `chunk.x`     | `number` | 区块 X 坐标（世界坐标 `>> 4`，即 `Math.floor(wx / 16)`） |
+| `chunk.z`     | `number` | 区块 Z 坐标                                              |
+| `chunk.world` | `string` | 所属世界名（可用于 `World.get()` 取回世界对象）          |
 
 ```ts
 // 区块 ↔ 世界坐标换算
@@ -33,7 +33,7 @@ const cx = Math.floor(wx / 16), cz = Math.floor(wz / 16);  // 世界坐标 → �
 
 ### 副作用：区块加载
 
-**`getChunkAt` / `getSnapshot` / `getTopSnapshot` 都会加载未加载的区块**——底层是 Bukkit 的 `World.getChunkAt(x, z)`，若目标区块不在内存中会强制加载（甚至触发生成）。副作用：
+**`getChunkAt` / `getSnapshot` / `getTopSnapshot` 都会加载未加载的区块**——若目标区块不在内存中会强制加载（甚至触发生成）。副作用：
 
 - 在未探索区域调用会**触发区块生成**（磁盘 IO / 主线程负载）
 - 加载的区块保持驻留，直到被正常卸载
@@ -85,7 +85,7 @@ top.data                                   // Uint16Array（256 元素）
 - 虚空列（无方块）回退 `'minecraft:air'`
 - 底层用 `World.getHighestBlockYAt`（世界坐标）直接查询，轻量高效
 
-## 示例：地图画
+## 示例：绘制地图
 
 ```js
 import { World, getBlocks } from 'yeow-api';
@@ -97,7 +97,7 @@ const top = await world.getChunkAt(0, 0).getTopSnapshot();
 // 遍历区块（16×16）
 for (let z = 0; z < 16; z++) {
   for (let x = 0; x < 16; x++) {
-    const key = top.getTop(x, z);            // 方块 key，可直接用于 world.setBlock
+    const key = top.getTop(x, z);            // 方块 key
     const color = colors[key];
     // ...
   }

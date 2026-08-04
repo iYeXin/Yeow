@@ -1,24 +1,30 @@
 # FS 通道
 
-文件系统操作，分三级访问级别。
+文件系统操作。
 
-> **权限**：`plugin` 级（默认）无需声明；`server` / `outer` 级**默认拒绝**，插件必须在 `yeow.json` 的 `computedPermissions` 中声明 `fs:server.*` / `fs:outer.*`（整级）或具体节点（如 `fs:server.readFile`）。`fs:*` 通配整个 fs 通道。未声明调用返回 `Permission denied: fs:<level>.<op>`。
+> **权限**：fs 通道的节点按**访问范围命名段**区分（`plugin` / `server` / `outer`）。`plugin` 节点（插件数据目录）默认允许；`server` / `outer` 节点默认拒绝，插件必须在 `yeow.json` 的 `computedPermissions` 中声明 `fs:server.*` / `fs:outer.*`（整组）或具体节点（如 `fs:server.readFile`）。`fs:*` 通配整个 fs 通道。未声明调用返回 `Permission denied: fs:server.readFile`。
+
+## 概念：消息节点
+
+`t` 字段是**消息节点**，格式为 `段.操作`：
+
+- `plugin.readFile`、`server.readFile`、`outer.readFile` 是三个**独立的节点**
+- 命名段（`plugin` / `server` / `outer`）是**业务/访问范围命名**，与 `task:player.get` 中 `player` 的性质相同；权限只按完整节点（`fs:plugin.readFile` 等）考虑
+- 运行时不理解命名段含义，仅做节点级通配匹配（见下）
 
 ## 调用格式
 
 ```json
-{ "t": "<level>.<operation>", "p": { "path": "<path>", "data": "<data>" }, "cb": "<callbackId>" }
+{ "t": "<段>.<操作>", "p": { "path": "<path>", "data": "<data>" }, "cb": "<callbackId>" }
 ```
 
-`t` 由**级别前缀 + 操作名**组成（`plugin` / `server` / `outer`）：
-
-| 级别 | 路径基准 | 权限 |
-| ---- | -------- | ---- |
-| `plugin.readFile` 等 | `plugins/<插件名>/` | 免声明 |
+| 节点前缀             | 路径基准                          | 权限                                 |
+| -------------------- | --------------------------------- | ------------------------------------ |
+| `plugin.readFile` 等 | `plugins/<插件名>/`               | 免声明（默认允许）                   |
 | `server.readFile` 等 | 服务器根目录（Java 进程工作目录） | 需 `fs:server.*` 或 `fs:server.<op>` |
-| `outer.readFile` 等 | 任意路径（相对路径基于服务器根） | 需 `fs:outer.*` 或 `fs:outer.<op>` |
+| `outer.readFile` 等  | 任意路径（相对路径基于服务器根）  | 需 `fs:outer.*` 或 `fs:outer.<op>`   |
 
-`path` 为相对于对应基准目录的路径；`server` 级阻止逃逸出服务器根，`outer` 级无范围限制。
+`path` 为相对于对应基准目录的路径；`server` 节点阻止逃逸出服务器根，`outer` 节点无范围限制。
 
 ### 异步模式
 
@@ -38,7 +44,7 @@
 
 ## 操作列表
 
-以下操作名在 `plugin` / `server` / `outer` 三个级别下均可使用（如 `plugin.readFile`、`server.readFile`、`outer.readFile`）。
+以下操作名在 `plugin` / `server` / `outer` 三个节点前缀下均可使用（如 `plugin.readFile`、`server.readFile`、`outer.readFile`）。
 
 ### `readFile`
 
@@ -97,12 +103,12 @@
 
 Base64 编码的二进制读写。
 
-### `systemPaths`（仅 outer 级）
+### `systemPaths`（仅 `outer` 前缀）
 
 - **p**：无需参数
 - **返回**：`{ "home": "<用户主目录>", "desktop": "<桌面路径>", "temp": "<系统临时目录>" }`
 
-获取常用系统路径（JVM 属性，无 IO）。`desktop` = `<home>/Desktop`（可能不存在），`temp` = `java.io.tmpdir`。此操作仅 `outer` 级可用（`outer.systemPaths`），其他级别调用返回错误。
+获取常用系统路径（JVM 属性，无 IO）。`desktop` = `<home>/Desktop`（可能不存在），`temp` = `java.io.tmpdir`。此节点仅 `outer` 前缀可用（`outer.systemPaths`），其他前缀调用返回错误。
 
 ---
 

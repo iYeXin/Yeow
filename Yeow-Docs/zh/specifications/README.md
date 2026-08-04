@@ -130,21 +130,22 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 | 节点（可省略）           | 覆盖消息操作                                                              |
 | ------------------------ | ------------------------------------------------------------------------- |
-| `fs:server.*`            | fs server 级（服务器根目录，如 `server.readFile`）；`fs:plugin.*`（插件数据目录）**免声明，默认允许** |
-| `fs:outer.*`             | fs outer 级（任意路径，如 `outer.readFile`）                              |
+| `fs:server.*`            | fs 通道 `server` 前缀节点（服务器根目录，如 `fs:server.readFile`）；`fs:plugin.*` 节点（插件数据目录）**免声明，默认允许** |
+| `fs:outer.*`             | fs 通道 `outer` 前缀节点（任意路径，如 `fs:outer.readFile`）              |
 | `http:*`                 | http 通道全部操作（`request`/`requestAsync`/`listen`/`respond`/`close`）  |
 | `service:registerNative` | service 通道的 `registerNative`（spawn 子进程）                           |
 | `assets:extract`         | assets 通道的 `extract`（解压到磁盘）                                     |
 
 规则：
 
-- **节点级**：`fs:server.readFile` 只授予该操作；**整级通配**：`fs:server.*` 授予该级别全部操作；**通道通配**：`fs:*` 授予 fs 通道全部（含 server/outer）——构建时 `fs:*` 在 `computedPermissions` 中**自动展开**为 `fs:outer.*, fs:server.*`（语义等价）
-- **默认允许**：上述默认拒绝类别之外的节点（如 `service:request`、`service:register`、`assets:read`、`fs:plugin.*`）无需声明
+- **节点概念**：权限只按**消息节点**（`channel:node`）考虑。节点名中的段（如 `fs:plugin.readFile` 的 `plugin`、`task:player.get` 的 `player`）是业务/访问范围命名，**不是层级**，不参与权限匹配
+- **节点匹配**：精确节点（`fs:server.readFile`）；**整组通配** `fs:server.*` 命中该前缀全部节点；**通道通配** `fs:*` 命中 fs 通道全部节点——构建时 `fs:*` 在 `computedPermissions` 中**自动展开**为 `fs:outer.*, fs:server.*`（语义等价）
+- **默认允许**：上述默认拒绝节点之外的节点（如 `service:request`、`service:register`、`assets:read`、`fs:plugin.readFile`）无需声明
 - **拒绝行为**：未声明调用返回错误 `Permission denied: <node>`。同步调用直接返回错误 JSON；异步调用（含 `cb`）通过回调投递 `{"err":"Permission denied: <node>"}`，JS 侧表现为 Promise reject
 - **其他通道**（`task`/`timer`/`log`/`now`/`dir`/`debug`/`lifecycle`）不受权限模型约束
 - 权限在插件加载时读取并**固定**（运行时不可变更），加载消息中打印声明内容——打印时 `fs:*` 会**展开为 `fs:outer.*, fs:server.*`**（仅展示，便于服主理解影响范围；权限校验仍按原值 `fs:*`）
 
-**`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:...`、`X:level.*` 覆盖 `X:level.<op>`；`fs:*` 展开为 `fs:outer.*, fs:server.*`）写入 `yeow.json` 的 `computedPermissions`。运行时读取该字段。运行时只校验通配/节点匹配，无需理解两者差异。
+**`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:...`、`X:段.*` 覆盖 `X:段.<op>`；`fs:*` 展开为 `fs:outer.*, fs:server.*`）写入 `yeow.json` 的 `computedPermissions`。运行时读取该字段。运行时只校验通配/节点匹配，无需理解节点命名段含义。
 
 **生命周期消息语义**：
 

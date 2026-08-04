@@ -294,31 +294,27 @@ public class PluginThread implements Runnable {
 
     /**
      * Sensitive-permission check for message channels.
-     * Deny-by-default categories (must be declared in yeow.config.json → yeow.json):
-     *   fs:server.* / fs:outer.* — server/outer level fs operations (fs:plugin.* needs no declaration)
-     *   http:*          — all http operations
-     *   service:registerNative — spawning native subprocesses
-     *   assets:extract  — extracting assets to disk
-     * All other message nodes are allowed by default. Granular nodes (e.g. fs:server.readFile)
-     * grant a single operation; a `channel:*` or `channel:level.*` node grants the whole level.
+     *
+     * 权限只按**消息节点**（`channel:node`，node 可含命名段，如 `fs:plugin.readFile`、
+     * `task:player.get`）考虑——节点名中的段是业务/访问范围命名，与权限模型无关。
+     *
+     * 策略（纯数据，见 {@link #DEFAULT_DENIED_NODES}）：声明命中（精确节点 / `channel:*`
+     * 通配 / `channel:段.*` 通配）→ 允许；否则节点命中默认拒绝前缀 → 拒绝；否则默认允许。
      *
      * @return the denied node (with "Permission denied: " prefix) or null when allowed
      */
+    private static final String[] DEFAULT_DENIED_NODES = {
+        "fs:server.", "fs:outer.", "http:", "service:registerNative", "assets:extract",
+    };
+
     private String checkChannelPermission(String channel, String op) {
         var node = channel + ":" + op;
-        if ("fs".equals(channel)) {
-            var dot = op.indexOf('.');
-            if (dot <= 0) return "Permission denied: " + node;
-            var level = op.substring(0, dot);
-            if ("plugin".equals(level)) return null; // plugin 级免声明（默认允许）
-            if (permissions.contains(node) || permissions.contains(channel + ":*")
-                || permissions.contains(channel + ":" + level + ".*")) return null;
-            return "Permission denied: " + node;
-        }
         if (permissions.contains(node) || permissions.contains(channel + ":*")) return null;
-        if ("http".equals(channel)) return "Permission denied: " + node;
-        if ("service".equals(channel) && "registerNative".equals(op)) return "Permission denied: " + node;
-        if ("assets".equals(channel) && "extract".equals(op)) return "Permission denied: " + node;
+        var dot = op.indexOf('.');
+        if (dot > 0 && permissions.contains(channel + ":" + op.substring(0, dot) + ".*")) return null;
+        for (var denied : DEFAULT_DENIED_NODES) {
+            if (node.startsWith(denied)) return "Permission denied: " + node;
+        }
         return null;
     }
 

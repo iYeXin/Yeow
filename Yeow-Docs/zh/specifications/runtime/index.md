@@ -405,16 +405,17 @@ string[]
 
 运行时**必须**根据插件 `yeow.json` 的 `computedPermissions` 声明对以下通道执行权限检查（粒度 = 消息节点）：
 
-| 默认拒绝的类别               | 覆盖的操作                                                                                 | 声明示例                                      |
-| ---------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
-| `fs:server.*` / `fs:outer.*` | fs 的 server 级（服务器根目录）/ outer 级（任意路径）；`fs:plugin.*`（插件数据目录）免声明 | `["fs:server.*"]` 或 `["fs:server.readFile"]` |
-| `http:*`                     | http 全部操作（含 `fetch` 使用的 `requestAsync`）                                          | `["http:*"]` 或 `["http:requestAsync"]`       |
-| `service:registerNative`     | 注册原生服务（spawn 子进程）                                                               | `["service:registerNative"]`                  |
-| `assets:extract`             | 解压资源到磁盘                                                                             | `["assets:extract"]`                          |
+| 默认拒绝的节点                 | 覆盖的操作                                                                                 | 声明示例                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| `fs:server.*` / `fs:outer.*`   | fs 通道 `server` / `outer` 前缀节点（服务器根 / 任意路径）；`fs:plugin.*` 节点（插件数据目录）免声明 | `["fs:server.*"]` 或 `["fs:server.readFile"]` |
+| `http:*`                       | http 全部操作（含 `fetch` 使用的 `requestAsync`）                                          | `["http:*"]` 或 `["http:requestAsync"]`       |
+| `service:registerNative`       | 注册原生服务（spawn 子进程）                                                               | `["service:registerNative"]`                  |
+| `assets:extract`               | 解压资源到磁盘                                                                             | `["assets:extract"]`                          |
 
 规则：
 
-- **通配**：声明 `channel:*` 放行该通道全部节点；**整级通配**：声明 `channel:level.*` 放行该级别全部操作；**节点级**：声明 `channel:level.op` 只放行该操作
-- **默认允许**：上述默认拒绝类别之外的节点（`service:request`、`service:register`、`assets:read`、`assets:readBase64`、`fs:plugin.*` 等）无需声明
+- **节点概念**：权限只按**消息节点**（`channel:node`）考虑；节点名中的段（`fs:plugin.readFile` 的 `plugin`）是业务/访问范围命名，**不是层级**，不参与匹配
+- **通配**：声明 `channel:*` 命中该通道全部节点；**整组通配** `channel:段.*` 命中该前缀全部节点；**节点级**：声明 `channel:段.op` 只命中该操作
+- **默认允许**：上述默认拒绝节点之外的节点（`service:request`、`service:register`、`assets:read`、`assets:readBase64`、`fs:plugin.readFile` 等）无需声明
 - **拒绝行为**：未声明调用返回 `Permission denied: <channel>:<op>`——同步调用以错误 JSON 返回；含 `cb` 的异步调用通过回调投递 `{"err": "Permission denied: <channel>:<op>"}`（JS 侧 Promise reject）
 - `task` / `timer` / `log` / `now` / `dir` / `debug` / `lifecycle` 通道不受约束
