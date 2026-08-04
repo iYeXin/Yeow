@@ -10,11 +10,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 原生服务批准存储（`plugins/Yeow/approve.json`）。
+ * 原生服务批准存储（`plugins/Yeow/runtime/approve.json`）。
  *
  * 内存是唯一信任源：启动时读取文件进入内存，`/yeow approve` 只修改内存；
  * 服务器关闭（所有 Yeow 插件卸载完成后）才写回文件。运行期间直接修改
- * approve.json 不会生效（下次关闭写回时被覆盖）。
+ * approve.json 不会生效（下次关闭写回时被覆盖）。文件位于 runtime 目录，
+ * 受 fs 写操作保护（插件无法通过 fs API 修改）。
  */
 public class ApprovalStore {
     private static final Gson gson = new Gson();
@@ -23,7 +24,7 @@ public class ApprovalStore {
     private final Map<String, Long> approvals = new ConcurrentHashMap<>();
 
     public ApprovalStore(File dataFolder) {
-        this.file = new File(dataFolder, "approve.json");
+        this.file = new File(new File(dataFolder, "runtime"), "approve.json");
         load();
     }
 

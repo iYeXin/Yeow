@@ -177,5 +177,6 @@ Yeow-Runtime 是多路复用中转站：插件通过 `request` / `subscribe` / `
 - 内存是唯一信任源：`config.yml` 的 `native-service-require-approval` 与 `approve.json` 启动时读取一次进入内存；批准修改（`/yeow approve`）只改内存
 - 服务器关闭、所有 Yeow 插件卸载完成后，才把内存写回文件（`config.yml` 按字段合并）
 - **运行期间直接修改这些文件不生效**（视为无效篡改），需关闭服务器修改
+- 文件位于 `plugins/Yeow/runtime/`（`config.yml`、`approve.json`）——该目录受 fs 写保护，插件无法通过 fs API 修改
 
 未声明/未批准时照常打印风险日志（视为不可信）。未来 Yeow 官方或社区可能维护一份已知安全 SHA-256 列表：命中列表的二进制在插件发布时可能被标记为安全，加载时无提醒。

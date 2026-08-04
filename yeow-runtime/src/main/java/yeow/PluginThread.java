@@ -319,6 +319,9 @@ public class PluginThread implements Runnable, PluginEntity {
         "fs:server.", "fs:outer.", "http:", "service:registerNative", "assets:extract",
     };
 
+    /** 运行时配置目录（plugins/Yeow/runtime/）：fs 写操作一律禁止修改（读取不受限）。 */
+    private static final Path RUNTIME_DIR = Path.of("plugins", "Yeow", "runtime").toAbsolutePath().normalize();
+
     private String checkChannelPermission(String channel, String op) {
         var node = channel + ":" + op;
         if (permissions.contains(node) || permissions.contains(channel + ":*")) return null;
@@ -328,6 +331,13 @@ public class PluginThread implements Runnable, PluginEntity {
             if (node.startsWith(denied)) return "Permission denied: " + node;
         }
         return null;
+    }
+
+    /** 禁止对 Yeow 运行时配置目录（含 approve.json / config.yml）的修改——fs 写操作（全部级别）一律拦截。 */
+    private void assertNotRuntimeDir(Path path) throws SecurityException {
+        if (path.startsWith(RUNTIME_DIR)) {
+            throw new SecurityException("Cannot modify Yeow runtime directory (plugins/Yeow/runtime): " + path);
+        }
     }
 
     private String handleFs(String pld) {
@@ -345,15 +355,15 @@ public class PluginThread implements Runnable, PluginEntity {
             };
             return switch (op) {
                 case "readFile" -> { var path = resolvePath(base, p.get("path").getAsString()); yield gson.toJson(Map.of("data", Files.readString(path))); }
-                case "writeFile" -> { var path = resolvePath(base, p.get("path").getAsString()); Files.writeString(path, p.get("data").getAsString()); yield "true"; }
-                case "appendFile" -> { var path = resolvePath(base, p.get("path").getAsString()); Files.writeString(path, p.get("data").getAsString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND); yield "true"; }
+                case "writeFile" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.writeString(path, p.get("data").getAsString()); yield "true"; }
+                case "appendFile" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.writeString(path, p.get("data").getAsString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND); yield "true"; }
                 case "exists" -> { var path = resolvePath(base, p.get("path").getAsString()); yield String.valueOf(Files.exists(path)); }
                 case "isDirectory" -> { var path = resolvePath(base, p.get("path").getAsString()); yield String.valueOf(Files.isDirectory(path)); }
-                case "delete" -> { var path = resolvePath(base, p.get("path").getAsString()); yield String.valueOf(Files.deleteIfExists(path)); }
-                case "mkdir" -> { var path = resolvePath(base, p.get("path").getAsString()); Files.createDirectories(path); yield "true"; }
+                case "delete" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); yield String.valueOf(Files.deleteIfExists(path)); }
+                case "mkdir" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.createDirectories(path); yield "true"; }
                 case "list" -> { var path = resolvePath(base, p.get("path").getAsString()); try (var s = Files.list(path)) { yield gson.toJson(s.map(Path::toString).toList()); } }
                 case "readBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(Files.readAllBytes(path)))); }
-                case "writeBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); Files.write(path, Base64.getDecoder().decode(p.get("data").getAsString())); yield "true"; }
+                case "writeBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.write(path, Base64.getDecoder().decode(p.get("data").getAsString())); yield "true"; }
                 case "systemPaths" -> {
                     // 仅 outer 级：返回常用系统路径（桌面/临时目录/用户主目录）
                     if (!"outer".equals(level)) throw new IllegalArgumentException("systemPaths is outer-level only");

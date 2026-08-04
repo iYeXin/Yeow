@@ -235,7 +235,7 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 - 未批准 → `registerNativeService` 的 Promise reject，错误信息包含 `/yeow approve <plugin>` 指引
 - **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-require-approval`（默认 `true`；`false` = 默认批准）。**该配置只能在服务器关闭时修改**——内存是唯一信任源，运行期间直接编辑文件视为无效篡改，不生效（关闭时按内存合并写回）
-- **批准存储**：`plugins/Yeow/approve.json`（插件名 → 批准时间戳）。同样只读一次进入内存，运行期修改不生效，关闭时写回
+- **批准存储**：`plugins/Yeow/runtime/approve.json`（插件名 → 批准时间戳）。同样只读一次进入内存，运行期修改不生效，关闭时写回。**runtime 目录受 fs 写保护**——插件无法通过 fs API 修改其中的文件（config.yml / approve.json）
 
 > **开发者**：错误处理与降级示例（区分"服务已存在 / 可执行文件被篡改 / 用户未批准"）见 [Service API](api/service.md) 与 [编写依赖包](package-author.md)。
 
