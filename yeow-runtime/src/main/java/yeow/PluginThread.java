@@ -145,11 +145,6 @@ public class PluginThread implements Runnable, PluginEntity {
         yeow.task.BossBarTasks.purgePlugin(name);
     }
 
-    private Scheduler.Priority parsePriority(String s) {
-        if (s == null) return Scheduler.Priority.NORMAL;
-        return switch (s.toLowerCase()) { case "high" -> Scheduler.Priority.HIGH; case "low" -> Scheduler.Priority.LOW; default -> Scheduler.Priority.NORMAL; };
-    }
-
     @Override
     public void run() {
         this.timer = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "timer-" + name));
@@ -221,25 +216,11 @@ public class PluginThread implements Runnable, PluginEntity {
         g.setProperty("$_send", (JSCallFunction) args -> {
             try {
                 var channel = String.valueOf(args[0]); var pld = String.valueOf(args.length > 1 ? args[1] : "{}");
-                if ("task".equals(channel)) {
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
-                    var taskType = obj.get("type").getAsString();
-                    var params = obj.has("params") ? obj.getAsJsonObject("params") : new JsonObject();
-                    params.addProperty("_plugin", name); // ownership for per-plugin cleanup (gui/bossbar etc.)
-                    var hasCb = obj.has("cb");
-                    var priority = parsePriority(obj.has("priority") ? obj.get("priority").getAsString() : null);
-                    if (hasCb) {
-                        var cbId = obj.get("cb").getAsString();
-                        scheduler.submitGameAsync(taskType, params, r -> {
-                            queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, r));
-                        }, priority, name);
-                        return null;
-                    } else {
-                        var future = new CompletableFuture<String>();
-                        scheduler.submitGameSync(taskType, params, future, priority, name);
-                        try { return future.get(5, TimeUnit.SECONDS); }
-                        catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
-                    }
+                var rt = yeow.YeowRuntime.inst();
+                if ("task".equals(channel) || "service".equals(channel)
+                    || "log".equals(channel) || "now".equals(channel) || "dir".equals(channel)) {
+                    // 通用通道：由运行时统一处理（适配器同一入口）
+                    return rt != null ? rt.submitMessage(PluginThread.this, channel, pld) : gson.toJson(Map.of("err", "runtime unavailable"));
                 } else if ("timer".equals(channel)) {
                     var obj = gson.fromJson(pld, JsonObject.class); var type = obj.get("type").getAsString(); var cbId = obj.get("cb").getAsString(); var delay = obj.get("delay").getAsLong();
                     if ("timeout".equals(type)) {
@@ -290,16 +271,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     if ("reportError".equals(dt)) { handleJSReport(gson.toJson(obj.get("p"))); }
                     else if ("pong".equals(dt)) { onPong(); }
                     return null;
-                } else if ("log".equals(channel)) {
-                    var o = gson.fromJson(pld, JsonObject.class); org.bukkit.Bukkit.getLogger().info(o.has("message") ? o.get("message").getAsString() : pld); return null;
-                } else if ("now".equals(channel)) { return String.valueOf(System.nanoTime()); }
-                else if ("service".equals(channel)) {
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
-                    var denied = checkChannelPermission("service", obj.has("t") ? obj.get("t").getAsString() : "");
-                    if (denied != null) return gson.toJson(Map.of("err", denied));
-                    return handleService(pld);
-                }
-                else if ("lifecycle".equals(channel)) {
+                } else if ("lifecycle".equals(channel)) {
                     var o = gson.fromJson(pld, JsonObject.class); var lt = o.has("type") ? o.get("type").getAsString() : "";
                     if ("gc-collect".equals(lt)) {
                         var ids = o.getAsJsonArray("ids");
@@ -310,7 +282,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     if ("unloadDone".equals(lt)) { running = false; return null; }
                     running = false; return null;
-                } else if ("dir".equals(channel)) { return dir; }
+                }
                 else { return null; }
             } catch (Exception ex) {
                 org.bukkit.Bukkit.getLogger().warning("[" + name + "] $_send err: " + ex.getMessage());
@@ -325,29 +297,11 @@ public class PluginThread implements Runnable, PluginEntity {
     }
 
     /**
-     * Sensitive-permission check for message channels.
-     *
-     * 权限只按**消息节点**（`channel:node`，node 可含命名段，如 `fs:plugin.readFile`、
-     * `task:player.get`）考虑——节点名中的段是业务/访问范围命名，与权限模型无关。
-     *
-     * 策略（纯数据，见 {@link #DEFAULT_DENIED_NODES}）：声明命中（精确节点 / `channel:*`
-     * 通配 / `channel:段.*` 通配）→ 允许；否则节点命中默认拒绝前缀 → 拒绝；否则默认允许。
-     *
-     * @return the denied node (with "Permission denied: " prefix) or null when allowed
+     * Sensitive-permission check for message channels（共享实现见 YeowRuntime）。
+     * 权限只按消息节点（channel:node）考虑；节点名中的段是业务/访问范围命名，非层级。
      */
-    private static final String[] DEFAULT_DENIED_NODES = {
-        "fs:server.", "fs:outer.", "http:", "service:registerNative", "assets:extract",
-    };
-
     private String checkChannelPermission(String channel, String op) {
-        var node = channel + ":" + op;
-        if (permissions.contains(node) || permissions.contains(channel + ":*")) return null;
-        var dot = op.indexOf('.');
-        if (dot > 0 && permissions.contains(channel + ":" + op.substring(0, dot) + ".*")) return null;
-        for (var denied : DEFAULT_DENIED_NODES) {
-            if (node.startsWith(denied)) return "Permission denied: " + node;
-        }
-        return null;
+        return yeow.YeowRuntime.checkChannelPermission(permissions, channel, op);
     }
 
     private String handleFs(String pld) {
@@ -563,26 +517,6 @@ public class PluginThread implements Runnable, PluginEntity {
             }
             log.warning(sb);
         } catch (Exception ex) { org.bukkit.Bukkit.getLogger().warning("[" + name + "] JS Error: " + pld); }
-    }
-
-    private String handleService(String pld) {
-        try {
-            var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
-            var t = obj.get("t").getAsString();
-            var sm = yeow.YeowRuntime.inst().getServiceManager();
-            return switch (t) {
-                case "register" -> { var refName = obj.get("refName").getAsString(); var onReq = obj.get("onRequest").getAsString(); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerPluginService(refName, name, onReq, isPublic); }
-                case "registerNative" -> { var refName = obj.get("refName").getAsString(); var platforms = obj.getAsJsonObject("platforms"); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerNativeService(refName, name, platforms, isPublic, jarPath, devAssetsDir); }
-                case "registerNativeTerminate" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.registerTerminateCb(svcId, cbId, name); yield "true"; }
-                case "request" -> { var svcId = obj.get("serviceId").getAsString(); var path = obj.has("path") ? obj.get("path").getAsString() : "/"; var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); var reqId = obj.get("requestId").getAsString(); sm.trackRequestConsumer(reqId, name, svcId); sm.request(svcId, path, body, reqId, name); yield null; }
-                case "awaitReady" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.awaitReady(svcId, cbId, name); yield null; }
-                case "response" -> { var reqId = obj.get("requestId").getAsString(); var result = obj.has("body") ? gson.fromJson(obj.get("body").toString(), Object.class) : null; sm.respond(reqId, name, result); yield null; }
-                case "subscribe" -> { var svcId = obj.get("serviceId").getAsString(); var eventPath = obj.get("eventPath").getAsString(); var cbId = obj.get("cb").getAsString(); sm.subscribe(svcId, eventPath, cbId, name); yield "true"; }
-                case "unsubscribe" -> { var svcId = obj.get("serviceId").getAsString(); var eventPath = obj.get("eventPath").getAsString(); sm.unsubscribe(svcId, eventPath, name); yield "true"; }
-                case "publish" -> { var token = obj.get("token").getAsString(); var eventPath = obj.get("eventPath").getAsString(); var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); sm.publish(token, eventPath, body); yield "true"; }
-                default -> gson.toJson(Map.of("err", "Unknown service op: " + t));
-            };
-        } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
     }
 
     private void handleJSError(QuickJSException e) {

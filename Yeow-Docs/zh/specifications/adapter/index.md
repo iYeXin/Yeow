@@ -2,10 +2,12 @@
 
 Yeow 的**标准开发语言是 JavaScript**（官方 JS 适配器）。其他语言通过**社区适配器**支持——适配器是**平台相关的**：为某个宿主平台（如 NeoForge 服务端）提供适配器时，需自行适应其模组/插件结构，但适配器本身的工作量可控：在 Java 平台上，只需实现 `PluginEntity` 接口并注册。
 
+下面是 Yeow 在 Paper/Bukkit 平台上的插件适配器规范。
+
 典型适配器形态：
 
 - **Yeow-Python**（Java Paper 插件，内置 CPython）：自行设计 Python 插件包结构、读取插件包、封装 Python 适配器后注册
-- **TCP 适配器**：把插件实体映射为远端进程（JSON line 协议），`postMessage` → TCP 推送，远端回报即 pong
+- **TCP 适配器**：把插件实体映射为远端进程
 
 ## 插件实体接口（PluginEntity）
 
@@ -33,6 +35,26 @@ Yeow 的**标准开发语言是 JavaScript**（官方 JS 适配器）。其他�
 | `{"t":"DEBUG","p":"ping"}`           | 心跳探测：实现应回报 pong（经适配器自身通道，完成 `ping()` 的 future） |
 
 完成回报（事件 `event.complete`、补全 `command.tabComplete`、异步结果）经 task 通道回传运行时（SyncCallbackHelper 契约）。适配器可定义自己的内部消息格式，只要满足接口语义。
+
+## 提交消息（JS `$_send` 的等价物）
+
+适配器通过运行时 API 提交 Yeow 消息（等价于 JS 插件的 `$_send(channel, jsonString)`）：
+
+```java
+String result = YeowRuntime.inst().submitMessage(entity, channel, json);
+```
+
+**通用通道（由运行时处理，适配器直接可用）：**
+
+| 通道 | 说明 |
+| ---- | ---- |
+| `task` | 游戏任务（调度器）。payload 含 `cb` → 异步（立即返回 null），结果经 `postMessage` 回投 `{"t":"cb","p":"<cbId>","r":<data>}`；无 `cb` → 同步阻塞返回结果 JSON。`cbId` 由适配器自行生成与管理 |
+| `service` | 服务注册/请求/订阅/发布（同 [service 通道](../message/service.md)）。敏感节点（`registerNative`）按 `declaredPermissions()` 做权限匹配 |
+| `log` | 控制台日志 |
+| `now` | 纳秒时间戳 |
+| `dir` | 插件数据目录路径 |
+
+**适配器自实现通道**：`timer` / `fs` / `http` / `assets` / `debug` / `lifecycle`——绑定 JS 适配器的执行单元（定时器、IO、HTTP 服务、错误上报）与协议（pong、unloadDone），适配器按需自行实现（可返回 null / 错误）。需要权限检查时可调用 `YeowRuntime.checkChannelPermission(perms, channel, op)`。
 
 ## 注册 API
 
