@@ -236,11 +236,11 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 - 拒绝加载 → 插件不运行（`onLoad` 不会执行），控制台提示包含 `/yeow approve <code>`
 - **一次性 code 机制**：每次拒绝加载时生成随机 6 位 36 进制 code（仅出现在控制台日志）——插件本身未加载，无法读取日志后 `dispatchCommand` 自动批准；code 用后即作废
 - **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-require-approval`（默认 `true`；`false` = 默认批准）。**运行时直接修改即生效**（config.yml 为信任源）
-- **批准存储**：`plugins/Yeow/runtime/approve.json`（插件名 → 批准时间戳）。启动时读入内存，`/yeow approve` 修改内存，服务器关闭时写回；运行期直接编辑文件不生效。**runtime 目录受 fs 写保护**——插件无法通过 fs API 修改其中的文件（config.yml / approve.json）
+- **批准存储**：`plugins/Yeow/runtime/approve.json`（插件名 → 批准时间戳）。**runtime 目录受 fs 写保护**——插件无法通过 fs API 修改其中的文件（config.yml / approve.json）
 
-> **开发者**：错误处理与降级示例（区分"服务已存在 / 可执行文件被篡改 / 用户未批准"）见 [Service API](api/service.md) 与 [编写依赖包](package-author.md)。
+> **开发者**：错误处理与降级示例（区分"服务已存在 / 可执行文件被篡改"）见 [Service API](api/service.md) 与 [编写依赖包](package-author.md)。
 
-> **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险、无需批准。zai'jia
+> **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险、无需批准。
 
 ## 插件管理命令
 
