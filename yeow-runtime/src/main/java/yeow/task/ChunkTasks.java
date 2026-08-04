@@ -97,12 +97,12 @@ public class ChunkTasks {
         return Map.of("data", encode(idx));
     }
 
-    /** short[] → big-endian 2 字节/元素 → base64。 */
+    /** short[] → little-endian 2 字节/元素 → base64（配合 JS 侧 Uint16Array 零拷贝视图）。 */
     private static String encode(short[] arr) {
         var bytes = new byte[arr.length * 2];
         for (int i = 0; i < arr.length; i++) {
-            bytes[i * 2] = (byte) (arr[i] >> 8);
-            bytes[i * 2 + 1] = (byte) arr[i];
+            bytes[i * 2] = (byte) arr[i];
+            bytes[i * 2 + 1] = (byte) (arr[i] >> 8);
         }
         return Base64.getEncoder().encodeToString(bytes);
     }
