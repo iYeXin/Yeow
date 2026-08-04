@@ -28,11 +28,6 @@ declare global {
         { cbId: string; handler: Function; manualRelease: boolean }[]
       >
     | undefined;
-
-  /** @deprecated 兼容保留——优先使用 ES2026 原生 `Uint8Array.prototype.toBase64()` */
-  function uint8ArrayToBase64(buffer: ArrayBuffer): string;
-  /** @deprecated 兼容保留——优先使用 ES2026 原生 `Uint8Array.fromBase64()` */
-  function base64ToUint8Array(base64: string): ArrayBuffer;
 }
 
 // yeow-dev：构建期虚拟模块（由 Yeow 构建器按 importer 所属依赖项注入命名空间）。

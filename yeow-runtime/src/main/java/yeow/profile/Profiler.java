@@ -93,9 +93,14 @@ public final class Profiler implements AutoCloseable {
         while (ring.size() > RING_CAPACITY) ring.removeFirst();
         if (cfg.warningsEnabled()) warnings.process(w);
 
-        // 发送下一轮心跳 ping
+        // 发送下一轮心跳 ping（上一个 ping 未返回的插件不再发送，避免死循环下消息堆积；
+        // 仍标记期望响应，维持挂起检测）
         long now = System.nanoTime();
         for (var e : plugins.entrySet()) {
+            if (collector.hasPendingPing(e.getKey())) {
+                collector.noteExpected(e.getKey());
+                continue;
+            }
             collector.notePingSent(e.getKey(), now);
             e.getValue().queue.sendJs("{\"t\":\"DEBUG\",\"p\":\"ping\"}");
         }

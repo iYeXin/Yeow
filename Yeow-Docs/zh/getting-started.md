@@ -191,7 +191,7 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 > 修改 `permissions` 后需重新构建并完整重载插件（`/yeow reload` 或重启服务器）；开发模式热重载只重载代码，不更新权限。
 
-> **控制台核对**：Yeow 运行时加载插件时会把权限清单打印到服务器控制台（`Loaded plugin: <name> ... — permissions: ...`，`fs:*` 展开显示为 `fs:outer.*, fs:server.*`），可直接核对插件实际生效的权限，无需信任包文档。
+> **控制台核对**：Yeow 运行时加载插件时会把权限清单打印到服务器控制台（`Loaded plugin: <name> ... — permissions: ...`。
 
 > **最终权限（computedPermissions）**：构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:server.*`、`fs:server.readFile` 等；`fs:server.*` 覆盖 `fs:server.readFile`），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。声明 `fs:*` 会被**自动展开**为 `fs:outer.*, fs:server.*`。可用 `npm run permissions` 查看计算过程与每个权限的来源分布（来自哪个包）。
 

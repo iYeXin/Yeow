@@ -54,12 +54,7 @@ public class ServiceManager {
         pendingReady.clear();
         registry.values().forEach(e -> {
             if (e.type == Type.NATIVE) {
-                try { if (e.nativeSocket != null) e.nativeSocket.close(); } catch (Exception ignored) {}
-                if (e.nativeProc != null) {
-                    e.nativeProc.destroy();
-                    try { e.nativeProc.waitFor(3, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
-                    if (e.nativeProc.isAlive()) e.nativeProc.destroyForcibly();
-                }
+                stopNative(e, "shutdown");
                 notifyTerminated(e, "shutdown");
                 deleteServiceDir(e.serviceId);
             }
@@ -67,6 +62,24 @@ public class ServiceManager {
         registry.clear();
         subscriptions.clear();
         tokens.clear();
+    }
+
+    /**
+     * 优雅停止原生服务：通过 TCP 推送 shutdown 消息，等待子进程自行清理资源并退出；
+     * 超时（3s + 3s）后 destroy → destroyForcibly 兜底。
+     */
+    private void stopNative(ServiceEntry e, String reason) {
+        if (e.nativeProc == null) return;
+        if (e.nativeSocket != null && !e.nativeSocket.isClosed() && e.nativeOut != null) {
+            try {
+                e.nativeOut.write(gson.toJson(Map.of("type", "shutdown", "reason", reason)).getBytes(StandardCharsets.UTF_8));
+                e.nativeOut.flush();
+                if (e.nativeProc.waitFor(3, TimeUnit.SECONDS)) return;
+                e.nativeProc.destroy();
+                if (e.nativeProc.waitFor(3, TimeUnit.SECONDS)) return;
+            } catch (Exception ignored) { /* 落到底部强制终止 */ }
+        }
+        if (e.nativeProc.isAlive()) e.nativeProc.destroyForcibly();
     }
 
     public void purgePluginServices(String pluginName) {
@@ -83,12 +96,7 @@ public class ServiceManager {
                     if (pendings != null) {
                         for (var p : pendings) respond(p.cbId(), p.pluginName(), Map.of("err", "Service " + id + " unregistered"));
                     }
-                    try { if (e.nativeSocket != null) e.nativeSocket.close(); } catch (Exception ignored) {}
-                    if (e.nativeProc != null) {
-                        e.nativeProc.destroy();
-                        try { e.nativeProc.waitFor(3, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
-                        if (e.nativeProc.isAlive()) e.nativeProc.destroyForcibly();
-                    }
+                    stopNative(e, "unregistered");
                     notifyTerminated(e, "unregistered");
                     deleteServiceDir(id);
                 }

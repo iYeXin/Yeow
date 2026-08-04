@@ -483,20 +483,41 @@ public class YeowRuntime extends JavaPlugin {
                             yield true;
                         }
                         if (plugins.containsKey(name)) unloadPlugin(name);
-                        if (pkg != null) {
-                            var backupDir = new File(getDataFolder(), ".backup");
-                            backupDir.mkdirs();
-                            var backup = new File(backupDir, pkg.getName() + "." + System.currentTimeMillis() + ".bak");
-                            try {
-                                java.nio.file.Files.move(pkg.toPath(), backup.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                                s.sendMessage("Uninstalled: " + name + " (package → " + backup.getAbsolutePath() + ")");
-                            } catch (Exception e) {
-                                s.sendMessage("Unloaded, but backup move failed for " + pkg.getAbsolutePath() + ": " + e.getMessage());
-                            }
-                        } else {
+                        if (pkg == null) {
                             s.sendMessage("Unloaded: " + name + " — no .yeow.zip found in plugins/Yeow");
+                            yield true;
                         }
-                        s.sendMessage("Plugin data directory plugins/" + name + " must be cleaned manually.");
+                        // 插件本体 + 数据目录一并迁移到 .backup/<时间戳>/（失败则放弃并报告错误）
+                        var ts = new java.text.SimpleDateFormat("yyyy-MM-dd_HH-mm-ss").format(new java.util.Date());
+                        var backupDir = new File(new File(getDataFolder(), ".backup"), ts);
+                        var failed = new java.util.ArrayList<String>();
+                        if (!backupDir.mkdirs()) {
+                            s.sendMessage("Uninstall failed: cannot create backup directory " + backupDir.getAbsolutePath());
+                            yield true;
+                        }
+                        try {
+                            java.nio.file.Files.move(pkg.toPath(),
+                                new File(backupDir, pkg.getName()).toPath(),
+                                java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        } catch (Exception e) {
+                            failed.add("package: " + e.getMessage());
+                        }
+                        var dataDir = new File("plugins", name);
+                        if (dataDir.exists()) {
+                            try {
+                                java.nio.file.Files.move(dataDir.toPath(),
+                                    new File(backupDir, name).toPath(),
+                                    java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                            } catch (Exception e) {
+                                failed.add("data directory: " + e.getMessage());
+                            }
+                        }
+                        if (!failed.isEmpty()) {
+                            s.sendMessage("Uninstall failed (files may be locked): " + String.join("; ", failed)
+                                + " — check " + backupDir.getAbsolutePath());
+                            yield true;
+                        }
+                        s.sendMessage("Uninstalled: " + name + " (package + data → .backup/" + ts + "/)");
                         yield true;
                     }
                     case "reload" -> {

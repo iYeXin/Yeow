@@ -58,7 +58,7 @@ npm run dev [-- options]
 
 ### 工作流程
 
-1. 检查本地 Paper 1.21.4 缓存，没有则下载
+1. 检查本地 Paper 开发版本缓存（默认 `1.21.4`，可在 `yeow.config.json` 的 `paperVersion` / `paperJar` 配置），没有则下载
 2. 启动 WebSocket 服务端（端口 17368）
 3. 以开发模式（`-Dyeow.dev=true`）启动 Paper 服务器
 4. 构建插件：生成 `.yeow/dev.json`（含源码路径）而非打包代码；部署 `.yeow.zip`（含 dev.json）到 `plugins/Yeow/`（dev-server 自动创建该目录，运行时自动扫描加载）

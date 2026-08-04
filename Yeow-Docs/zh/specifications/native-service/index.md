@@ -111,6 +111,20 @@ Yeow 插件调用服务请求时：
 | `eventPath` | 事件路径            |
 | `body`      | 事件体（JSON 对象） |
 
+### 5. 关闭 (runtime → child)
+
+运行时停止服务时（插件卸载 / hot-reload / 运行时关闭）推送：
+
+```json
+{"type":"shutdown","reason":"unregistered"}
+```
+
+| 字段     | 说明                                        |
+| -------- | ------------------------------------------- |
+| `reason` | `unregistered`（卸载）/ `shutdown`（运行时关闭） |
+
+子进程收到后应**自行进行资源清理**（关闭文件、刷新持久化、停止内部线程）并退出进程——运行时通过进程退出作为完成信号；等待 3 秒未退出则 `destroy()`，再等 3 秒仍未退出则 `destroyForcibly()` 强制终止。
+
 ## 发现与通信拓扑
 
 ```
@@ -126,9 +140,9 @@ Yeow-Runtime 是多路复用中转站：插件通过 `request` / `subscribe` / `
 
 ## 退出
 
-子进程退出时：
-- 连接断开 → Yeow-Runtime 将该服务标记为不可用，之后请求返回 `{"err":"service not ready"}`
-- 插件 unload / hot-reload → 子进程被 `destroyForcibly()` 终止
+- 子进程退出时：
+  - 连接断开 → Yeow-Runtime 将该服务标记为不可用，之后请求返回 `{"err":"service not ready"}`
+  - 插件 unload / hot-reload → 运行时推送 `shutdown` 消息，子进程自行清理后退出（最多 6 秒等待，超时 `destroyForcibly()` 强制终止）
 
 ## 打包与部署
 

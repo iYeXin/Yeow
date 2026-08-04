@@ -207,8 +207,6 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 | 全局                 | 签名                                                      | 说明                                                                             |
 | -------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `$_send`             | `(channel: string, jsonString: string) => string \| null` | **唯一 JS→运行时桥**。同步通道返回结果 JSON；含 `cb` 的异步通道立即返回 `null`   |
-| `uint8ArrayToBase64` | `(buffer: ArrayBuffer) => string`                         | 二进制 → Base64（**兼容保留**；优先用 ES2026 `Uint8Array.prototype.toBase64()`） |
-| `base64ToUint8Array` | `(base64: string) => ArrayBuffer`                         | Base64 → 二进制（**兼容保留**；优先用 ES2026 `Uint8Array.fromBase64()`）         |
 | `__plugin`           | `{ name, version, author }`                               | 来自 yeow.json，只读                                                             |
 | `$dev`               | `boolean`                                                 | 开发模式标记                                                                     |
 
@@ -381,7 +379,7 @@ JS 端通过 `task` 通道回传补全结果：
 - [ ] **权限模型**：解析 yeow.json `computedPermissions`；`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 默认拒绝（`fs:plugin.*` 免声明）；未声明调用返回 `Permission denied: <node>`
 - [ ] **加载消息**：插件加载成功时输出加载消息（含插件名、版本、权限声明）
 - [ ] **JS 引擎**：ES2023+，支持 `Promise`/`WeakRef`/`FinalizationRegistry`/`Uint8Array`
-- [ ] **原生注入**：`$_send`、`uint8ArrayToBase64`、`base64ToUint8Array`、`__plugin`、`$dev`
+- [ ] **原生注入**：`$_send`、`__plugin`、`$dev`
 - [ ] **引导脚本**：`$send`、`_registerCallback`/`_unregisterCallback`、`console`、定时器、`fetch`、`$hm`
 - [ ] **消息循环**：拉消息 → `$hm` 分发 → 微任务 → GC 队列刷新
 - [ ] **生命周期**：INIT / LOAD / DISABLE / RELOAD，`unloadDone` 确认

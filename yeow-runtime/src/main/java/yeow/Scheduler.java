@@ -30,6 +30,9 @@ public class Scheduler {
     private final TaskFrequencyTracker freqTracker;
     private volatile ProfileSink sink;
     private volatile BudgetScaler budgetScaler;
+    private long lastLowQueueWarnMs;
+    private static final long LOW_QUEUE_WARN_INTERVAL_MS = 60_000;
+    private static final int LOW_QUEUE_WARN_THRESHOLD = 100_000;
 
     public Scheduler(YeowConfig config) {
         this.freqTracker = new TaskFrequencyTracker(config.demoteThreshold());
@@ -99,6 +102,15 @@ public class Scheduler {
         }
         BudgetScaler sc = budgetScaler;
         if (sc != null) sc.onTick(!highPool.isEmpty() || !normalPool.isEmpty());
+
+        // LOW 批量队列异常膨胀（>100k 任务）→ 告警（60s 冷却）
+        int lowSize = lowPool.size();
+        if (lowSize > LOW_QUEUE_WARN_THRESHOLD && System.currentTimeMillis() - lastLowQueueWarnMs > LOW_QUEUE_WARN_INTERVAL_MS) {
+            lastLowQueueWarnMs = System.currentTimeMillis();
+            LOG.warning("[Yeow] LOW priority queue is critically backed up: " + lowSize
+                + " pending tasks (>100k) — a plugin is flooding low-priority async tasks;"
+                + " check scheduler saturation and plugin health");
+        }
     }
 
     private void greedyDrain(long deadline) {

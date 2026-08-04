@@ -450,7 +450,7 @@ export async function initRenderer(): Promise<ImageRenderer> {
     return {
         serviceId,
         async render(width, height, pixels) {
-            const base64 = pixels.toBase64(); // ES2026 原生；兼容旧版可用全局 uint8ArrayToBase64(pixels.buffer)
+            const base64 = pixels.toBase64(); // ES2026 原生
             return serviceRequest(serviceId, '/imageRender', {
                 width,
                 height,
