@@ -116,4 +116,4 @@ Base64 编码的二进制读写。
 
 实现**必须**拦截任何尝试逃逸基准目录的请求（包含 `../` 或以 `/` 开头的绝对路径）——`plugin` 级基准为 `plugins/<插件名>/`，`server` 级基准为服务器根目录。`outer` 级无此限制。
 
-**运行时配置目录保护**：实现**必须**拒绝所有 fs **写操作**（`writeFile` / `appendFile` / `writeBase64` / `delete` / `mkdir`）对 `plugins/Yeow/runtime/` 目录的修改（全部级别一致拦截）——该目录存放运行时的 `config.yml` 与 `approve.json`（唯一信任源），插件不可通过 fs API 篡改。读取不受限。
+**运行时配置目录保护**：实现**必须**拒绝所有 fs **写操作**（`writeFile` / `appendFile` / `writeBase64` / `delete` / `mkdir`）对运行时配置目录（如 `plugins/Yeow/runtime/`）的修改（全部级别一致拦截）——该目录存放运行时的 `config.yml` 与 `approve.json`，插件不可通过 fs API 篡改。读取不受限。

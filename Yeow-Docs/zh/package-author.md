@@ -403,8 +403,9 @@ export async function initRenderer(): Promise<ImageRenderer | null> {
             return null;
         }
         if (msg.includes('not approved')) {
-            // 用户未批准：提示管理员 /yeow approve <plugin> 后 reload；包内可降级到纯 JS 实现
-            log.warn('Native service requires approval — run /yeow approve <plugin> then /yeow reload <plugin>');
+            // 用户未批准：管理员需在服务器控制台执行 /yeow approve <code>（一次性码见控制台日志）后 reload；
+            // 包内可降级到纯 JS 实现
+            log.warn('Native service requires approval — an admin must run /yeow approve <code> on the console, then /yeow reload <plugin>');
             return fallbackJsRenderer();   // 降级：切换到纯 JS 实现 / 禁用相关功能
         }
         log.error('Native service failed:', msg);

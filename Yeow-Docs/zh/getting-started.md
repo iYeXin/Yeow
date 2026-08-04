@@ -226,14 +226,15 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 ### 批准（默认需要）
 
-**默认情况下，加载原生服务需要批准**（目前全部原生服务均视为不安全，即使有哈希声明）：
+**默认情况下，加载原生服务需要批准**（目前全部原生服务均视为不安全，即使有哈希声明）。拒绝加载时，服务器**控制台日志**打印一次性批准码：
 
 ```
-/yeow approve <plugin>    # 批准插件（内存修改，服务器关闭时写回）
-/yeow reload <plugin>     # 重新加载，使批准生效
+/yeow approve <code>    # code 为 6 位 36 进制一次性码（仅控制台日志可见）
+/yeow reload <plugin>   # 重新加载，使批准生效
 ```
 
-- 未批准 → `registerNativeService` 的 Promise reject，错误信息包含 `/yeow approve <plugin>` 指引
+- 未批准 → `registerNativeService` 的 Promise reject，错误信息引导管理员查看控制台日志并执行 `/yeow approve <code>`
+- **一次性 code 机制**：每次拒绝加载时生成随机 6 位 36 进制 code（仅出现在控制台日志，**错误返回中不含 code**）——插件无法预知 code，杜绝通过 `dispatchCommand` 自动批准；code 用后即作废
 - **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-require-approval`（默认 `true`；`false` = 默认批准）。**该配置只能在服务器关闭时修改**——内存是唯一信任源，运行期间直接编辑文件视为无效篡改，不生效（关闭时按内存合并写回）
 - **批准存储**：`plugins/Yeow/runtime/approve.json`（插件名 → 批准时间戳）。同样只读一次进入内存，运行期修改不生效，关闭时写回。**runtime 目录受 fs 写保护**——插件无法通过 fs API 修改其中的文件（config.yml / approve.json）
 
@@ -255,7 +256,7 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 | `/yeow unload <plugin\|all>`             | 卸载插件（与热重载相同的卸载逻辑，5s 强制终止）                                                                                                                                      |
 | `/yeow uninstall <plugin>`               | 卸载并把 `plugins/Yeow/` 下对应 `.yeow.zip` 移入 `plugins/Yeow/.backup/`（数据目录 `plugins/<plugin>/` 需手动清理）                                                                  |
 | `/yeow reload <plugin\|all> [path\|url]` | 重新加载。`<plugin>` 可选 `path` 或 `url` 从新来源加载（URL 为临时，不持久化）；`all` 按原路径全部重载                                                                               |
-| `/yeow approve <plugin>`                 | 批准插件的原生服务（默认需要批准才可加载；内存修改，关闭时写回 `approve.json`，需 `reload` 生效）                                                                                          |
+| `/yeow approve <code>`                   | 用控制台日志中的**一次性批准码**批准插件的原生服务（默认需要批准才可加载；code 用后作废，内存修改，关闭时写回 `approve.json`，需 `reload` 生效）                                                                 |
 | `/yeow profile`                          | 性能快照（需 `profile.enabled: true` 开启全量分析）                                                                                                                                          |
 | `/yeow track <plugin> <seconds>`         | 单插件深度追踪（需 `profile.enabled: true`）                                                                                                                                         |
 

@@ -170,13 +170,13 @@ const { serviceId, ready } = await registerNativeService('myNative', {
 }, true);
 ```
 
-> **可信性校验与批准**：插件（或依赖包）在 `yeow.config.json` 声明 `native` 字段后，构建时计算二进制 SHA-256 写入 `yeow.json`。运行时注册原生服务时：哈希不匹配（可执行文件被篡改）→ **拒绝加载**；**默认情况下未批准的原生服务同样拒绝**（`/yeow approve <plugin>` 批准后 `reload`）。错误原因可从 `ready()` 的 reject 消息区分：
+> **可信性校验与批准**：插件（或依赖包）在 `yeow.config.json` 声明 `native` 字段后，构建时计算二进制 SHA-256 写入 `yeow.json`。运行时注册原生服务时：哈希不匹配（可执行文件被篡改）→ **拒绝加载**；**默认情况下未批准的原生服务同样拒绝**（管理员用控制台日志中的一次性码 `/yeow approve <code>` 批准后 `reload`）。错误原因可从 `ready()` 的 reject 消息区分：
 >
 > - `Service already registered: <id>` — 服务已存在（用 `err.serviceId` 降级接入，无需批准）
 > - `hash mismatch ... refused to load` — 可执行文件被篡改
-> - `not approved — run /yeow approve <plugin>` — 用户未批准
+> - `not approved ... /yeow approve <code>` — 用户未批准（一次性码仅控制台可见，插件无法自动批准）
 >
-> 完整 try-catch 降级示例见 [原生服务可信性声明](../getting-started.md#原生服务可信性声明)。
+> 完整 try-catch 降级示例见 [编写依赖包](../package-author.md#原生服务的错误处理与降级)。
 
 **支持平台**：key 支持 `操作系统` 或 `操作系统-架构` 两种粒度。**精确匹配（含架构）优先，找不到则回退到操作系统**：
 
@@ -365,8 +365,8 @@ try {
         // 可执行文件被篡改（声明与实际 SHA-256 不一致）：拒绝使用，检查二进制来源
         log.error('Native binary tampered — refusing to load');
     } else if (msg.includes('not approved')) {
-        // 用户未批准：提示管理员批准后 reload（/yeow approve <plugin>）
-        log.warn('Native service requires approval — run /yeow approve <plugin> then /yeow reload <plugin>');
+        // 用户未批准：管理员需在服务器控制台执行 /yeow approve <code>（一次性码见控制台日志）后 reload
+        log.warn('Native service requires approval — an admin must run /yeow approve <code> on the console, then /yeow reload <plugin>');
         // 降级：切换到纯 JS 实现 / 禁用相关功能
     } else {
         log.error('Native service failed:', msg);

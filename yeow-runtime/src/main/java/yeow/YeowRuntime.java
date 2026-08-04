@@ -57,6 +57,16 @@ public class YeowRuntime extends JavaPlugin {
         if (approvals != null) approvals.approve(plugin);
     }
 
+    /** 生成一次性批准码（只打印在控制台日志，插件不可预知）。 */
+    public String requestApprovalCode(String plugin) {
+        return approvals != null ? approvals.requestApprovalCode(plugin) : null;
+    }
+
+    /** 用一次性 code 批准（成功返回插件名并作废 code；失败返回 null）。 */
+    public String approveNativeByCode(String code) {
+        return approvals != null ? approvals.approveByCode(code) : null;
+    }
+
     public static YeowRuntime inst() { return instance; }
 
     @Override public void onLoad() {
@@ -675,12 +685,14 @@ public class YeowRuntime extends JavaPlugin {
                     }
                     case "approve" -> {
                         if (!s.hasPermission("yeow.admin")) { s.sendMessage("No permission."); yield true; }
-                        if (a.length < 2) { s.sendMessage("Usage: /yeow approve <plugin>"); yield true; }
-                        var pn = a[1];
-                        if (!plugins.containsKey(pn)) { s.sendMessage("Plugin not loaded: " + pn); yield true; }
-                        approveNativePlugin(pn);
-                        s.sendMessage("Approved native services for " + pn
-                            + " — run /yeow reload " + pn + " to load them (persisted on server shutdown)");
+                        if (a.length < 2) { s.sendMessage("Usage: /yeow approve <code>"); yield true; }
+                        var pn = approveNativeByCode(a[1]);
+                        if (pn != null) {
+                            s.sendMessage("Approved native services for " + pn
+                                + " — run /yeow reload " + pn + " to load them (persisted on server shutdown)");
+                        } else {
+                            s.sendMessage("Invalid or expired approval code: " + a[1]);
+                        }
                         yield true;
                     }
                     default -> { usage(s); yield true; }
@@ -688,7 +700,7 @@ public class YeowRuntime extends JavaPlugin {
             }
 
             private void usage(CommandSender s) {
-                s.sendMessage("Usage: /yeow load <path|url> | /yeow install <url> | /yeow update <url> | /yeow unload <plugin|all> | /yeow uninstall <plugin> | /yeow reload <plugin|all> [path|url] | /yeow approve <plugin> | /yeow profile | /yeow track <plugin> <seconds>");
+                s.sendMessage("Usage: /yeow load <path|url> | /yeow install <url> | /yeow update <url> | /yeow unload <plugin|all> | /yeow uninstall <plugin> | /yeow reload <plugin|all> [path|url] | /yeow approve <code> | /yeow profile | /yeow track <plugin> <seconds>");
             }
 
             @Override
@@ -699,7 +711,7 @@ public class YeowRuntime extends JavaPlugin {
                     out.add("approve"); out.add("profile"); out.add("track");
                 } else if (a.length == 2) {
                     switch (a[0]) {
-                        case "unload", "reload", "approve" -> { out.add("all"); out.addAll(plugins.keySet()); }
+                        case "unload", "reload" -> { out.add("all"); out.addAll(plugins.keySet()); }
                         case "uninstall" -> out.addAll(plugins.keySet());
                         case "load" -> out.addAll(pluginFileCandidates());
                         case "track" -> out.addAll(plugins.keySet());

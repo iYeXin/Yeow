@@ -186,15 +186,19 @@ public class ServiceManager {
                     + packagedPath + " — treat as untrusted. Declare 'native' in yeow.config.json to pin hashes.");
             }
 
-            // 批准检查：默认情况下不安全原生服务需要 /yeow approve <plugin>（内存唯一信任源）。
+            // 批准检查：默认情况下不安全原生服务需要 /yeow approve <code>（内存唯一信任源）。
+            // 一次性 code 只打印在服务器控制台日志——错误返回不含 code，插件无法预知并自动批准。
             var rt = yeow.YeowRuntime.inst();
             if (rt != null && rt.requireNativeApproval() && !rt.isNativeApproved(pluginName)) {
+                var code = rt.requestApprovalCode(pluginName);
                 LOG.warning("Native service " + id + " (" + pluginName + ") not approved —"
-                    + " run /yeow approve " + pluginName + " then /yeow reload " + pluginName);
+                    + " run /yeow approve " + code + " on the console, then /yeow reload " + pluginName
+                    + " (one-time code, visible to admins only)");
                 cleanDir(svcDir);
                 return gson.toJson(Map.of("err",
-                    "Native service " + id + " not approved — run /yeow approve " + pluginName
-                        + " then /yeow reload " + pluginName + " to load it"));
+                    "Native service " + id + " not approved — an admin must run /yeow approve <code>"
+                        + " on the console (code printed in server log), then /yeow reload " + pluginName
+                        + " to load it"));
             }
 
             execFile.toFile().setExecutable(true);

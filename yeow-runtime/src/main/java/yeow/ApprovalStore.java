@@ -22,6 +22,8 @@ public class ApprovalStore {
     private final File file;
     /** pluginName → 批准时间戳（ms）。 */
     private final Map<String, Long> approvals = new ConcurrentHashMap<>();
+    /** 一次性批准码（code → pluginName）：每次拒绝加载不安全原生服务时生成，仅控制台可见。 */
+    private final Map<String, String> pendingCodes = new ConcurrentHashMap<>();
 
     public ApprovalStore(File dataFolder) {
         this.file = new File(new File(dataFolder, "runtime"), "approve.json");
@@ -52,6 +54,29 @@ public class ApprovalStore {
     /** 批准一个插件（内存修改；关闭时写回）。 */
     public void approve(String pluginName) {
         approvals.put(pluginName, System.currentTimeMillis());
+    }
+
+    /**
+     * 为插件的本次拒绝生成一次性批准码（6 位 36 进制，去重）。
+     * 只通过控制台日志告知管理员——插件无法预知，杜绝 dispatchCommand 自动批准。
+     */
+    public synchronized String requestApprovalCode(String pluginName) {
+        String code;
+        do {
+            code = Integer.toString(Math.abs(java.util.concurrent.ThreadLocalRandom.current().nextInt()), 36);
+            while (code.length() < 6) code = "0" + code;
+            code = code.substring(0, 6);
+        } while (pendingCodes.containsKey(code));
+        pendingCodes.put(code, pluginName);
+        return code;
+    }
+
+    /** 用一次性 code 批准（成功返回插件名并作废该 code；失败返回 null）。 */
+    public synchronized String approveByCode(String code) {
+        if (code == null) return null;
+        var plugin = pendingCodes.remove(code.trim().toLowerCase());
+        if (plugin != null) approve(plugin);
+        return plugin;
     }
 
     /** 写回 approve.json（服务器关闭、插件卸载完成后调用）。 */

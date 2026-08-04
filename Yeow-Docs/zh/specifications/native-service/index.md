@@ -170,7 +170,7 @@ Yeow-Runtime 是多路复用中转站：插件通过 `request` / `subscribe` / `
 运行时注册原生服务时，按顺序执行：
 
 1. **哈希校验**（单文件模式）：与声明不一致 → **拒绝加载**（`ready()` reject，错误含声明/实际哈希——可执行文件可能被篡改）
-2. **批准检查**：默认情况下（`native-service-require-approval: true`）全部原生服务视为不安全，插件需 `/yeow approve <plugin>` 批准后 `reload`；未批准 → **拒绝加载**（错误含批准指引）
+2. **批准检查**：默认情况下（`native-service-require-approval: true`）全部原生服务视为不安全。拒绝加载时，服务器**控制台日志**打印一次性批准码（6 位 36 进制，仅管理员可见，错误返回中不含 code）：管理员执行 `/yeow approve <code>` 批准后 `reload`；未批准 → **拒绝加载**（错误含批准指引）。一次性 code 机制杜绝插件通过 `dispatchCommand` 自动批准。
 
 **批准与配置的持久化**：
 
