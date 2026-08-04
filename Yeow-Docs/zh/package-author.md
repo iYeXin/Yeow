@@ -246,7 +246,7 @@ npm run permissions
 
 - `files` 为**本包** `assets/` 下的二进制原始路径（与 `getAssetsPath` 使用的路径一致）
 - 构建时自动映射为打包后路径（`assets/<id>/...`）并计算 SHA-256，写入 `yeow.json` 的 `native` 字段；主项目与依赖包声明相同 `serviceId` 时合并（files 归并）
-- 运行时注册该原生服务时校验哈希：不匹配 → 拒绝加载（Promise reject）；无论是否声明都会打印风险日志。详见[快速开始 - 原生服务可信性声明](../getting-started.md#原生服务可信性声明)
+- 运行时注册该原生服务时校验哈希：不匹配 → 拒绝加载（Promise reject）；无论是否声明都会打印风险日志。详见[快速开始 - 原生服务可信性声明](getting-started.md#原生服务可信性声明)
 
 ---
 
@@ -293,7 +293,7 @@ export function onBalanceChange(handler: (p: { player: string; balance: number }
 
 包内实现服务方逻辑（纯 JS），入口处尝试注册：**成功 → 本插件成为唯一服务实例；失败（同名 public 服务已存在）→ 降级为调用方**，用 `err.serviceId` 接入既有服务：
 
-> **封装铁律（服务端与客户端隔离）**：一个 service 的封装包括**服务端逻辑**（`onRequest`、`publish`）与**客户端逻辑**（`subscribe`、`request`）。由于 public 服务同一时刻只能存在一个服务端，包内必须先**尝试注册服务端**，再**以客户端身份封装对外接口**；无论注册是否成功，对外暴露的逻辑一致。**绝对不允许暴露任何直接调用服务端能力的接口（最典型是发布事件）**——注册失败时拿不到 `token`，逻辑缺失；即使拿到 `token`，各插件 JS 上下文不同，外部发布也会造成致命的状态不一致。哪怕需求只是单纯发布事件，也应走 `serviceRequest(svcId, '/publishEvent', event)` 由服务端配合。详见 [Service API 自包含设计](../api/service.md#公共服务的自包含设计)。
+> **封装铁律（服务端与客户端隔离）**：一个 service 的封装包括**服务端逻辑**（`onRequest`、`publish`）与**客户端逻辑**（`subscribe`、`request`）。由于 public 服务同一时刻只能存在一个服务端，包内必须先**尝试注册服务端**，再**以客户端身份封装对外接口**；无论注册是否成功，对外暴露的逻辑一致。**绝对不允许暴露任何直接调用服务端能力的接口（最典型是发布事件）**——注册失败时拿不到 `token`，逻辑缺失；即使拿到 `token`，各插件 JS 上下文不同，外部发布也会造成致命的状态不一致。哪怕需求只是单纯发布事件，也应走 `serviceRequest(svcId, '/publishEvent', event)` 由服务端配合。详见 [Service API 自包含设计](api/service.md#公共服务的自包含设计)。
 
 ```ts
 // yeow-stats —— JS 服务 + 调用方封装

@@ -40,11 +40,11 @@ await ready(); // Promise resolve 表示 TCP 连接已建立、就绪消息已�
 
 若进程在发送就绪消息前异常退出，`ready()` 会 reject。Error 对象包含：
 
-| 属性 | 类型 | 说明 |
-|------|------|------|
-| `message` | `string` | 错误描述（含退出码） |
-| `exitCode` | `number` | 进程退出码 |
-| `output` | `string` | stdout + stderr 合并输出 |
+| 属性       | 类型     | 说明                     |
+| ---------- | -------- | ------------------------ |
+| `message`  | `string` | 错误描述（含退出码）     |
+| `exitCode` | `number` | 进程退出码               |
+| `output`   | `string` | stdout + stderr 合并输出 |
 
 ```js
 try {
@@ -119,8 +119,8 @@ Yeow 插件调用服务请求时：
 {"type":"shutdown","reason":"unregistered"}
 ```
 
-| 字段     | 说明                                        |
-| -------- | ------------------------------------------- |
+| 字段     | 说明                                             |
+| -------- | ------------------------------------------------ |
 | `reason` | `unregistered`（卸载）/ `shutdown`（运行时关闭） |
 
 子进程收到后应**自行进行资源清理**（关闭文件、刷新持久化、停止内部线程）并退出进程——运行时通过进程退出作为完成信号；等待 3 秒未退出则 `destroy()`，再等 3 秒仍未退出则 `destroyForcibly()` 强制终止。
@@ -174,7 +174,6 @@ Yeow-Runtime 是多路复用中转站：插件通过 `request` / `subscribe` / `
 **配置与批准持久化**：
 
 - `config.yml` 的 `native-service-require-approval` 为**信任源**——运行时直接修改即生效
-- `approve.json` 启动时读入内存，`/yeow approve` 修改内存，服务器关闭、所有 Yeow 插件卸载完成后写回文件；运行期直接编辑不生效
 - 文件位于 `plugins/Yeow/runtime/`（`config.yml`、`approve.json`）——该目录受 fs 写保护，插件无法通过 fs API 修改
 
 未声明/未批准时照常打印风险日志（视为不可信）。未来 Yeow 官方或社区可能维护一份已知安全 SHA-256 列表：命中列表的二进制在插件发布时可能被标记为安全，加载时无提醒。
