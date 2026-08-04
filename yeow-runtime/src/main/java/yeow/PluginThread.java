@@ -49,7 +49,10 @@ public class PluginThread implements Runnable, PluginEntity {
     @Override public String source() { return jarPath; }
     @Override public String type() { return "js"; }
     @Override public boolean isVirtual() { return false; }
-    @Override public void postMessage(String json) { queue.sendJs(json); }
+    @Override public void postMessage(Object message) {
+        // JS 适配器需要 JSON 字符串：POJO 由运行时序列化，String 原样投递
+        queue.sendJs(message instanceof String s ? s : gson.toJson(message));
+    }
 
     @Override
     public CompletableFuture<Long> ping() {

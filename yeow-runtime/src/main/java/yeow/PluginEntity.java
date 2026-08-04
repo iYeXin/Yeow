@@ -49,8 +49,12 @@ public interface PluginEntity {
      */
     boolean isVirtual();
 
-    /** 向插件投递消息（回调 / 生命周期）。线程安全，不阻塞。 */
-    void postMessage(String json);
+    /**
+     * 向插件投递消息。接受 JSON 字符串或 POJO（适配器自行决定是否序列化：
+     * String 按消息契约直接消化；POJO 可序列化为自身格式或按字段处理）。
+     * 线程安全，不阻塞。
+     */
+    void postMessage(Object message);
 
     /**
      * 发起一次心跳探测，返回往返耗时（纳秒）的 future。

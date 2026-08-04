@@ -305,14 +305,22 @@ public class YeowRuntime extends JavaPlugin {
      * {@link PluginEntity#postMessage} 回投 `{"t":"cb","p":"<cbId>","r":<data>}`；
      * 无 `cb` 时同步阻塞返回结果 JSON。`cbId` 由适配器自行生成与管理。
      *
-     * @param entity 提交方实体（注册表中的插件）
-     * @param json   任务消息 JSON：`{"type":"player.get","params":{...},"cb":"<id>","priority":"high"}`
+     * @param entity  提交方实体（注册表中的插件）
+     * @param message 任务消息：JSON 字符串，或 POJO（**直接使用**，避免序列化开销——
+     *               gson `JsonObject` 零转换直接执行；一般 POJO 由运行时一次转换）
      * @return 结果 JSON（同步）或 null（异步）
      */
-    public String submitTask(PluginEntity entity, String json) {
+    public String submitTask(PluginEntity entity, Object message) {
         if (entity == null) return gson.toJson(Map.of("err", "unknown plugin entity"));
         try {
-            var obj = gson.fromJson(json.isEmpty() ? "{}" : json, JsonObject.class);
+            JsonObject obj;
+            if (message instanceof String s) {
+                obj = gson.fromJson(s.isEmpty() ? "{}" : s, JsonObject.class);
+            } else if (message instanceof JsonObject jo) {
+                obj = jo; // 直接使用，零序列化
+            } else {
+                obj = gson.toJsonTree(message).getAsJsonObject(); // 一般 POJO 一次转换
+            }
             var taskType = obj.get("type").getAsString();
             var params = obj.has("params") ? obj.getAsJsonObject("params") : new JsonObject();
             params.addProperty("_plugin", entity.name()); // ownership for per-plugin cleanup (gui/bossbar etc.)
