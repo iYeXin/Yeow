@@ -376,7 +376,7 @@ export async function initRenderer(): Promise<ImageRenderer> {
 
 #### 原生服务的错误处理与降级
 
-`registerNativeService` / `ready()` 的 reject 原因需要区分（服务已存在 / 可执行文件被篡改 / 用户未批准），包内封装时应统一处理并降级：
+`registerNativeService` / `ready()` 的 reject 原因需要区分（服务已存在 / 可执行文件被篡改）。**未批准在加载层处理**：声明原生服务的插件默认被拒绝加载（控制台提示一次性码 `/yeow approve <code>`，批准后自动加载），插件不运行；若已批准，则注册阶段的错误只剩以下两类：
 
 ```ts
 import { registerNativeService, serviceRequest, log } from 'yeow-api';
@@ -401,12 +401,6 @@ export async function initRenderer(): Promise<ImageRenderer | null> {
             // 可执行文件被篡改（声明与实际 SHA-256 不一致）：拒绝使用
             log.error('Native binary tampered — refusing to load');
             return null;
-        }
-        if (msg.includes('not approved')) {
-            // 用户未批准：管理员需在服务器控制台执行 /yeow approve <code>（一次性码见控制台日志）后 reload；
-            // 包内可降级到纯 JS 实现
-            log.warn('Native service requires approval — an admin must run /yeow approve <code> on the console, then /yeow reload <plugin>');
-            return fallbackJsRenderer();   // 降级：切换到纯 JS 实现 / 禁用相关功能
         }
         log.error('Native service failed:', msg);
         return null;

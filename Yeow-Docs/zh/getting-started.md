@@ -169,12 +169,12 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 **默认需要声明（未声明则调用返回错误）：**
 
-| 权限节点                     | 覆盖范围                                                                                |
-| ---------------------------- | --------------------------------------------------------------------------------------- |
+| 权限节点                     | 覆盖范围                                                                                             |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `fs:server.*` / `fs:outer.*` | fs 通道 `server` / `outer` 前缀节点（服务器根 / 任意路径）；`fs:plugin.*` 节点（插件数据目录）免声明 |
-| `http:*`                     | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen` 等）                  |
-| `service:registerNative`     | 注册原生服务（spawn 子进程）                                                            |
-| `assets:extract`             | 解压资源到磁盘                                                                          |
+| `http:*`                     | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen` 等）                               |
+| `service:registerNative`     | 注册原生服务（spawn 子进程）                                                                         |
+| `assets:extract`             | 解压资源到磁盘                                                                                       |
 
 > **节点概念**：权限只按**消息节点**考虑（如 `fs:plugin.readFile`、`fs:server.readFile`）。节点名中的段（`plugin` / `server` / `outer`、`task:player.get` 的 `player`）是业务/访问范围命名，**不是层级**——权限匹配不看命名段含义。
 
@@ -226,21 +226,21 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 
 ### 批准（默认需要）
 
-**默认情况下，加载原生服务需要批准**（目前全部原生服务均视为不安全，即使有哈希声明）。拒绝加载时，服务器**控制台日志**打印一次性批准码：
+**默认情况下，声明了原生服务的插件需要批准才能加载**（目前全部原生服务均视为不安全，即使有哈希声明）。插件加载时检测到 `native` 声明且未批准 → **拒绝加载本插件**，服务器控制台打印醒目的提示信息（一次性批准码）：
 
 ```
-/yeow approve <code>    # code 为 6 位 36 进制一次性码（仅控制台日志可见）
-/yeow reload <plugin>   # 重新加载，使批准生效
+/yeow approve <code>    # code 为 6 位 36 进制一次性码（仅控制台可见）
+                        # 批准后自动加载被拒的插件，无需手动 reload
 ```
 
-- 未批准 → `registerNativeService` 的 Promise reject，错误信息引导管理员查看控制台日志并执行 `/yeow approve <code>`
-- **一次性 code 机制**：每次拒绝加载时生成随机 6 位 36 进制 code（仅出现在控制台日志，**错误返回中不含 code**）——插件无法预知 code，杜绝通过 `dispatchCommand` 自动批准；code 用后即作废
-- **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-require-approval`（默认 `true`；`false` = 默认批准）。**该配置只能在服务器关闭时修改**——内存是唯一信任源，运行期间直接编辑文件视为无效篡改，不生效（关闭时按内存合并写回）
-- **批准存储**：`plugins/Yeow/runtime/approve.json`（插件名 → 批准时间戳）。同样只读一次进入内存，运行期修改不生效，关闭时写回。**runtime 目录受 fs 写保护**——插件无法通过 fs API 修改其中的文件（config.yml / approve.json）
+- 拒绝加载 → 插件不运行（`onLoad` 不会执行），控制台提示包含 `/yeow approve <code>`
+- **一次性 code 机制**：每次拒绝加载时生成随机 6 位 36 进制 code（仅出现在控制台日志）——插件本身未加载，无法读取日志后 `dispatchCommand` 自动批准；code 用后即作废
+- **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-require-approval`（默认 `true`；`false` = 默认批准）。**运行时直接修改即生效**（config.yml 为信任源）
+- **批准存储**：`plugins/Yeow/runtime/approve.json`（插件名 → 批准时间戳）。启动时读入内存，`/yeow approve` 修改内存，服务器关闭时写回；运行期直接编辑文件不生效。**runtime 目录受 fs 写保护**——插件无法通过 fs API 修改其中的文件（config.yml / approve.json）
 
 > **开发者**：错误处理与降级示例（区分"服务已存在 / 可执行文件被篡改 / 用户未批准"）见 [Service API](api/service.md) 与 [编写依赖包](package-author.md)。
 
-> **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险、无需批准。
+> **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险、无需批准。zai'jia
 
 ## 插件管理命令
 
@@ -256,8 +256,8 @@ Yeow 对**敏感消息节点**实施声明式权限。插件在 `yeow.config.jso
 | `/yeow unload <plugin\|all>`             | 卸载插件（与热重载相同的卸载逻辑，5s 强制终止）                                                                                                                                      |
 | `/yeow uninstall <plugin>`               | 卸载并把 `plugins/Yeow/` 下对应 `.yeow.zip` 移入 `plugins/Yeow/.backup/`（数据目录 `plugins/<plugin>/` 需手动清理）                                                                  |
 | `/yeow reload <plugin\|all> [path\|url]` | 重新加载。`<plugin>` 可选 `path` 或 `url` 从新来源加载（URL 为临时，不持久化）；`all` 按原路径全部重载                                                                               |
-| `/yeow approve <code>`                   | 用控制台日志中的**一次性批准码**批准插件的原生服务（默认需要批准才可加载；code 用后作废，内存修改，关闭时写回 `approve.json`，需 `reload` 生效）                                                                 |
-| `/yeow profile`                          | 性能快照（需 `profile.enabled: true` 开启全量分析）                                                                                                                                          |
+| `/yeow approve <code>`                   | 用控制台提示中的**一次性批准码**批准插件（声明原生服务的插件被拒后，批准会**自动加载**它；code 用后作废，关闭时写回 `approve.json`）                                                                |
+| `/yeow profile`                          | 性能快照（需 `profile.enabled: true` 开启全量分析）                                                                                                                                  |
 | `/yeow track <plugin> <seconds>`         | 单插件深度追踪（需 `profile.enabled: true`）                                                                                                                                         |
 
 ```bash
@@ -283,9 +283,8 @@ auto-demote: true                # 自动降级
 demote-threshold: 200            # 降级阈值（次/秒）
 idle-spin-us: 100                # 空闲自旋（us），0 关闭
 
-native-service-require-approval: true  # 原生服务需要批准（默认 true；false = 默认批准）。
-                                       # 只能在服务器关闭时修改——内存是唯一信任源，
-                                       # 运行期间编辑不生效（关闭时按内存合并写回）。
+native-service-require-approval: true  # 声明原生服务的插件需要批准（默认 true；false = 默认批准）。
+                                       # 运行时直接修改即生效（config.yml 为信任源）。
 
 profile:
   enabled: false                 # 全量性能分析（逐任务采集），默认关闭

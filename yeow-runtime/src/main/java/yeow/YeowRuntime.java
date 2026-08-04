@@ -38,6 +38,8 @@ public class YeowRuntime extends JavaPlugin {
     private yeow.service.ServiceManager serviceManager;
     private yeow.profile.Profiler profiler;
     private ApprovalStore approvals;
+    /** 因原生服务未批准而被拒加载的插件（pluginName → 包路径）；批准后自动加载。 */
+    private final Map<String, String> pendingLoads = new java.util.concurrent.ConcurrentHashMap<>();
 
     public PluginEntity getPlugin(String name) { return plugins.get(name); }
     public Scheduler getScheduler() { return scheduler; }
@@ -112,9 +114,8 @@ public class YeowRuntime extends JavaPlugin {
         plugins.values().forEach(PluginEntity::stopAndWait);
         scheduler.shutdown();
         if (serviceManager != null) serviceManager.shutdown();
-        // 所有 Yeow 插件卸载完成后，把内存中的批准与配置写回文件（内存是唯一信任源）
+        // 所有 Yeow 插件卸载完成后，把内存中的批准写回文件（approve.json；config.yml 为信任源，无需回写）
         if (approvals != null) approvals.save();
-        config.saveRequireApproval();
         instance = null;
     }
 
@@ -223,6 +224,7 @@ public class YeowRuntime extends JavaPlugin {
             var author = "";
             var perms = new java.util.LinkedHashSet<String>();
             var nativeHashes = new java.util.HashMap<String, String>(); // 打包后路径 → SHA-256
+            var declaresNative = false; // 插件是否声明了原生服务（yeow.json native 非空）
             if (metaEntry != null) {
                 var meta = new String(zip.getInputStream(metaEntry).readAllBytes(), StandardCharsets.UTF_8);
                 var obj = new Gson().fromJson(meta, JsonObject.class);
@@ -235,7 +237,8 @@ public class YeowRuntime extends JavaPlugin {
                     for (var el : obj.getAsJsonArray("computedPermissions")) perms.add(el.getAsString());
                 }
                 // 原生服务可信性声明（构建时计算 SHA-256 写入）：打包后路径 → hash
-                if (obj.has("native") && obj.get("native").isJsonArray()) {
+                if (obj.has("native") && obj.get("native").isJsonArray() && obj.getAsJsonArray("native").size() > 0) {
+                    declaresNative = true;
                     for (var el : obj.getAsJsonArray("native")) {
                         if (!el.isJsonObject()) continue;
                         var e = el.getAsJsonObject();
@@ -252,6 +255,22 @@ public class YeowRuntime extends JavaPlugin {
 
             if (plugins.containsKey(name)) {
                 LOG.warning("Duplicate plugin load rejected: " + name + " is already loaded (source: " + jarPath + ")");
+                return false;
+            }
+
+            // 原生服务批准检查（加载时）：声明了原生服务的插件需要批准，否则拒绝加载本插件。
+            // 一次性批准码只打印在控制台（插件可读日志也无法预知——code 在拒绝时新生成，且
+            // 插件本身未加载，无法 dispatchCommand）。批准后自动重新加载。
+            if (declaresNative && config.requireNativeApproval() && !isNativeApproved(name)) {
+                var code = requestApprovalCode(name);
+                pendingLoads.put(name, jarPath); // 批准后自动加载
+                var banner = "\n" + "=".repeat(60)
+                    + "\n  [Yeow] " + name + " declares NATIVE SERVICES and is NOT approved"
+                    + "\n  The plugin was REFUSED to load (native binaries are untrusted)."
+                    + "\n  To approve and load it, run:  /yeow approve " + code
+                    + "\n  (one-time code — visible to server console only)"
+                    + "\n" + "=".repeat(60);
+                LOG.severe(banner);
                 return false;
             }
 
@@ -687,11 +706,20 @@ public class YeowRuntime extends JavaPlugin {
                         if (!s.hasPermission("yeow.admin")) { s.sendMessage("No permission."); yield true; }
                         if (a.length < 2) { s.sendMessage("Usage: /yeow approve <code>"); yield true; }
                         var pn = approveNativeByCode(a[1]);
-                        if (pn != null) {
-                            s.sendMessage("Approved native services for " + pn
-                                + " — run /yeow reload " + pn + " to load them (persisted on server shutdown)");
+                        if (pn == null) { s.sendMessage("Invalid or expired approval code: " + a[1]); yield true; }
+                        s.sendMessage("Approved native services for " + pn + " (persisted on server shutdown)");
+                        // 被拒加载的插件：自动重新加载
+                        var pending = pendingLoads.remove(pn);
+                        if (pending != null) {
+                            s.sendMessage("Loading " + pn + " ...");
+                            if (registerPlugin(pending, true)) {
+                                s.sendMessage("Loaded " + pn);
+                                yeow.task.CommandTasks.syncCommands();
+                            } else {
+                                s.sendMessage("Failed to load " + pn + " (see log)");
+                            }
                         } else {
-                            s.sendMessage("Invalid or expired approval code: " + a[1]);
+                            s.sendMessage("Run /yeow reload " + pn + " if it is already loaded");
                         }
                         yield true;
                     }

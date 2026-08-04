@@ -167,16 +167,14 @@ Yeow-Runtime 是多路复用中转站：插件通过 `request` / `subscribe` / `
 
 插件或依赖包可在 `yeow.config.json` 声明 `native` 字段固定二进制哈希（构建时计算打包后路径的 SHA-256 写入 `yeow.json` 的 `native` 字段）。**声明只对单文件模式有效**（`string` / `{file}`）；目录模式（`{dir, entry}`）暂不支持。
 
-运行时注册原生服务时，按顺序执行：
+**批准（插件加载层）**：默认情况下（`native-service-require-approval: true`）全部原生服务视为不安全。声明了原生服务的插件**加载时被拒绝**——控制台打印醒目的提示信息，含一次性批准码（6 位 36 进制，仅控制台可见；插件未加载，无法预知 code 或自动批准）：管理员执行 `/yeow approve <code>` 后**自动加载**该插件。
 
-1. **哈希校验**（单文件模式）：与声明不一致 → **拒绝加载**（`ready()` reject，错误含声明/实际哈希——可执行文件可能被篡改）
-2. **批准检查**：默认情况下（`native-service-require-approval: true`）全部原生服务视为不安全。拒绝加载时，服务器**控制台日志**打印一次性批准码（6 位 36 进制，仅管理员可见，错误返回中不含 code）：管理员执行 `/yeow approve <code>` 批准后 `reload`；未批准 → **拒绝加载**（错误含批准指引）。一次性 code 机制杜绝插件通过 `dispatchCommand` 自动批准。
+**哈希校验（运行时）**：插件加载后，注册原生服务时校验所选二进制（单文件模式）SHA-256：与声明不一致 → **拒绝加载**（`ready()` reject，错误含声明/实际哈希——可执行文件可能被篡改）。
 
-**批准与配置的持久化**：
+**配置与批准持久化**：
 
-- 内存是唯一信任源：`config.yml` 的 `native-service-require-approval` 与 `approve.json` 启动时读取一次进入内存；批准修改（`/yeow approve`）只改内存
-- 服务器关闭、所有 Yeow 插件卸载完成后，才把内存写回文件（`config.yml` 按字段合并）
-- **运行期间直接修改这些文件不生效**（视为无效篡改），需关闭服务器修改
+- `config.yml` 的 `native-service-require-approval` 为**信任源**——运行时直接修改即生效
+- `approve.json` 启动时读入内存，`/yeow approve` 修改内存，服务器关闭、所有 Yeow 插件卸载完成后写回文件；运行期直接编辑不生效
 - 文件位于 `plugins/Yeow/runtime/`（`config.yml`、`approve.json`）——该目录受 fs 写保护，插件无法通过 fs API 修改
 
 未声明/未批准时照常打印风险日志（视为不可信）。未来 Yeow 官方或社区可能维护一份已知安全 SHA-256 列表：命中列表的二进制在插件发布时可能被标记为安全，加载时无提醒。
