@@ -15,6 +15,8 @@ Yeow Native Service 是通过子进程启动的可执行文件，通过 TCP 与 
 | `yeowPort`  | Yeow-Runtime 的 TCP 监听端口 |
 | `serviceId` | 为此服务分配的唯一 ID        |
 
+**工作目录**：子进程的默认工作目录为**服务器根目录**（Java 进程工作目录）——子进程可用相对路径直接读写服务器文件（如 `config.yml`、`plugins/` 下文件）；二进制本身被提取到临时目录运行，不影响工作目录语义。
+
 ## 启动流程
 
 ```
