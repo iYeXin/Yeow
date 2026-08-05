@@ -113,6 +113,8 @@ eventOn('playerJoin', (e) => {
 
 > **LOW 批量队列不计入**——大批量重复任务允许积压与延迟。
 
+> **建议**：如果操作很重（例如触发区块生成），建议手动声明**低优先级**——所有走 task 通道的 API 方法均支持末尾任务配置 `{ priority: 'low' }`（如 `world.getChunkAtSync(x, z, { priority: 'low' })`），把重任务放进 LOW 队列，避免挤占实时交互、触发本告警。详见 [进阶知识 - 优先级参数](advanced.md#优先级参数)。
+
 ### scheduler.saturated（调度饱和）
 
 **检测机制：** 窗口内 HIGH/NORMAL 执行时间占 tick 总时长 >80%。
