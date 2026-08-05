@@ -72,17 +72,20 @@ snap.minY / snap.height                   // 世界最低高度 / 层数
 
 ## ChunkTopSnapshot（顶部快照，2D）
 
-`chunk.getTopSnapshot()` 返回每列**最高非空气方块**的索引（256 元素，16×16）：
+`chunk.getTopSnapshot()` 返回每列**最高非空气方块**的索引（256 元素，16×16）。传 `withHeight=true` 可同时获取 **heightMap**（每列最高方块的世界高度）：
 
 ```ts
-const top = await chunk.getTopSnapshot();  // ChunkTopSnapshot
+const top = await chunk.getTopSnapshot();           // ChunkTopSnapshot
+const top2 = await chunk.getTopSnapshot(true);      // 附带 heightMap
 top.getTop(x, z)                           // string —— 列最高方块 key
 top.getTopIndex(x, z)                      // number —— 原始索引
-top.data                                   // Uint16Array（256 元素）
+top.getTopHeight(x, z)                     // number | null —— 列最高方块的世界高度（需 withHeight）
+top.data                                   // Uint16Array（256 元素，方块索引）
+top.height                                 // Uint16Array | undefined（256 元素，高度）
 ```
 
-- **遍历顺序**：`z` 外层 → `x` 内层；偏移量 = `z * 16 + x`
-- 虚空列（无方块）回退 `'minecraft:air'`
+- **遍历顺序**：`z` 外层 → `x` 内层；偏移量 = `z * 16 + x`（`data` 与 `height` 同布局）
+- 虚空列（无方块）`getTop` 回退 `'minecraft:air'`，`getTopHeight` 返回实际最低高度
 - 底层用 `World.getHighestBlockYAt`（世界坐标）直接查询，轻量高效
 
 ## 示例：绘制地图

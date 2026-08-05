@@ -85,12 +85,12 @@
 | 任务 | 请求 | 返回 |
 |------|------|------|
 | `chunk.getSnapshot` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `{ "data": "<base64>", "minY": <int>, "height": <int> }` |
-| `chunk.getTopSnapshot` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `{ "data": "<base64>" }` |
+| `chunk.getTopSnapshot` | `{ "world": "<name>", "x": <int>, "z": <int> [, "withHeight": true] }` | `{ "data": "<base64>" [, "height": "<base64>"] }` |
 
 - `data` 为**方块类型索引数组**的 base64 编码：`short[]` **小端序**（每元素 2 字节，与 JS 侧 `Uint16Array` 视图零拷贝解码匹配）
 - **索引基准**：方块类型索引 = `server.getBlocks` 返回数组的下标（见 [server 规范](server.md)）；索引仅当前运行时内有效，不可持久化
 - `chunk.getSnapshot`：完整区块，长度 `16×16×height`（`height = maxHeight - minY`），遍历顺序 **y 外层 → z 中层 → x 内层**；偏移量 `((y - minY) * 16 + z) * 16 + x`，`y` 为世界绝对高度
-- `chunk.getTopSnapshot`：每列最高非空气方块，长度 256，遍历顺序 **z 外层 → x 内层**；偏移量 `z * 16 + x`；虚空列回退 air 索引；底层用 `World.getHighestBlockYAt`（世界坐标）查询
+- `chunk.getTopSnapshot`：每列最高非空气方块，长度 256，遍历顺序 **z 外层 → x 内层**；偏移量 `z * 16 + x`；虚空列回退 air 索引；底层用 `World.getHighestBlockYAt`（世界坐标）查询。请求带 `withHeight: true` 时同时返回 `height`（**heightMap**：每列最高方块的世界高度，short[] 小端序 base64，与 `data` 同布局）
 
 ### 方块
 

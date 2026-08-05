@@ -66,12 +66,14 @@ export class ChunkSnapshot {
 
 /**
  * 顶部方块快照（2D，256 元素）：每列最高非空气方块的类型索引，顺序 z 外层 → x 内层。
+ * 请求时带 withHeight 可同时获得 heightMap（每列最高方块的世界高度，同布局）。
  * 索引仅当前运行时有效，不可持久化。
  */
 export class ChunkTopSnapshot {
   constructor(
     readonly data: Uint16Array,
     readonly blocks: string[],
+    readonly height?: Uint16Array,
   ) {}
 
   getTop(x: number, z: number): string {
@@ -84,12 +86,26 @@ export class ChunkTopSnapshot {
     return this.data[z * 16 + x];
   }
 
-  static async fromRaw(raw: { data: string }): Promise<ChunkTopSnapshot> {
-    return new ChunkTopSnapshot(decodeShortArray(raw.data), await ensureBlocks());
+  /** 列最高方块的世界高度（需 withHeight 请求；未请求时返回 null）。 */
+  getTopHeight(x: number, z: number): number | null {
+    if (!this.height || x < 0 || x > 15 || z < 0 || z > 15) return null;
+    return this.height[z * 16 + x];
   }
 
-  static fromRawSync(raw: { data: string }): ChunkTopSnapshot {
-    return new ChunkTopSnapshot(decodeShortArray(raw.data), ensureBlocksSync());
+  static async fromRaw(raw: { data: string; height?: string }): Promise<ChunkTopSnapshot> {
+    return new ChunkTopSnapshot(
+      decodeShortArray(raw.data),
+      await ensureBlocks(),
+      raw.height ? decodeShortArray(raw.height) : undefined,
+    );
+  }
+
+  static fromRawSync(raw: { data: string; height?: string }): ChunkTopSnapshot {
+    return new ChunkTopSnapshot(
+      decodeShortArray(raw.data),
+      ensureBlocksSync(),
+      raw.height ? decodeShortArray(raw.height) : undefined,
+    );
   }
 }
 
@@ -112,11 +128,16 @@ export class Chunk {
     return ChunkSnapshot.fromRawSync(call<{ data: string; minY: number; height: number }>('chunk.getSnapshot', { world: this.world, x: this.x, z: this.z }));
   }
 
-  /** 顶部方块快照（256 元素，每列最高非空气方块，z 外层 → x 内层）。 */
-  getTopSnapshot(): Promise<ChunkTopSnapshot> {
-    return post<{ data: string }>('chunk.getTopSnapshot', { world: this.world, x: this.x, z: this.z }).then(ChunkTopSnapshot.fromRaw);
+  /** 顶部方块快照（256 元素，每列最高非空气方块，z 外层 → x 内层）。
+   *  传 withHeight=true 时同时返回 heightMap（每列最高方块的世界高度）。 */
+  getTopSnapshot(withHeight?: boolean): Promise<ChunkTopSnapshot> {
+    const params: Record<string, unknown> = { world: this.world, x: this.x, z: this.z };
+    if (withHeight) params.withHeight = true;
+    return post<{ data: string; height?: string }>('chunk.getTopSnapshot', params).then(ChunkTopSnapshot.fromRaw);
   }
-  getTopSnapshotSync(): ChunkTopSnapshot {
-    return ChunkTopSnapshot.fromRawSync(call<{ data: string }>('chunk.getTopSnapshot', { world: this.world, x: this.x, z: this.z }));
+  getTopSnapshotSync(withHeight?: boolean): ChunkTopSnapshot {
+    const params: Record<string, unknown> = { world: this.world, x: this.x, z: this.z };
+    if (withHeight) params.withHeight = true;
+    return ChunkTopSnapshot.fromRawSync(call<{ data: string; height?: string }>('chunk.getTopSnapshot', params));
   }
 }

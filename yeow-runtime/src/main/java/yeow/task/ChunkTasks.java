@@ -75,7 +75,9 @@ public class ChunkTasks {
         return Map.of("data", encode(idx), "minY", minY, "height", height);
     }
 
-    /** 顶部方块快照：{ data: base64(short[256]) }，每列最高非空气方块，顺序 z 外层 → x。
+    /** 顶部方块快照：{ data: base64(short[256]) [, height: base64(short[256])] }，
+     *  每列最高非空气方块（z 外层 → x 内层）。请求带 withHeight=true 时同时返回
+     *  每列最高方块的世界高度（heightMap，与 data 同布局、同编码）。
      *  用 World.getHighestBlockYAt（世界坐标）直接查询，避免构造 ChunkSnapshot 的开销。 */
     public static Object getTopSnapshot(JsonObject p) {
         blockKeys(); // 确保索引缓存已初始化（可能先于任何 server.getBlocks 调用）
@@ -85,10 +87,12 @@ public class ChunkTasks {
         var chunk = w.getChunkAt(cx, cz);
         int minY = w.getMinHeight();
         var idx = new short[256];
+        var heights = new short[256];
         int n = 0;
         for (int z = 0; z < 16; z++) {
             for (int x = 0; x < 16; x++) {
                 int y = w.getHighestBlockYAt(cx * 16 + x, cz * 16 + z);
+                heights[n] = (short) y;
                 if (y < minY) {
                     idx[n++] = AIR_INDEX; // 虚空列
                 } else {
@@ -96,7 +100,12 @@ public class ChunkTasks {
                 }
             }
         }
-        return Map.of("data", encode(idx));
+        var out = new java.util.LinkedHashMap<String, Object>();
+        out.put("data", encode(idx));
+        if (p.has("withHeight") && p.get("withHeight").getAsBoolean()) {
+            out.put("height", encode(heights));
+        }
+        return out;
     }
 
     /** short[] → little-endian 2 字节/元素 → base64（配合 JS 侧 Uint16Array 零拷贝视图）。 */
