@@ -33,6 +33,7 @@ export default defineConfig({
             { text: '分发', link: '/distribution', activeMatch: '/distribution' },
             { text: '包开发', link: '/package-author', activeMatch: '/package-author' },
             { text: '规范', link: '/specifications/', activeMatch: '/specifications/' },
+            { text: '路线图', link: '/todo', activeMatch: '/todo' },
             { text: 'GitHub', link: 'https://github.com/iyexin/yeow' },
             { text: '下载运行时', link: 'https://modrinth.com/plugin/yeow' },
         ],
@@ -45,6 +46,7 @@ export default defineConfig({
                     { text: 'CLI 参考', link: '/cli' },
                     { text: '构建与分发', link: '/distribution' },
                     { text: '运行时警告', link: '/runtime-warning' },
+                    { text: '路线图', link: '/todo' },
                 ],
             },
             {
@@ -64,6 +66,7 @@ export default defineConfig({
                         collapsed: true,
                         items: [
                             { text: 'World', link: '/api/world' },
+                            { text: 'Chunk', link: '/api/chunk' },
                             { text: 'Location', link: '/api/location' },
                             { text: 'Block', link: '/api/block' },
                             { text: 'Material', link: '/api/material' },
@@ -187,6 +190,7 @@ export default defineConfig({
                         items: [
                             { text: '运行时环境标准', link: '/specifications/runtime/' },
                             { text: 'Native Service 协议', link: '/specifications/native-service/' },
+                            { text: '适配器规范', link: '/specifications/adapter/' },
                         ],
                     },
                 ],
