@@ -9,7 +9,7 @@ import { request } from 'yeow-api';
 
 ## request(url, options?)
 
-发出 HTTP 请求（异步）。
+发出 HTTP 请求（**异步**，不阻塞 JS 线程——底层走 `http:requestAsync` 通道）。推荐用于事件处理器与高频场景。
 
 ```ts
 request(url: string, options?: RequestOptions): Promise<HttpResponse>
@@ -34,12 +34,26 @@ request(url: string, options?: RequestOptions): Promise<HttpResponse>
 }
 ```
 
+## requestSync(url, options?)
+
+发出 HTTP 请求（**同步，阻塞 JS 线程**直到响应返回——底层走 `http:request` 通道）。
+
+```ts
+requestSync(url: string, options?: RequestOptions): HttpResponse
+```
+
+> ⚠ **阻塞语义**：`requestSync` 阻塞期间 JS 线程无法处理事件、命令与回调——**可能触发 `event.timeout` 运行时告警**。仅适合低频、非事件上下文（如启动初始化）；事件处理器或高频场景请使用 `request`（异步）或全局 `fetch`。
+
 ### 示例
 
 ```js
-// GET 请求
+// GET 请求（异步，推荐）
 const res = await request('https://api.example.com/data');
 console.log(res.status, res.body);
+
+// 同步请求（阻塞 JS 线程，低频场景）
+const res2 = requestSync('https://api.example.com/data');
+console.log(res2.status, res2.body);
 
 // POST 请求
 await request('https://api.example.com/submit', {

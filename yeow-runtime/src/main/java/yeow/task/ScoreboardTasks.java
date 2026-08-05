@@ -78,7 +78,11 @@ public class ScoreboardTasks {
     public static Object getScore(JsonObject p) {
         var obj = sb(p).getObjective(p.get("objective").getAsString());
         if (obj == null) return null;
-        return obj.getScore(p.get("entry").getAsString()).getScore();
+        try {
+            return obj.getScore(p.get("entry").getAsString()).getScore();
+        } catch (Exception e) {
+            return null; // entry 无分数记录：明确返回 null（而非抛错/丢键）
+        }
     }
 
     public static Object setScore(JsonObject p) {

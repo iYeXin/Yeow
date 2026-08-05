@@ -216,6 +216,7 @@ public class Tasks {
                 var tps = org.bukkit.Bukkit.getTPS();
                 yield Map.of("tps1m", tps[0], "tps5m", tps[1], "tps15m", tps[2]);
             }
+            case "server.getMaxPlayers" -> org.bukkit.Bukkit.getMaxPlayers();
             case "server.setMotd"   -> { org.bukkit.Bukkit.getServer().setMotd(p.get("motd").getAsString()); yield true; }
             case "server.setIcon"   -> { try { var bytes = java.util.Base64.getDecoder().decode(p.get("icon").getAsString()); var img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes)); var icon = org.bukkit.Bukkit.getServer().loadServerIcon(img); var m = org.bukkit.Bukkit.getServer().getClass().getMethod("setServerIcon", org.bukkit.util.CachedServerIcon.class); m.invoke(org.bukkit.Bukkit.getServer(), icon); } catch(Exception e) { /* icon err */ } yield true; }
             // Material

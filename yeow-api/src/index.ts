@@ -33,7 +33,7 @@ export {
     broadcast, broadcastSync, dispatchCommand, dispatchCommandSync,
     setMotd, setMotdSync, setIcon, setIconSync,
     getMotd, getMotdSync, getVersion, getVersionSync,
-    getTps, getTpsSync,
+    getTps, getTpsSync, getMaxPlayers, getMaxPlayersSync,
 } from './server.js';
 export type { TpsInfo } from './server.js';
 export {
@@ -49,7 +49,7 @@ export { assets, read as assetsRead, readSync as assetsReadSync,
     extract as assetsExtract, extractSync as assetsExtractSync,
     extractDir as assetsExtractDir, extractDirSync as assetsExtractDirSync } from './assets.js';
 export { path } from './path.js';
-export { listen, respond, close, request } from './http.js';
+export { listen, respond, close, request, requestSync } from './http.js';
 export { logError } from './log-error.js';
 export { InstanceId, GUIHandle, BossBarHandle, InventoryHandle } from './instance-id.js';
 export type { ItemStack } from './item.js';

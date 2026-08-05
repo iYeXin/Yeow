@@ -40,7 +40,7 @@ server.close()                  // 关闭服务器
     serverId: string
     method: string
     path: string
-    query: string
+    query: string | undefined   // 查询串；无查询参数时为 undefined——解析前需容错（如 (req.query ?? '').split('&')）
     headers: object
     body: string
     params: Record<string, string>   // 路径变量
@@ -59,14 +59,19 @@ app.get('/users/:id', (req) => {
 });
 
 app.get('/posts/:postId/comments/:commentId', (req) => {
-    // GET /posts/10/comments/5 →  req.params.postId === "10", req.params.commentId === "5"
+    // GET /posts/10/comments/5 →  req.postId === "10", req.commentId === "5"
 });
 ```
 
+### handler 返回值
+
 handler 可以返回：
+
 - 字符串 → 自动作为 body 响应，status 200
 - `{status, body, headers}` → 自定义响应
 - `undefined` → 不自动响应，可通过 `respond(...)` 手动响应
+
+**handler 支持 async**（返回 Promise 时自动 `await`，完成后才响应——不会把 Promise 当作 body 回传）；handler 内抛错时自动响应 500：
 
 ## 示例
 

@@ -5,7 +5,8 @@ export interface RouteRequest {
   method: string;
   body: string;
   headers: Record<string, string>;
-  query: string;
+  /** 查询串（可能为 undefined——无查询参数时运行时返回 null）。使用前需容错。 */
+  query: string | undefined;
   connId: string;
   serverId: string;
   params: Record<string, string>;
@@ -48,7 +49,7 @@ function compile(path: string): { regex: RegExp; paramNames: string[] } {
 export function createServer(port?: number): Server {
   const routes: Record<string, CompiledRoute[]> = {};
 
-  const srv = listen((raw: any) => {
+  const srv = listen(async (raw: any) => {
     const req = raw as RouteRequest;
     const method = (req.method || 'GET').toUpperCase();
     const compiled = routes[method] || [];
@@ -59,10 +60,16 @@ export function createServer(port?: number): Server {
         for (let i = 0; i < cr.paramNames.length; i++) {
           req.params[cr.paramNames[i]] = decodeURIComponent(m[i + 1]);
         }
-        const result = cr.handler(req);
-        if (result !== undefined) {
-          const opts = typeof result === 'string' ? { body: result } : result;
-          respond(req.serverId, req.connId, opts);
+        try {
+          // 支持异步 handler：await 结果后再 respond（Promise 不会被当作 body 回传）
+          const result = await cr.handler(req);
+          if (result !== undefined) {
+            const opts = typeof result === 'string' ? { body: result } : result;
+            respond(req.serverId, req.connId, opts);
+            return;
+          }
+        } catch (e) {
+          respond(req.serverId, req.connId, { status: 500, body: 'Internal Server Error' });
           return;
         }
       }

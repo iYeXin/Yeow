@@ -28,3 +28,7 @@ export interface TpsInfo {
  */
 export function getTps(options?: TaskOptions): Promise<TpsInfo> { return post<TpsInfo>('server.getTps', {}, options); }
 export function getTpsSync(options?: TaskOptions): TpsInfo { return call<TpsInfo>('server.getTps', {}, options); }
+
+/** 服务器最大玩家数。 */
+export function getMaxPlayers(options?: TaskOptions): Promise<number> { return post<number>('server.getMaxPlayers', {}, options); }
+export function getMaxPlayersSync(options?: TaskOptions): number { return call<number>('server.getMaxPlayers', {}, options); }

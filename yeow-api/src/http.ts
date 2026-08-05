@@ -48,11 +48,27 @@ _registerCallback(() => {
   _servers.clear();
 }, { persistent: true });
 
+/**
+ * 异步 HTTP 请求（不阻塞 JS 线程）——底层走 `http:requestAsync` 通道。
+ * 推荐用于事件处理器与高频场景。需要同步阻塞返回的用 `requestSync`。
+ */
 export function request(url: string, opts: Record<string, unknown> = {}): Promise<HttpResult> {
   return new Promise((resolve, reject) => {
+    const cbId = _registerCallback((result: unknown) => {
+      if ((result as any)?.err) reject(new Error((result as any).err));
+      else resolve(result as HttpResult);
+    });
     try {
-      const result = _sendHttp({ t: 'request', p: { url, ...opts } });
-      resolve(result);
+      _sendHttp({ t: 'requestAsync', p: { url, ...opts, cb: String(cbId) } });
     } catch (e) { reject(e); }
   });
+}
+
+/**
+ * 同步 HTTP 请求（**阻塞 JS 线程**直到响应返回）——底层走 `http:request` 通道。
+ * 阻塞期间 JS 线程无法处理事件/命令/回调（可能触发 event.timeout 告警）；
+ * 仅适合低频、非事件上下文。事件处理器或高频场景请用 `request`（异步）或全局 `fetch`。
+ */
+export function requestSync(url: string, opts: Record<string, unknown> = {}): HttpResult {
+  return _sendHttp({ t: 'request', p: { url, ...opts } });
 }
