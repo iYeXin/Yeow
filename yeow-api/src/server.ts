@@ -13,3 +13,18 @@ export function getMotd(options?: TaskOptions): Promise<string> { return post<st
 export function getMotdSync(options?: TaskOptions): string { return call<string>('server.getMotd', {}, options); }
 export function getVersion(options?: TaskOptions): Promise<string> { return post<string>('server.getVersion', {}, options); }
 export function getVersionSync(options?: TaskOptions): string { return call<string>('server.getVersion', {}, options); }
+
+export interface TpsInfo {
+  /** 最近 1 分钟平均 TPS。 */
+  tps1m: number;
+  /** 最近 5 分钟平均 TPS。 */
+  tps5m: number;
+  /** 最近 15 分钟平均 TPS。 */
+  tps15m: number;
+}
+/**
+ * 服务器 TPS。**跨平台不保证可用**（Paper 平台基于 `Bukkit.getTPS`；其他平台运行时不保证，
+ * 且未来 TPS 这一概念可能发生变化）——调用前需自行降级处理。
+ */
+export function getTps(options?: TaskOptions): Promise<TpsInfo> { return post<TpsInfo>('server.getTps', {}, options); }
+export function getTpsSync(options?: TaskOptions): TpsInfo { return call<TpsInfo>('server.getTps', {}, options); }

@@ -43,3 +43,12 @@ getMotdSync()            // string — 同步
 await getVersion()       // Promise<string>
 getVersionSync()         // string — 同步
 ```
+
+## 服务器 TPS
+
+```js
+await getTps()           // Promise<{ tps1m, tps5m, tps15m }>
+getTpsSync()             // { tps1m, tps5m, tps15m } — 同步
+```
+
+> ⚠ **跨平台不保证可用**：TPS 是宿主平台的运行指标（Paper 平台基于 `Bukkit.getTPS`）——其他平台运行时不保证支持，且未来 TPS 这一概念可能发生变化。调用前请自行降级处理（如捕获异常或按平台判断）。

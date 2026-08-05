@@ -33,7 +33,9 @@ export {
     broadcast, broadcastSync, dispatchCommand, dispatchCommandSync,
     setMotd, setMotdSync, setIcon, setIconSync,
     getMotd, getMotdSync, getVersion, getVersionSync,
+    getTps, getTpsSync,
 } from './server.js';
+export type { TpsInfo } from './server.js';
 export {
     fs,
     readFile, readFileSync, readFileBase64, readFileBase64Sync,

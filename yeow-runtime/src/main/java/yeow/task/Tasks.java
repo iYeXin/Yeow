@@ -3,6 +3,8 @@ package yeow.task;
 import com.google.gson.JsonObject;
 import yeow.YeowRuntime;
 
+import java.util.Map;
+
 public class Tasks {
     public static Object execute(String taskType, JsonObject p) throws Exception {
         return switch (taskType) {
@@ -208,6 +210,12 @@ public class Tasks {
             case "server.broadcast" -> { org.bukkit.Bukkit.broadcast(TextUtil.parse(p.get("message").getAsString())); yield true; }
             case "server.getMotd"   -> org.bukkit.Bukkit.getMotd();
             case "server.getVersion" -> org.bukkit.Bukkit.getVersion();
+            // TPS 为 Paper 平台指标（Bukkit.getTPS）；其他平台运行时不保证可用，
+            // 且未来 TPS 概念可能发生变化。
+            case "server.getTps"    -> {
+                var tps = org.bukkit.Bukkit.getTPS();
+                yield Map.of("tps1m", tps[0], "tps5m", tps[1], "tps15m", tps[2]);
+            }
             case "server.setMotd"   -> { org.bukkit.Bukkit.getServer().setMotd(p.get("motd").getAsString()); yield true; }
             case "server.setIcon"   -> { try { var bytes = java.util.Base64.getDecoder().decode(p.get("icon").getAsString()); var img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes)); var icon = org.bukkit.Bukkit.getServer().loadServerIcon(img); var m = org.bukkit.Bukkit.getServer().getClass().getMethod("setServerIcon", org.bukkit.util.CachedServerIcon.class); m.invoke(org.bukkit.Bukkit.getServer(), icon); } catch(Exception e) { /* icon err */ } yield true; }
             // Material

@@ -11,6 +11,9 @@
 | `server.setMotd` | `{ "motd": "<text>" }` | `true` |
 | `server.getVersion` | `{}` | `string` |
 | `server.setIcon` | `{ "icon": "<base64>" }` | `true` |
+| `server.getTps` | `{}` | `{ "tps1m": <double>, "tps5m": <double>, "tps15m": <double> }` |
+
+> **`server.getTps` 跨平台不保证可用**：TPS 是宿主平台的运行指标（Paper 平台基于 `Bukkit.getTPS`）——其他平台运行时不保证支持，且未来 TPS 这一概念可能发生变化；调用方需自行降级处理。
 
 ## Material / Block / Item 查询
 
