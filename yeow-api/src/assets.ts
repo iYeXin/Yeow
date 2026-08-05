@@ -43,4 +43,16 @@ export function extractSync(path: string, dest?: string): string {
   return (_sendAssets({ t: 'extract', p }) as { path: string }).path;
 }
 
-export const assets = { read, readSync, readBase64, readBase64Sync, extract, extractSync };
+export async function extractDir(path: string, dest?: string): Promise<string> {
+  const p: Record<string, unknown> = { path };
+  if (dest) p.dest = dest;
+  const r = await _sendAssetsAsync({ t: 'extractDir', p }) as { path: string };
+  return r.path;
+}
+export function extractDirSync(path: string, dest?: string): string {
+  const p: Record<string, unknown> = { path };
+  if (dest) p.dest = dest;
+  return (_sendAssets({ t: 'extractDir', p }) as { path: string }).path;
+}
+
+export const assets = { read, readSync, readBase64, readBase64Sync, extract, extractSync, extractDir, extractDirSync };

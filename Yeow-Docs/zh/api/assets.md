@@ -95,6 +95,19 @@ assets.extractSync(getAssetsPath('config.json')): string
 
 > **权限**：`assets:extract` 默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明 `"assets:extract"`。`assets.read` / `assets.readBase64` 默认允许。
 
+## assets.extractDir(path, dest?) / assets.extractDirSync(path, dest?)
+
+**目录**整体提取到文件系统（递归，保持内部相对结构）。`path` 指向 `assets/` 下的一个目录（如 `native/`）；`dest` 默认 `plugins/<插件名>/assets/<path>`。
+
+```ts
+assets.extractDir(getAssetsPath('native/')): Promise<string>
+assets.extractDirSync(getAssetsPath('native/')): string
+```
+
+返回解压后的目标目录绝对路径。与 `extract` 的差异：`extractDir` 提取整个目录树（含嵌套子目录），适合需要完整保留内部引用的资源集。
+
+> **权限**：`assets:extractDir` 是**独立节点**，默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明 `"assets:extractDir"`（或 `"assets:*"`）——**`"assets:extract"` 不覆盖目录提取**。未声明调用返回 `Permission denied: assets:extractDir`。
+
 ## 示例
 
 ```js

@@ -385,6 +385,20 @@ public class PluginThread implements Runnable, PluginEntity {
         Files.createDirectories(p.getParent()); return p;
     }
 
+    /** 递归复制目录（assetsExtractDir：dev 模式源目录 → 目标）。 */
+    private static void copyDirRecursive(Path src, Path dst) throws IOException {
+        try (var stream = Files.walk(src)) {
+            for (var p : stream.toList()) {
+                var target = dst.resolve(src.relativize(p).toString());
+                if (Files.isDirectory(p)) Files.createDirectories(target);
+                else {
+                    Files.createDirectories(target.getParent());
+                    Files.copy(p, target, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+        }
+    }
+
     private String handleHttp(String pld) {
         try {
             var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class); var t = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
@@ -506,6 +520,12 @@ public class PluginThread implements Runnable, PluginEntity {
                         Files.copy(fp, target, StandardCopyOption.REPLACE_EXISTING);
                         yield gson.toJson(Map.of("path", target.toString()));
                     }
+                    case "extractDir" -> {
+                        if (!Files.isDirectory(fp)) yield gson.toJson(Map.of("err", "Asset directory not found: " + rawPath));
+                        var target = resolvePath(Path.of("plugins", name), dest);
+                        copyDirRecursive(fp, target);
+                        yield gson.toJson(Map.of("path", target.toString()));
+                    }
                     default -> gson.toJson(Map.of("err", "Unknown assets op: " + task));
                 };
             }
@@ -518,6 +538,24 @@ public class PluginThread implements Runnable, PluginEntity {
                         if (entry == null || entry.isDirectory()) yield gson.toJson(Map.of("err", "Asset not found: " + rawPath));
                         var target = resolvePath(Path.of("plugins", name), dest);
                         Files.copy(zip.getInputStream(entry), target, StandardCopyOption.REPLACE_EXISTING);
+                        yield gson.toJson(Map.of("path", target.toString()));
+                    }
+                    case "extractDir" -> {
+                        var prefix = rawPath.endsWith("/") ? rawPath : rawPath + "/";
+                        var target = resolvePath(Path.of("plugins", name), dest);
+                        var found = false;
+                        var entries = zip.entries();
+                        while (entries.hasMoreElements()) {
+                            var ze = entries.nextElement();
+                            var zn = ze.getName();
+                            if (!zn.startsWith(prefix) || ze.isDirectory()) continue;
+                            found = true;
+                            var rel = zn.substring(prefix.length());
+                            var dst = target.resolve(rel);
+                            Files.createDirectories(dst.getParent());
+                            Files.copy(zip.getInputStream(ze), dst, StandardCopyOption.REPLACE_EXISTING);
+                        }
+                        if (!found) yield gson.toJson(Map.of("err", "Asset directory not found: " + rawPath));
                         yield gson.toJson(Map.of("path", target.toString()));
                     }
                     default -> gson.toJson(Map.of("err", "Unknown assets op: " + task));

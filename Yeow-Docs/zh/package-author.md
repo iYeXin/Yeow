@@ -75,7 +75,7 @@ npm install --save-dev yeow-api
 | `fs:server.*` / `fs:outer.*`（或 `fs:server.readFile` 等节点） | `fs.server.*` / `fs.outer.*` API（服务器根/任意路径）；`fs.*`（插件数据目录）免声明 |
 | `http:*`（或 `http:requestAsync` 等节点）     | `fetch`、`request`、HTTP 服务器（`createServer`/`listen`） |
 | `service:registerNative`                      | `registerNativeService`（spawn 原生子进程）                |
-| `assets:extract`                              | `assetsExtract` / `assetsExtractSync`（解压资源到磁盘）    |
+| `assets:extract` / `assets:extractDir`        | `assetsExtract` / `assetsExtractDir`（解压资源到磁盘，两个独立节点） |
 
 规则：
 

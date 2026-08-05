@@ -44,7 +44,8 @@ export {
 } from './fs.js';
 export { assets, read as assetsRead, readSync as assetsReadSync,
     readBase64 as assetsReadBase64, readBase64Sync as assetsReadBase64Sync,
-    extract as assetsExtract, extractSync as assetsExtractSync } from './assets.js';
+    extract as assetsExtract, extractSync as assetsExtractSync,
+    extractDir as assetsExtractDir, extractDirSync as assetsExtractDirSync } from './assets.js';
 export { path } from './path.js';
 export { listen, respond, close, request } from './http.js';
 export { logError } from './log-error.js';

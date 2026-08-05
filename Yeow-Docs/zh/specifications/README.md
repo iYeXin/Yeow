@@ -136,7 +136,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 | `fs:outer.*`             | fs 通道 `outer` 前缀节点（任意路径，如 `fs:outer.readFile`）              |
 | `http:*`                 | http 通道全部操作（`request`/`requestAsync`/`listen`/`respond`/`close`）  |
 | `service:registerNative` | service 通道的 `registerNative`（spawn 子进程）                           |
-| `assets:extract`         | assets 通道的 `extract`（解压到磁盘）                                     |
+| `assets:extract` / `assets:extractDir` | assets 通道的 `extract` / `extractDir`（解压到磁盘，两个独立节点） |
 
 规则：
 

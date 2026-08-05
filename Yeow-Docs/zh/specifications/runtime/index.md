@@ -410,7 +410,7 @@ string[]
 | `fs:server.*` / `fs:outer.*`   | fs 通道 `server` / `outer` 前缀节点（服务器根 / 任意路径）；`fs:plugin.*` 节点（插件数据目录）免声明 | `["fs:server.*"]` 或 `["fs:server.readFile"]` |
 | `http:*`                       | http 全部操作（含 `fetch` 使用的 `requestAsync`）                                          | `["http:*"]` 或 `["http:requestAsync"]`       |
 | `service:registerNative`       | 注册原生服务（spawn 子进程）                                                               | `["service:registerNative"]`                  |
-| `assets:extract`               | 解压资源到磁盘                                                                             | `["assets:extract"]`                          |
+| `assets:extract` / `assets:extractDir`       | 解压资源到磁盘（单文件 / 目录，两个独立节点）                 | `["assets:extractDir"]` |
 
 规则：
 

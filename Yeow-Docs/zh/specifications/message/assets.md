@@ -2,7 +2,7 @@
 
 读取插件 JAR/包内 `assets/` 目录中的内置资源文件。
 
-> **权限**：`assets:extract`（解压资源到磁盘）**默认拒绝**，插件必须在 `yeow.json` 的 `permissions` 中声明；`assets:read` / `assets:readBase64` 默认允许。未声明调用返回 `Permission denied: assets:extract`。
+> **权限**：`assets:extract`（解压单文件）与 `assets:extractDir`（解压目录）为**两个独立节点**，默认拒绝，插件必须在 `yeow.json` 的 `computedPermissions` 中声明；`assets:read` / `assets:readBase64` 默认允许。`assets:extract` 不覆盖 `extractDir`。未声明调用返回 `Permission denied: assets:extractDir`。
 
 ## 调用格式
 
@@ -36,6 +36,13 @@
 - **返回**：`{ "path": "<absolutePath>" }`
 
 将资源文件提取到文件系统。`dest` 为可选的目标路径，默认提取到 `plugins/<插件名>/assets/<path>`。
+
+### `extractDir`
+
+- **p**：`{ "path": "<path>", "dest": "<extractPath>" }`
+- **返回**：`{ "path": "<absolutePath>" }`
+
+将资源**目录树**提取到文件系统（递归，保持内部相对结构）。`path` 指向 `assets/` 下的目录（如 `native/`），`dest` 默认 `plugins/<插件名>/assets/<path>`。独立权限节点 `assets:extractDir`。
 
 ---
 
