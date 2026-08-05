@@ -8,9 +8,8 @@ export function post<T = unknown>(
       if (result?.err) {
         const msg = result.type ? `[${result.type}] ${result.err}` : result.err;
         const e = new Error(msg);
-        if ($dev && typeof _getCurrentCbStack === 'function') {
-          const s = _getCurrentCbStack();
-          if (s) e.stack += '    --- cb registered at ---\n' + s;
+        if ($dev && typeof _attachCbStack === 'function') {
+          _attachCbStack(e);
         }
         if (result.stack) {
           e.stack += '\n    --- runtime executer error(for reference) ---\n' + result.stack;

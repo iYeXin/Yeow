@@ -1,28 +1,87 @@
-// ── Callback Registry ───────────────────────────────────────────────
-const _cbs = {};
-let _cbSeq = 1;
+// ── 栈片段（StackNode）───────────────────────────────────────────
+// 注册/传播时只存引用链（不拼接字符串）：每个片段只捕获一次
+// `new Error().stack`，外层回调通过 outer 引用连接。报错时才构建
+// 最终字符串——合并连续相同片段，超过 12 段保留首 6 + 尾 6。
+const MAX_STACK_SEGMENTS = 12;
+const KEEP_HEAD = 6;
+const KEEP_TAIL = 6;
 
-function _enhanceStack(ex, regStack) {
-    if (regStack && ex && typeof ex === 'object' && !ex._enhanced) {
-        ex._enhanced = true;
-        ex.stack = (ex.stack || '') + '    --- cb registered at ---\n' + regStack;
-    }
+function _captureStack() {
+    return globalThis.$dev ? new Error().stack : null;
 }
 
-let _currentCbStack = null;
+/** 展开节点链 → 段列表（cb registered + outer 链 + promise chain 段）。 */
+function _expandSegments(node, chainNodes) {
+    const segs = [];
+    if (chainNodes) {
+        for (const n of chainNodes) _pushSeg(segs, n, '    --- promise chain ---\n');
+    }
+    let cur = node;
+    let first = true;
+    while (cur) {
+        _pushSeg(segs, cur, first ? '    --- cb registered at ---\n' : '    --- outer callback ---\n');
+        first = false;
+        cur = cur.outer;
+    }
+    return segs;
+}
+
+function _pushSeg(segs, node, marker) {
+    if (node && node.stack) segs.push({ stack: node.stack, marker });
+}
+
+/** 合并连续相同片段；超过上限保留首 6 + 尾 6，中间标记省略。 */
+function _dedupeAndTrim(segs) {
+    const out = [];
+    for (const s of segs) {
+        const last = out[out.length - 1];
+        if (last && !last.omitted && last.stack === s.stack && last.marker === s.marker) {
+            last.count = (last.count || 1) + 1;
+        } else {
+            out.push({ stack: s.stack, marker: s.marker, count: 1 });
+        }
+    }
+    if (out.length <= MAX_STACK_SEGMENTS) return out;
+    const head = out.slice(0, KEEP_HEAD);
+    const tail = out.slice(out.length - KEEP_TAIL);
+    const omitted = out.length - KEEP_HEAD - KEEP_TAIL;
+    return head.concat([{ omitted: true, marker: '    ... (' + omitted + ' segments omitted) ...\n' }], tail);
+}
+
+/** 构建最终栈字符串（报错时才调用）。 */
+function _buildStackText(originalStack, node, chainNodes) {
+    const segs = _dedupeAndTrim(_expandSegments(node, chainNodes));
+    let text = originalStack || '';
+    for (const s of segs) {
+        if (s.omitted) { text += '\n' + s.marker; continue; }
+        text += '\n' + s.marker + s.stack + (s.count > 1 ? '\n    (×' + s.count + ')' : '');
+    }
+    return text;
+}
+
+/**
+ * 把当前回调栈片段挂到错误对象并构建一次（报错时调用）。
+ * 构建后 `__yeowStackBuilt` 标记，reportError 幂等。
+ */
+function _enhanceStack(ex, node) {
+    if (!globalThis.$dev || !node || !ex || typeof ex !== 'object') return;
+    if (ex.__yeowStackBuilt) return;
+    ex.__yeowStackBuilt = true;
+    if (!ex.__yeowStackNode) ex.__yeowStackNode = node;
+    ex.stack = _buildStackText(ex.stack || '', ex.__yeowStackNode, ex.__yeowChainNodes || null);
+}
+
+let _currentCbStack = null; // 当前回调的 StackNode（或 null）
 globalThis._getCurrentCbStack = () => _currentCbStack;
+globalThis._attachCbStack = (err) => { if (err && typeof err === 'object') _enhanceStack(err, _currentCbStack); };
 
 globalThis._registerCallback = (fn, { persistent = false } = {}) => {
     const id = 'cb_' + (_cbSeq++);
-    let regStack = globalThis.$dev ? new Error().stack : null;
-    // 跨层链：若注册发生在另一个回调执行中（回调体内再注册异步任务），
-    // 把外层回调的注册栈一并拼入，还原多层嵌套的回调来源。
-    if (globalThis.$dev && regStack && _currentCbStack) {
-        regStack += '    --- outer callback ---\n' + _currentCbStack;
-    }
+    const regNode = globalThis.$dev ? { stack: new Error().stack, outer: _currentCbStack || null } : null;
+    // 片段链只存引用——不在此处拼接字符串（嵌套注册 O(1)）。
     _cbs[id] = {
         h: function $cb() {
-            if (globalThis.$dev) _currentCbStack = regStack;
+            if (globalThis.$dev && regNode) _currentCbStack = regNode;
             try {
                 const result = fn.apply(this, arguments);
                 if (result && typeof result.then === 'function') {
@@ -32,10 +91,10 @@ globalThis._registerCallback = (fn, { persistent = false } = {}) => {
                     return result.then(null, ex => { reportError(ex); });
                 }
                 return result;
-            } catch (ex) { _enhanceStack(ex, regStack); throw ex; }
+            } catch (ex) { _enhanceStack(ex, regNode); throw ex; }
         },
         persistent,
-        stack: regStack,
+        stack: regNode,
     };
     return id;
 };
@@ -82,7 +141,7 @@ globalThis.fetch = (url, options = {}) => {
         const id = 'f' + (_tSeq++);
         const cb = _registerCallback((raw) => {
             const r = typeof raw === 'string' ? JSON.parse(raw) : raw;
-            if (r?.error) { const e = new Error(r.error); const s = globalThis.$dev ? _getCurrentCbStack() : null; if (s) e.stack += '    --- cb registered at ---\n' + s; reject(e); return; }
+            if (r?.error) { const e = new Error(r.error); if (globalThis.$dev) _attachCbStack(e); reject(e); return; }
             const body = r.body || '';
             const status = r.status || 200;
             const headers = r.headers || {};
@@ -105,6 +164,13 @@ function _parseStack(stack) {
     return m ? { fileName: m[1], lineNumber: parseInt(m[2]), columnNumber: parseInt(m[3]) } : {};
 }
 
+/** 幂等构建最终栈（未构建过且挂有片段时构建一次）。 */
+function _finalStack(e) {
+    if (!globalThis.$dev || !e || typeof e !== 'object') return e?.stack || '';
+    if (!e.__yeowStackBuilt && e.__yeowStackNode) _enhanceStack(e, e.__yeowStackNode);
+    return e?.stack || '';
+}
+
 function reportError(e) {
     var msg = e?.message || String(e);
     // UnhandledPromiseRejectionException often has a truncated message;
@@ -117,7 +183,7 @@ function reportError(e) {
     }
     const info = {
         message: msg,
-        stack: e?.stack || '',
+        stack: _finalStack(e),
         fileName: e?.fileName || 'main.js',
         lineNumber: e?.lineNumber || 0,
         columnNumber: e?.columnNumber || 0,
@@ -153,7 +219,7 @@ function _runLifecycleCallbacks(cbs) {
     // that .then() calls made inside onLoad/onInit (and their microtask
     // continuations, which run in this message's job pump) capture the user
     // call chain. The next message clears/overwrites it, so no stale leak.
-    if (globalThis.$dev) _currentCbStack = new Error().stack;
+    if (globalThis.$dev) _currentCbStack = { stack: new Error().stack, outer: _currentCbStack || null };
     for (var i = 0; i < cbs.length; i++) {
         try {
             var result = cbs[i]();
@@ -240,16 +306,18 @@ globalThis.$hm = (json) => {
 // origin (user frames are captured via _currentCbStack inside callbacks).
 // Note: `await` is NOT intercepted (engine-internal), so async-function
 // intermediate frames remain unavailable — this only covers visible .then chains.
+// 传播时只 push 节点（O(1)），字符串在错误构建时统一展开。
 if (globalThis.$dev) {
     const _origThen = Promise.prototype.then;
     const _chainMark = Symbol('yeowChainDone');
     Promise.prototype.then = function (onFulfilled, onRejected) {
-        const attachStack = globalThis._getCurrentCbStack() || new Error().stack;
+        const attachNode = globalThis._getCurrentCbStack() || { stack: new Error().stack, outer: null };
         const promise = this;
         const mark = function (reason) {
             if (reason && typeof reason === 'object' && !promise[_chainMark]) {
                 promise[_chainMark] = true;
-                reason.stack = (reason.stack || '') + '    --- promise chain ---\n' + attachStack;
+                if (!reason.__yeowChainNodes) reason.__yeowChainNodes = [];
+                reason.__yeowChainNodes.push(attachNode);
             }
             return reason;
         };

@@ -57,6 +57,7 @@ public class ChunkTasks {
 
     /** 完整方块快照：{ data: base64(short[]), minY, height }，遍历顺序 y 外层 → z → x。 */
     public static Object getSnapshot(JsonObject p) {
+        blockKeys(); // 确保索引缓存已初始化（可能先于任何 server.getBlocks 调用）
         var w = world(p);
         var chunk = w.getChunkAt(p.get("x").getAsInt(), p.get("z").getAsInt());
         var snap = chunk.getChunkSnapshot();
@@ -77,6 +78,7 @@ public class ChunkTasks {
     /** 顶部方块快照：{ data: base64(short[256]) }，每列最高非空气方块，顺序 z 外层 → x。
      *  用 World.getHighestBlockYAt（世界坐标）直接查询，避免构造 ChunkSnapshot 的开销。 */
     public static Object getTopSnapshot(JsonObject p) {
+        blockKeys(); // 确保索引缓存已初始化（可能先于任何 server.getBlocks 调用）
         var w = world(p);
         int cx = p.get("x").getAsInt();
         int cz = p.get("z").getAsInt();

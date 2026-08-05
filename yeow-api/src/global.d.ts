@@ -9,7 +9,8 @@ declare global {
     options?: { persistent?: boolean }
   ): string;
   function _unregisterCallback(id: string): void;
-  function _getCurrentCbStack(): string | null;
+  function _getCurrentCbStack(): { stack: string; outer: unknown } | null;
+  function _attachCbStack(err: unknown): void;
 
   var __plugin:
     | {
