@@ -189,7 +189,8 @@ public class ServiceManager {
             execFile.toFile().setExecutable(true);
 
             var pb = new ProcessBuilder(execFile.toAbsolutePath().toString(), String.valueOf(nativePort), id);
-            pb.directory(svcDir.toFile());
+            // 工作目录默认位于服务器根目录（Java 进程工作目录），便于子进程使用相对路径读写服务器文件
+            pb.directory(new File(System.getProperty("user.dir", ".")));
             pb.redirectErrorStream(true);
             var proc = pb.start();
 

@@ -33,14 +33,14 @@
 ### `extract`
 
 - **p**：`{ "path": "<path>", "dest": "<extractPath>" }`
-- **返回**：`{ "path": "<absolutePath>" }`
+- **返回**：`{ "path": "<相对服务器根目录的路径>" }`
 
 将资源文件提取到文件系统。`dest` 为可选的目标路径，默认提取到 `plugins/<插件名>/assets/<path>`。
 
 ### `extractDir`
 
 - **p**：`{ "path": "<path>", "dest": "<extractPath>" }`
-- **返回**：`{ "path": "<absolutePath>" }`
+- **返回**：`{ "path": "<相对服务器根目录的路径>" }`
 
 将资源**目录树**提取到文件系统（递归，保持内部相对结构）。`path` 指向 `assets/` 下的目录（如 `native/`），`dest` 默认 `plugins/<插件名>/assets/<path>`。独立权限节点 `assets:extractDir`。
 

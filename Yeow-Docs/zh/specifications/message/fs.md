@@ -110,6 +110,13 @@ Base64 编码的二进制读写。
 
 获取常用系统路径（JVM 属性，无 IO）。`desktop` = `<home>/Desktop`（可能不存在），`temp` = `java.io.tmpdir`。此节点仅 `outer` 前缀可用（`outer.systemPaths`），其他前缀调用返回错误。
 
+### `getServerPath`（仅 `outer` 前缀）
+
+- **p**：无需参数
+- **返回**：`{ "path": "<服务器根目录绝对路径>" }`
+
+返回服务器根目录（Java 进程工作目录）的绝对路径——`server` 前缀节点与 assets 解压等相对路径均以它为基准。仅 `outer` 前缀可用（`outer.getServerPath`），需 `fs:outer.*` 或 `fs:outer.getServerPath` 权限。
+
 ---
 
 ## 路径安全

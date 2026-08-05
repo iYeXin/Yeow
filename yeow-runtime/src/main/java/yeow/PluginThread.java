@@ -373,6 +373,11 @@ public class PluginThread implements Runnable, PluginEntity {
                         "desktop", Path.of(home, "Desktop").toString(),
                         "temp", System.getProperty("java.io.tmpdir", "")));
                 }
+                case "getServerPath" -> {
+                    // 仅 outer 级：服务器根目录（Java 进程工作目录）的绝对路径
+                    if (!"outer".equals(level)) throw new IllegalArgumentException("getServerPath is outer-level only");
+                    yield gson.toJson(Map.of("path", Path.of("").toAbsolutePath().normalize().toString()));
+                }
                 default -> throw new IllegalArgumentException("Unknown fs: " + task);
             };
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }

@@ -106,14 +106,22 @@ function _makeFs(level: FsLevel) {
     return _sendFs({ t: t('systemPaths') }) as { home: string; desktop: string; temp: string };
   }
 
+  /** 服务器根目录（Java 进程工作目录）的绝对路径。 */
+  async function getServerPath(): Promise<string> {
+    return (await _sendFsAsync({ t: t('getServerPath') }) as { path: string }).path;
+  }
+  function getServerPathSync(): string {
+    return (_sendFs({ t: t('getServerPath') }) as { path: string }).path;
+  }
+
   return {
     readFile, readFileSync, readFileBase64, readFileBase64Sync,
     writeFile, writeFileSync, writeFileBase64, writeFileBase64Sync,
     appendFile, appendFileSync,
     exists, existsSync, isDirectory, isDirectorySync,
     deleteFile, deleteFileSync, mkdir, mkdirSync, list, listSync,
-    // systemPaths 仅 outer 级提供（fs.outer.systemPaths）
-    ...(level === 'outer' ? { systemPaths, systemPathsSync } : {}),
+    // outer 专属能力（systemPaths / getServerPath）
+    ...(level === 'outer' ? { systemPaths, systemPathsSync, getServerPath, getServerPathSync } : {}),
   };
 }
 

@@ -117,6 +117,18 @@ fs.outer.systemPathsSync(): { home: string; desktop: string; temp: string }
 
 `desktop` / `temp` 返回的路径可直接传给 outer 段操作（如 `fs.outer.writeFileSync(path.join(p.temp, 'x.txt'), ...)`）。`systemPaths` 属于 outer 段节点（`fs:outer.systemPaths`），需要 `fs:outer.*` 或 `fs:outer.systemPaths` 权限。
 
+### 服务器根目录（outer 段）
+
+`fs.outer.getServerPath()` 返回**服务器根目录**（Java 进程工作目录）的绝对路径——`fs.server.*` / assets 解压等相对路径都以它为基准：
+
+```ts
+fs.outer.getServerPath(): Promise<string>
+fs.outer.getServerPathSync(): string
+// → "C:\\Users\\YeXin\\server"
+```
+
+属于 outer 段节点（`fs:outer.getServerPath`），需要 `fs:outer.*` 或 `fs:outer.getServerPath` 权限。
+
 > **⚠ 权限建议**：直接声明 `fs:*`（整个 fs 通道）是**危险且不专业的**——等于把服务器根与任意路径的读写权交给插件。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs:plugin.*` 节点默认允许）。确需访问服务器文件时，尽可能**精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整组/通道通配。即使声明 `fs:*`，构建的 `computedPermissions` 也会自动展开为 `fs:outer.*, fs:server.*`。
 
 ## path 工具
