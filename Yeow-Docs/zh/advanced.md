@@ -138,6 +138,16 @@ post('player.sendMessage', {...}, 'low') // 低优先级
 // 默认 normal
 ```
 
+**任务配置（TaskOptions）**：所有走 task 通道的 API 方法（`player.sendMessage`、`world.setBlock` 等，含 Sync 变体）均可在**参数末尾**传入可选任务配置对象，透传给调度器：
+
+```js
+await player.sendMessage('Hello', { priority: 'high' });   // 高优先级
+world.setBlockSync(0, 65, 0, 'stone', { priority: 'low' }); // 低优先级（Sync 同样支持）
+registerCommand('back', {...}, { priority: 'low' });        // options 已被占用的方法用 taskOptions 第三参
+```
+
+`TaskOptions`：`{ priority?: 'high' | 'normal' | 'low' }`（未来可扩展）。属性访问器（`player.ping` 等）无法携带配置，请使用对应的方法形式。
+
 ## 异步 vs 同步
 
 ### 异步操作（默认 API）
