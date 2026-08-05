@@ -12,6 +12,33 @@ declare global {
   function _getCurrentCbStack(): { stack: string; outer: unknown } | null;
   function _attachCbStack(err: unknown): void;
 
+  // ── init.js 注入的标准环境（lib 为 ESNext，不含 DOM——自行声明）──
+  interface YeowConsole {
+    log(...args: any[]): void;
+    info(...args: any[]): void;
+    warn(...args: any[]): void;
+    error(...args: any[]): void;
+  }
+  var console: YeowConsole;
+
+  interface YeowResponse {
+    ok: boolean;
+    status: number;
+    statusText: string;
+    headers: { get(name: string): string | undefined };
+    text(): Promise<string>;
+    json(): Promise<any>;
+  }
+  function fetch(
+    url: string,
+    init?: { method?: string; headers?: Record<string, string>; body?: string | null }
+  ): Promise<YeowResponse>;
+
+  function setTimeout(handler: (...args: any[]) => void, timeout?: number, ...args: any[]): string;
+  function clearTimeout(id: string): void;
+  function setInterval(handler: (...args: any[]) => void, timeout?: number, ...args: any[]): string;
+  function clearInterval(id: string): void;
+
   var __plugin:
     | {
         name: string;
