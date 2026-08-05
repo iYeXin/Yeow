@@ -1,4 +1,5 @@
 import { post } from './task.js';
+import type { TaskOptions } from './task.js';
 import type { ItemStack } from './item.js';
 
 type RecipeDefinition = ShapedRecipe | ShapelessRecipe | FurnaceRecipe | BlastRecipe | SmokerRecipe | CampfireRecipe;
@@ -53,14 +54,14 @@ interface CampfireRecipe {
   cookingTime?: number;
 }
 
-export function add(recipe: RecipeDefinition): Promise<boolean> {
-  return post<boolean>('recipe.add', recipe as unknown as Record<string, unknown>);
+export function add(recipe: RecipeDefinition, options?: TaskOptions): Promise<boolean> {
+  return post<boolean>('recipe.add', recipe as unknown as Record<string, unknown>, options);
 }
 
-export function remove(key: string): Promise<void> {
-  return post('recipe.remove', { key });
+export function remove(key: string, options?: TaskOptions): Promise<void> {
+  return post('recipe.remove', { key }, options);
 }
 
-export function getForItem(item: ItemStack): Promise<string[]> {
-  return post<string[]>('recipe.getForItem', { item });
+export function getForItem(item: ItemStack, options?: TaskOptions): Promise<string[]> {
+  return post<string[]>('recipe.getForItem', { item }, options);
 }

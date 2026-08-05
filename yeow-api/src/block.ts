@@ -1,4 +1,5 @@
 import { call, post } from './task.js';
+import type { TaskOptions } from './task.js';
 import { Location } from './location.js';
 import type { ItemStack } from './item.js';
 
@@ -14,20 +15,20 @@ export class Block {
   get location(): Location {
     return new Location(this.x, this.y, this.z, undefined, undefined, this.world);
   }
-  isSolid(): Promise<boolean> { return post<boolean>('block.isSolid', { world: this.world, x: this.x, y: this.y, z: this.z }); }
-  isSolidSync(): boolean { return call<boolean>('block.isSolid', { world: this.world, x: this.x, y: this.y, z: this.z }); }
-  isLiquid(): Promise<boolean> { return post<boolean>('block.isLiquid', { world: this.world, x: this.x, y: this.y, z: this.z }); }
-  isLiquidSync(): boolean { return call<boolean>('block.isLiquid', { world: this.world, x: this.x, y: this.y, z: this.z }); }
-  isEmpty(): Promise<boolean> { return post<boolean>('block.isEmpty', { world: this.world, x: this.x, y: this.y, z: this.z }); }
-  isEmptySync(): boolean { return call<boolean>('block.isEmpty', { world: this.world, x: this.x, y: this.y, z: this.z }); }
-  breakNaturally(tool?: ItemStack): Promise<boolean> {
+  isSolid(options?: TaskOptions): Promise<boolean> { return post<boolean>('block.isSolid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
+  isSolidSync(options?: TaskOptions): boolean { return call<boolean>('block.isSolid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
+  isLiquid(options?: TaskOptions): Promise<boolean> { return post<boolean>('block.isLiquid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
+  isLiquidSync(options?: TaskOptions): boolean { return call<boolean>('block.isLiquid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
+  isEmpty(options?: TaskOptions): Promise<boolean> { return post<boolean>('block.isEmpty', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
+  isEmptySync(options?: TaskOptions): boolean { return call<boolean>('block.isEmpty', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
+  breakNaturally(tool?: ItemStack, options?: TaskOptions): Promise<boolean> {
     const p: Record<string, unknown> = { world: this.world, x: this.x, y: this.y, z: this.z };
     if (tool) p.item = tool;
-    return post<boolean>('block.breakNaturally', p);
+    return post<boolean>('block.breakNaturally', p, options);
   }
-  breakNaturallySync(tool?: ItemStack): boolean {
+  breakNaturallySync(tool?: ItemStack, options?: TaskOptions): boolean {
     const p: Record<string, unknown> = { world: this.world, x: this.x, y: this.y, z: this.z };
     if (tool) p.item = tool;
-    return call<boolean>('block.breakNaturally', p);
+    return call<boolean>('block.breakNaturally', p, options);
   }
 }

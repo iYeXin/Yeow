@@ -1,4 +1,5 @@
 import { call, post } from './task.js';
+import type { TaskOptions } from './task.js';
 import { Location, LocationData } from './location.js';
 import { Block } from './block.js';
 import { Chunk, ChunkData } from './chunk.js';
@@ -8,18 +9,18 @@ interface WorldData {
 }
 
 export class World {
-  static get(name: string): Promise<World | null> {
-    return post<WorldData>('world.get', { name }).then((d) => (d ? new World(d.name) : null));
+  static get(name: string, options?: TaskOptions): Promise<World | null> {
+    return post<WorldData>('world.get', { name }, options).then((d) => (d ? new World(d.name) : null));
   }
-  static getSync(name: string): World | null {
-    const d = call<WorldData>('world.get', { name });
+  static getSync(name: string, options?: TaskOptions): World | null {
+    const d = call<WorldData>('world.get', { name }, options);
     return d ? new World(d.name) : null;
   }
-  static getAll(): Promise<World[]> {
-    return post<WorldData[]>('world.getAll', {}).then((list) => list.map((r) => new World(r.name)));
+  static getAll(options?: TaskOptions): Promise<World[]> {
+    return post<WorldData[]>('world.getAll', {}, options).then((list) => list.map((r) => new World(r.name)));
   }
-  static getAllSync(): World[] {
-    return call<WorldData[]>('world.getAll', {}).map((r) => new World(r.name));
+  static getAllSync(options?: TaskOptions): World[] {
+    return call<WorldData[]>('world.getAll', {}, options).map((r) => new World(r.name));
   }
 
   constructor(public readonly name: string) {}
@@ -38,132 +39,132 @@ export class World {
   }
   set spawnLocation(v: Location) { call('world.setSpawnLocation', { world: this.name, ...v.toObject() }); }
 
-  getHighestBlockY(x: number, z: number): Promise<number> {
-    return post<number>('world.getHighestBlockY', { world: this.name, x, z });
+  getHighestBlockY(x: number, z: number, options?: TaskOptions): Promise<number> {
+    return post<number>('world.getHighestBlockY', { world: this.name, x, z }, options);
   }
-  getHighestBlockYSync(x: number, z: number): number {
-    return call<number>('world.getHighestBlockY', { world: this.name, x, z });
+  getHighestBlockYSync(x: number, z: number, options?: TaskOptions): number {
+    return call<number>('world.getHighestBlockY', { world: this.name, x, z }, options);
   }
-  getChunkAt(x: number, z: number): Promise<Chunk> {
-    return post<ChunkData>('world.getChunkAt', { world: this.name, x, z }).then((d) => Chunk.from(d));
+  getChunkAt(x: number, z: number, options?: TaskOptions): Promise<Chunk> {
+    return post<ChunkData>('world.getChunkAt', { world: this.name, x, z }, options).then((d) => Chunk.from(d));
   }
-  getChunkAtSync(x: number, z: number): Chunk {
-    return Chunk.from(call<ChunkData>('world.getChunkAt', { world: this.name, x, z }));
+  getChunkAtSync(x: number, z: number, options?: TaskOptions): Chunk {
+    return Chunk.from(call<ChunkData>('world.getChunkAt', { world: this.name, x, z }, options));
   }
-  isChunkLoaded(x: number, z: number): Promise<boolean> {
-    return post<boolean>('world.isChunkLoaded', { world: this.name, x, z });
+  isChunkLoaded(x: number, z: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.isChunkLoaded', { world: this.name, x, z }, options);
   }
-  isChunkLoadedSync(x: number, z: number): boolean {
-    return call<boolean>('world.isChunkLoaded', { world: this.name, x, z });
+  isChunkLoadedSync(x: number, z: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.isChunkLoaded', { world: this.name, x, z }, options);
   }
-  loadChunk(x: number, z: number): Promise<boolean> {
-    return post<boolean>('world.loadChunk', { world: this.name, x, z });
+  loadChunk(x: number, z: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.loadChunk', { world: this.name, x, z }, options);
   }
-  loadChunkSync(x: number, z: number): boolean {
-    return call<boolean>('world.loadChunk', { world: this.name, x, z });
+  loadChunkSync(x: number, z: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.loadChunk', { world: this.name, x, z }, options);
   }
-  unloadChunk(x: number, z: number): Promise<boolean> {
-    return post<boolean>('world.unloadChunk', { world: this.name, x, z });
+  unloadChunk(x: number, z: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.unloadChunk', { world: this.name, x, z }, options);
   }
-  unloadChunkSync(x: number, z: number): boolean {
-    return call<boolean>('world.unloadChunk', { world: this.name, x, z });
+  unloadChunkSync(x: number, z: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.unloadChunk', { world: this.name, x, z }, options);
   }
-  getBlockLightLevel(x: number, y: number, z: number): Promise<number> {
-    return post<number>('world.getBlockLightLevel', { world: this.name, x, y, z });
+  getBlockLightLevel(x: number, y: number, z: number, options?: TaskOptions): Promise<number> {
+    return post<number>('world.getBlockLightLevel', { world: this.name, x, y, z }, options);
   }
-  getBlockLightLevelSync(x: number, y: number, z: number): number {
-    return call<number>('world.getBlockLightLevel', { world: this.name, x, y, z });
+  getBlockLightLevelSync(x: number, y: number, z: number, options?: TaskOptions): number {
+    return call<number>('world.getBlockLightLevel', { world: this.name, x, y, z }, options);
   }
-  getSkyLightLevel(x: number, y: number, z: number): Promise<number> {
-    return post<number>('world.getSkyLightLevel', { world: this.name, x, y, z });
+  getSkyLightLevel(x: number, y: number, z: number, options?: TaskOptions): Promise<number> {
+    return post<number>('world.getSkyLightLevel', { world: this.name, x, y, z }, options);
   }
-  getSkyLightLevelSync(x: number, y: number, z: number): number {
-    return call<number>('world.getSkyLightLevel', { world: this.name, x, y, z });
+  getSkyLightLevelSync(x: number, y: number, z: number, options?: TaskOptions): number {
+    return call<number>('world.getSkyLightLevel', { world: this.name, x, y, z }, options);
   }
-  getGameRule(rule: string): Promise<string | null> {
-    return post<string | null>('world.getGameRule', { world: this.name, rule });
+  getGameRule(rule: string, options?: TaskOptions): Promise<string | null> {
+    return post<string | null>('world.getGameRule', { world: this.name, rule }, options);
   }
-  getGameRuleSync(rule: string): string | null {
-    return call<string | null>('world.getGameRule', { world: this.name, rule });
+  getGameRuleSync(rule: string, options?: TaskOptions): string | null {
+    return call<string | null>('world.getGameRule', { world: this.name, rule }, options);
   }
-  setGameRule(rule: string, value: string): Promise<boolean> {
-    return post('world.setGameRule', { world: this.name, rule, value });
+  setGameRule(rule: string, value: string, options?: TaskOptions): Promise<boolean> {
+    return post('world.setGameRule', { world: this.name, rule, value }, options);
   }
-  setGameRuleSync(rule: string, value: string): boolean {
-    return call<boolean>('world.setGameRule', { world: this.name, rule, value });
+  setGameRuleSync(rule: string, value: string, options?: TaskOptions): boolean {
+    return call<boolean>('world.setGameRule', { world: this.name, rule, value }, options);
   }
-  getBiome(x: number, y: number, z: number): Promise<string> {
-    return post<string>('world.getBiome', { world: this.name, x, y, z });
+  getBiome(x: number, y: number, z: number, options?: TaskOptions): Promise<string> {
+    return post<string>('world.getBiome', { world: this.name, x, y, z }, options);
   }
-  getBiomeSync(x: number, y: number, z: number): string {
-    return call<string>('world.getBiome', { world: this.name, x, y, z });
+  getBiomeSync(x: number, y: number, z: number, options?: TaskOptions): string {
+    return call<string>('world.getBiome', { world: this.name, x, y, z }, options);
   }
-  getBlock(x: number, y: number, z: number): Promise<Block | null> {
-    return post<{ x: number; y: number; z: number; type: string }>('world.getBlock', { world: this.name, x, y, z })
+  getBlock(x: number, y: number, z: number, options?: TaskOptions): Promise<Block | null> {
+    return post<{ x: number; y: number; z: number; type: string }>('world.getBlock', { world: this.name, x, y, z }, options)
       .then((r) => (r ? new Block(this.name, r.x, r.y, r.z, r.type) : null));
   }
-  getBlockSync(x: number, y: number, z: number): Block | null {
-    const r = call<{ x: number; y: number; z: number; type: string }>('world.getBlock', { world: this.name, x, y, z });
+  getBlockSync(x: number, y: number, z: number, options?: TaskOptions): Block | null {
+    const r = call<{ x: number; y: number; z: number; type: string }>('world.getBlock', { world: this.name, x, y, z }, options);
     return r ? new Block(this.name, r.x, r.y, r.z, r.type) : null;
   }
-  setBlock(x: number, y: number, z: number, blockType: string): Promise<void> {
-    return post('world.setBlock', { world: this.name, x, y, z, blockType });
+  setBlock(x: number, y: number, z: number, blockType: string, options?: TaskOptions): Promise<void> {
+    return post('world.setBlock', { world: this.name, x, y, z, blockType }, options);
   }
-  setBlockSync(x: number, y: number, z: number, blockType: string): void {
-    call('world.setBlock', { world: this.name, x, y, z, blockType });
+  setBlockSync(x: number, y: number, z: number, blockType: string, options?: TaskOptions): void {
+    call('world.setBlock', { world: this.name, x, y, z, blockType }, options);
   }
-  getEntities(): Promise<string[]> {
-    return post<string[]>('world.getEntities', { world: this.name });
+  getEntities(options?: TaskOptions): Promise<string[]> {
+    return post<string[]>('world.getEntities', { world: this.name }, options);
   }
-  getEntitiesSync(): string[] {
-    return call<string[]>('world.getEntities', { world: this.name });
+  getEntitiesSync(options?: TaskOptions): string[] {
+    return call<string[]>('world.getEntities', { world: this.name }, options);
   }
-  getPlayers(): Promise<string[]> {
-    return post<string[]>('world.getPlayers', { world: this.name });
+  getPlayers(options?: TaskOptions): Promise<string[]> {
+    return post<string[]>('world.getPlayers', { world: this.name }, options);
   }
-  getPlayersSync(): string[] {
-    return call<string[]>('world.getPlayers', { world: this.name });
+  getPlayersSync(options?: TaskOptions): string[] {
+    return call<string[]>('world.getPlayers', { world: this.name }, options);
   }
-  getNearbyEntities(x: number, y: number, z: number, radius: number): Promise<string[]> {
-    return post<string[]>('world.getNearbyEntities', { world: this.name, x, y, z, radius });
+  getNearbyEntities(x: number, y: number, z: number, radius: number, options?: TaskOptions): Promise<string[]> {
+    return post<string[]>('world.getNearbyEntities', { world: this.name, x, y, z, radius }, options);
   }
-  getNearbyEntitiesSync(x: number, y: number, z: number, radius: number): string[] {
-    return call<string[]>('world.getNearbyEntities', { world: this.name, x, y, z, radius });
+  getNearbyEntitiesSync(x: number, y: number, z: number, radius: number, options?: TaskOptions): string[] {
+    return call<string[]>('world.getNearbyEntities', { world: this.name, x, y, z, radius }, options);
   }
-  dropItem(x: number, y: number, z: number, itemType: string, amount?: number): Promise<void> {
-    return post('world.dropItem', { world: this.name, x, y, z, itemType, amount });
+  dropItem(x: number, y: number, z: number, itemType: string, amount?: number, options?: TaskOptions): Promise<void> {
+    return post('world.dropItem', { world: this.name, x, y, z, itemType, amount }, options);
   }
-  dropItemSync(x: number, y: number, z: number, itemType: string, amount?: number): void {
-    call('world.dropItem', { world: this.name, x, y, z, itemType, amount });
+  dropItemSync(x: number, y: number, z: number, itemType: string, amount?: number, options?: TaskOptions): void {
+    call('world.dropItem', { world: this.name, x, y, z, itemType, amount }, options);
   }
-  strikeLightning(x: number, y: number, z: number): Promise<void> {
-    return post('world.strikeLightning', { world: this.name, x, y, z });
+  strikeLightning(x: number, y: number, z: number, options?: TaskOptions): Promise<void> {
+    return post('world.strikeLightning', { world: this.name, x, y, z }, options);
   }
-  strikeLightningSync(x: number, y: number, z: number): void {
-    call('world.strikeLightning', { world: this.name, x, y, z });
+  strikeLightningSync(x: number, y: number, z: number, options?: TaskOptions): void {
+    call('world.strikeLightning', { world: this.name, x, y, z }, options);
   }
-  strikeLightningEffect(x: number, y: number, z: number): Promise<void> {
-    return post('world.strikeLightningEffect', { world: this.name, x, y, z });
+  strikeLightningEffect(x: number, y: number, z: number, options?: TaskOptions): Promise<void> {
+    return post('world.strikeLightningEffect', { world: this.name, x, y, z }, options);
   }
-  strikeLightningEffectSync(x: number, y: number, z: number): void {
-    call('world.strikeLightningEffect', { world: this.name, x, y, z });
+  strikeLightningEffectSync(x: number, y: number, z: number, options?: TaskOptions): void {
+    call('world.strikeLightningEffect', { world: this.name, x, y, z }, options);
   }
-  createExplosion(x: number, y: number, z: number, power?: number, fire?: boolean, breaks?: boolean): Promise<void> {
-    return post('world.createExplosion', { world: this.name, x, y, z, power, setFire: fire, breakBlocks: breaks });
+  createExplosion(x: number, y: number, z: number, power?: number, fire?: boolean, breaks?: boolean, options?: TaskOptions): Promise<void> {
+    return post('world.createExplosion', { world: this.name, x, y, z, power, setFire: fire, breakBlocks: breaks }, options);
   }
-  createExplosionSync(x: number, y: number, z: number, power?: number, fire?: boolean, breaks?: boolean): void {
-    call('world.createExplosion', { world: this.name, x, y, z, power, setFire: fire, breakBlocks: breaks });
+  createExplosionSync(x: number, y: number, z: number, power?: number, fire?: boolean, breaks?: boolean, options?: TaskOptions): void {
+    call('world.createExplosion', { world: this.name, x, y, z, power, setFire: fire, breakBlocks: breaks }, options);
   }
-  spawnEntity(type: string, x: number, y: number, z: number): Promise<string | null> {
-    return post<string | null>('world.spawnEntity', { world: this.name, type, x, y, z });
+  spawnEntity(type: string, x: number, y: number, z: number, options?: TaskOptions): Promise<string | null> {
+    return post<string | null>('world.spawnEntity', { world: this.name, type, x, y, z }, options);
   }
-  spawnEntitySync(type: string, x: number, y: number, z: number): string | null {
-    return call<string | null>('world.spawnEntity', { world: this.name, type, x, y, z });
+  spawnEntitySync(type: string, x: number, y: number, z: number, options?: TaskOptions): string | null {
+    return call<string | null>('world.spawnEntity', { world: this.name, type, x, y, z }, options);
   }
-  playSound(sound: string, x: number, y: number, z: number, volume?: number, pitch?: number): Promise<void> {
-    return post('world.playSound', { world: this.name, sound, x, y, z, volume, pitch });
+  playSound(sound: string, x: number, y: number, z: number, volume?: number, pitch?: number, options?: TaskOptions): Promise<void> {
+    return post('world.playSound', { world: this.name, sound, x, y, z, volume, pitch }, options);
   }
-  playSoundSync(sound: string, x: number, y: number, z: number, volume?: number, pitch?: number): void {
-    call('world.playSound', { world: this.name, sound, x, y, z, volume, pitch });
+  playSoundSync(sound: string, x: number, y: number, z: number, volume?: number, pitch?: number, options?: TaskOptions): void {
+    call('world.playSound', { world: this.name, sound, x, y, z, volume, pitch }, options);
   }
 }

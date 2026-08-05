@@ -1,4 +1,5 @@
 import { post } from './task.js';
+import type { TaskOptions } from './task.js';
 import type { ItemStack } from './item.js';
 
 export interface ParticleOptions {
@@ -18,7 +19,7 @@ export interface ParticleOptions {
   item?: ItemStack;
 }
 
-export function spawnParticle(options: ParticleOptions): Promise<void> {
+export function spawnParticle(options: ParticleOptions, taskOptions?: TaskOptions): Promise<void> {
   return post('world.spawnParticle', {
     world: options.world,
     particle: options.particle,
@@ -34,5 +35,5 @@ export function spawnParticle(options: ParticleOptions): Promise<void> {
     color: options.color,
     blockType: options.blockType,
     item: options.item,
-  });
+  }, taskOptions);
 }

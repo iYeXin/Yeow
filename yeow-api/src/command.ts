@@ -1,4 +1,5 @@
 import { call } from './task.js';
+import type { TaskOptions } from './task.js';
 
 export interface CommandSender {
   readonly name: string;
@@ -28,7 +29,7 @@ export interface CommandOptions {
   completer?: CompleterFn | ManualCompleter;
 }
 
-export function registerCommand(name: string, options: CommandOptions): boolean {
+export function registerCommand(name: string, options: CommandOptions, taskOptions?: TaskOptions): boolean {
   const executor = options.executor;
   const completer = options.completer;
   const pluginName = __plugin?.name || 'unknown';
@@ -36,7 +37,7 @@ export function registerCommand(name: string, options: CommandOptions): boolean 
   function decorateSender(sender: CommandSender): CommandSender {
     if (sender?.uuid && sender.isPlayer) {
       (sender as any).sendMessage = (msg: string) => {
-        call('player.sendMessage', { uuid: sender.uuid, message: msg });
+        call('player.sendMessage', { uuid: sender.uuid, message: msg }, taskOptions);
       };
     } else {
       (sender as any).sendMessage = (msg: string) => {
@@ -109,5 +110,5 @@ export function registerCommand(name: string, options: CommandOptions): boolean 
     usage: options.usage,
     permission: options.permission,
     aliases: options.aliases,
-  });
+  }, taskOptions);
 }
