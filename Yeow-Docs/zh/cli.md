@@ -212,9 +212,4 @@ npm run build
 
 **导出规则**：
 
-- **普遍规则**：`Yeow` 将 yeow-api 中的**全部具名导出**作为属性（`Yeow.Player`、`Yeow.eventOn`、`Yeow.fs`、`Yeow.listen`、`Yeow.registerService`、`Yeow.getTps`、`Yeow.createBossBar`……）
-- **特殊情形**：
-  - **GUI 模块**：成员统一带 `GUI` 后缀（`openGUI` / `destroyGUI` / `closeGUI` / `setGUIItem` / `fillGUI` / `clearGUI`；`createGUI` 原名不变）
-  - **Recipe 模块**：以 yeow-api 命名导出的别名呈现（`addRecipe` / `removeRecipe` / `getRecipesForItem`）
-  - **Service 模块**：`request` / `subscribe` / `publish` 在 `Yeow` 上为 `serviceRequest` / `serviceSubscribe` / `servicePublish`
-  - **命名冲突**：同名属性以 HTTP / server 等基础模块为准（如 `Yeow.close` 为 HTTP 服务端关闭，GUI 关闭为 `Yeow.closeGUI`）
+- `Yeow` 以 **index.ts 的全部具名导出**为属性（`Yeow.Player`、`Yeow.eventOn`、`Yeow.fs`、`Yeow.listen`、`Yeow.registerService`、`Yeow.getTps`、`Yeow.createBossBar`、`Yeow.closeGUI`……）——属性名与命名导入完全一致
