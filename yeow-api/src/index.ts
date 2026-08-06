@@ -1,5 +1,8 @@
 /// <reference path="global.d.ts" />
 
+export { default as Yeow } from './yeow.js';
+export { default } from './yeow.js';
+
 export { call } from './task.js';
 export { Location } from './location.js';
 export { Player } from './player.js';
