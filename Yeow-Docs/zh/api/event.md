@@ -16,6 +16,8 @@ import { eventOn, eventOff } from 'yeow-api';
 
 返回一个取消订阅函数：`() => void`。
 
+> **同一事件可注册多个 handler，全部生效**（按注册顺序串行调用；并发模式下并行投递）。`eventOff` 按 handler 引用移除对应回调；全部移除后才停止订阅该事件。
+
 ```js
 const unsubscribe = eventOn('playerJoin', (e) => { ... });
 unsubscribe();  // 取消订阅

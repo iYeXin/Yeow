@@ -291,7 +291,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 { "type": "event.subscribe", "params": { "pluginName": "my-plugin", "eventType": "playerJoin", "callbackId": "cb_42" } }
 ```
 
-运行时维护 `eventType → plugin → callbackId` 映射。取消订阅用 `event.unsubscribe`。
+运行时维护 `eventType → plugin → 回调集合` 映射。**同一插件可对同一事件注册多个回调（全部生效）**；取消订阅用 `event.unsubscribe`（按插件整体移除）。
 
 ### 触发
 

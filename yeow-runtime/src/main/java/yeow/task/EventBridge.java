@@ -26,7 +26,8 @@ public class EventBridge implements Listener {
     static final Gson gson = new Gson();
 
     private final YeowRuntime runtime;
-    private final Map<String, Map<String, String>> subs = new ConcurrentHashMap<>();
+    /** 事件类型 → 插件 → 该插件的全部回调（同一插件可对同一事件注册多个 handler）。 */
+    private final Map<String, Map<String, Set<String>>> subs = new ConcurrentHashMap<>();
     /** 事件类型 → 是否已注册 Bukkit 监听器（生命周期 = EventBridge，一经注册永久保留）。 */
     private final Map<String, Boolean> reg = new ConcurrentHashMap<>();
     private volatile ProfileSink sink;
@@ -84,7 +85,10 @@ public class EventBridge implements Listener {
 
     public void subscribe(String plugin, String et, String cbId) {
         var c = EVENTS.get(et); if (c == null) { LOG.warning("Unknown event: " + et); return; }
-        subs.computeIfAbsent(et, k -> new ConcurrentHashMap<>()).put(plugin, cbId);
+        // 同一插件对同一事件可注册多个 handler：按插件收集到 Set，全部生效（不再覆盖）。
+        subs.computeIfAbsent(et, k -> new ConcurrentHashMap<>())
+            .computeIfAbsent(plugin, k -> ConcurrentHashMap.newKeySet())
+            .add(cbId);
         // 监听器一经注册永久保留（reg 只作去重标记，绝不在 unsubscribe 时移除）——
         // Bukkit 无法注销匿名监听器，若热重载后重新注册会累积多个监听器，
         // callEvent 会串行调用每个监听器（每个都走一遍完整超时等待），
@@ -124,43 +128,49 @@ public class EventBridge implements Listener {
             dispatchSerial(ev, et, pluginMap, data);
     }
 
-    private void dispatchSerial(Event ev, String et, Map<String, String> pluginMap, Map<String,Object> data) {
+    private void dispatchSerial(Event ev, String et, Map<String, Set<String>> pluginMap, Map<String,Object> data) {
         for (var entry : pluginMap.entrySet()) {
             var pn = entry.getKey();
-            var cb = entry.getValue();
             var pt = runtime.getPlugin(pn); if (pt == null) continue;
-            try {
-                long t0 = System.nanoTime();
-                var pend = SyncCallbackHelper.register(cb);
-                pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
-                long timeout = timeoutMs;
-                var deadline = System.nanoTime() + timeout * 1_000_000;
-                while (System.nanoTime() < deadline && !pend.isDone()) {
-                    runtime.getScheduler().tick();
-                }
-                long elapsedNs = System.nanoTime() - t0;
-                boolean timedOut = !pend.isDone();
-                ProfileSink s = sink;
-                if (s != null) s.onEvent(new EventMetric(pn, et, elapsedNs, timedOut));
-                if (pend.isDone() && pend.getResult() instanceof Map<?,?> m)
-                    applyMods(ev, m);
-                else
-                    SyncCallbackHelper.remove(cb);
-            } catch (Exception e) { LOG.warning("Event: " + e.getMessage()); }
+            for (var cb : entry.getValue()) {
+                try {
+                    long t0 = System.nanoTime();
+                    var pend = SyncCallbackHelper.register(cb);
+                    pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
+                    long timeout = timeoutMs;
+                    var deadline = System.nanoTime() + timeout * 1_000_000;
+                    while (System.nanoTime() < deadline && !pend.isDone()) {
+                        runtime.getScheduler().tick();
+                    }
+                    long elapsedNs = System.nanoTime() - t0;
+                    boolean timedOut = !pend.isDone();
+                    ProfileSink s = sink;
+                    if (s != null) s.onEvent(new EventMetric(pn, et, elapsedNs, timedOut));
+                    if (pend.isDone() && pend.getResult() instanceof Map<?,?> m)
+                        applyMods(ev, m);
+                    else
+                        SyncCallbackHelper.remove(cb);
+                } catch (Exception e) { LOG.warning("Event: " + e.getMessage()); }
+            }
         }
     }
 
-    private void dispatchConcurrent(Event ev, String et, Map<String, String> pluginMap, Map<String,Object> data) {
-        var latch = new CountDownLatch(pluginMap.size());
+    private void dispatchConcurrent(Event ev, String et, Map<String, Set<String>> pluginMap, Map<String,Object> data) {
+        int total = 0;
+        for (var set : pluginMap.values()) total += set.size();
+        if (total == 0) return;
+        var latch = new CountDownLatch(total);
         long t0 = System.nanoTime();
         var startNs = new HashMap<String, Long>();
         for (var entry : pluginMap.entrySet()) {
             var pn = entry.getKey();
-            var cb = entry.getValue();
-            var pt = runtime.getPlugin(pn); if (pt == null) { latch.countDown(); continue; }
-            startNs.put(cb, System.nanoTime());
-            SyncCallbackHelper.register(cb, latch::countDown);
-            pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
+            var pt = runtime.getPlugin(pn);
+            if (pt == null) { for (var cb : entry.getValue()) latch.countDown(); continue; }
+            for (var cb : entry.getValue()) {
+                startNs.put(cb, System.nanoTime());
+                SyncCallbackHelper.register(cb, latch::countDown);
+                pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
+            }
         }
         long timeout = timeoutMs;
         var deadline = System.nanoTime() + timeout * 1_000_000;
@@ -171,14 +181,15 @@ public class EventBridge implements Listener {
         long now = System.nanoTime();
         boolean cancelled = false;
         for (var entry : pluginMap.entrySet()) {
-            var cb = entry.getValue();
-            var r = SyncCallbackHelper.waitFor(cb, 0);
-            if (r instanceof Map<?,?> m && Boolean.TRUE.equals(m.get("cancelled")))
-                cancelled = true;
-            long start = startNs.getOrDefault(cb, t0);
-            ProfileSink s = sink;
-            if (s != null) s.onEvent(new EventMetric(entry.getKey(), et, now - start, r == null));
-            SyncCallbackHelper.remove(cb);
+            for (var cb : entry.getValue()) {
+                var r = SyncCallbackHelper.waitFor(cb, 0);
+                if (r instanceof Map<?,?> m && Boolean.TRUE.equals(m.get("cancelled")))
+                    cancelled = true;
+                long start = startNs.getOrDefault(cb, t0);
+                ProfileSink s = sink;
+                if (s != null) s.onEvent(new EventMetric(entry.getKey(), et, now - start, r == null));
+                SyncCallbackHelper.remove(cb);
+            }
         }
         if (cancelled && ev instanceof Cancellable c) c.setCancelled(true);
     }
