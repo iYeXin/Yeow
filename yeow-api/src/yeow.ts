@@ -26,6 +26,7 @@ import { createGUI, open as openGUI, destroy as destroyGUI, close as closeGUI, s
 import * as inventoryModule from './inventory.js';
 import * as scoreboardModule from './scoreboard.js';
 import * as advancementModule from './advancement.js';
+import { add as addRecipe, remove as removeRecipe, getForItem as getRecipesForItem } from './recipe.js';
 import * as potionModule from './potion.js';
 import { playSound, stopSound, stopAllSounds } from './sound.js';
 import { spawnParticle } from './particle.js';
@@ -51,6 +52,7 @@ const Yeow = {
   ...inventoryModule,
   ...scoreboardModule,
   ...advancementModule,
+  addRecipe, removeRecipe, getRecipesForItem,
   ...potionModule,
   playSound, stopSound, stopAllSounds,
   spawnParticle,

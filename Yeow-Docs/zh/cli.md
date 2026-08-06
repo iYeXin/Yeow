@@ -201,3 +201,20 @@ npm run build
 > 开发模式下构建产物放在 `dist/.dev/`，与生产 `dist/` 隔离。`yeow.config.json` 的 `permissions` 字段会写入 `yeow.json`，作为插件加载时的权限声明。
 
 > **分发**：两种产物的对比与 Modrinth 等平台的上传建议、`/yeow install <url>` 一键安装，见 [构建与分发](distribution.md)。
+
+---
+
+## 附录：Yeow 默认导出对象（不推荐）
+
+`yeow-api` 额外提供一个**默认导出的聚合对象**（`import Yeow from 'yeow-api'` 或 `import { Yeow } from 'yeow-api'`）。
+
+> ⚠ **日常完全不推荐使用**：默认导入会把整个 yeow-api 打进 bundle，破坏 tree-shaking，显著增大插件体积。除了**简化动态执行含任意逻辑的代码**（如 `eval` / `new Function` 构造的代码通过单一对象访问全部 API）外，几乎没有其他应用场景。请始终使用按需命名导入。
+
+**导出规则**：
+
+- **普遍规则**：`Yeow` 将 yeow-api 中的**全部具名导出**作为属性（`Yeow.Player`、`Yeow.eventOn`、`Yeow.fs`、`Yeow.listen`、`Yeow.registerService`、`Yeow.getTps`、`Yeow.createBossBar`……）
+- **特殊情形**：
+  - **GUI 模块**：成员统一带 `GUI` 后缀（`openGUI` / `destroyGUI` / `closeGUI` / `setGUIItem` / `fillGUI` / `clearGUI`；`createGUI` 原名不变）
+  - **Recipe 模块**：以 yeow-api 命名导出的别名呈现（`addRecipe` / `removeRecipe` / `getRecipesForItem`）
+  - **Service 模块**：`request` / `subscribe` / `publish` 在 `Yeow` 上为 `serviceRequest` / `serviceSubscribe` / `servicePublish`
+  - **命名冲突**：同名属性以 HTTP / server 等基础模块为准（如 `Yeow.close` 为 HTTP 服务端关闭，GUI 关闭为 `Yeow.closeGUI`）
