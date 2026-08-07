@@ -3,14 +3,15 @@ import type { TaskOptions } from './task.js';
 import { Location } from './location.js';
 import type { ItemStack } from './item.js';
 
-/** 方块状态（BlockData 键值对，值统一为字符串）。 */
+/** 方块状态（Minecraft 原版键值对枚举，值统一为字符串）。 */
 export interface BlockState {
   [key: string]: string;
 }
 
 /**
  * Block —— **数据层面**的方块描述符（不绑定世界坐标）。
- * 对应 Bukkit BlockData：方块类型 + 状态键值对。
+ * 对应 Minecraft 原版的方块概念：类型 + 方块状态（键值对枚举，如
+ * `facing`、`waterlogged`、`level` 等，值统一为字符串）。
  */
 export class Block {
   constructor(

@@ -45,9 +45,9 @@ world.setGameRuleSync(rule, value)
 ```js
 world.getBlock(x, y, z)             // Promise<WorldBlock | null>（含类型与状态）
 world.getBlockSync(x, y, z)         // WorldBlock | null
-world.setBlock(x, y, z, blockType)  // Promise（blockType 为字符串，兼容）
-world.setBlock(x, y, z, block, state?)  // Promise（block 为 Block 描述符，可带状态）
-world.setBlockSync(x, y, z, block, state?)
+world.setBlock(x, y, z, blockType)  // Promise（blockType 为字符串，兼容，无状态）
+world.setBlock(x, y, z, block)      // Promise（block 为 Block 描述符，可带状态）
+world.setBlockSync(x, y, z, block)
 ```
 
 `WorldBlock` 对象上的方法：

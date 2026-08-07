@@ -4,7 +4,7 @@ Yeow 把"方块"分为两个概念：
 
 | 类 | 语义 | 用途 |
 | --- | ---- | ---- |
-| **`Block`** | **数据层面**的方块描述符（类型 + 状态键值对，对应 Bukkit BlockData），**不绑定坐标** | 构造/描述方块，传给 `world.setBlock` |
+| **`Block`** | **数据层面**的方块描述符（类型 + 方块状态键值对，Minecraft 原版概念），**不绑定坐标** | 构造/描述方块，传给 `world.setBlock` |
 | **`WorldBlock`** | 世界中的方块（位置 + 数据描述符） | 由 `world.getBlock(x, y, z)` 返回，查询/操作世界中的方块 |
 
 ```js
@@ -23,7 +23,7 @@ block.withState({ waterlogged: 'true' })            // 派生新描述符（原�
 block.matches('minecraft:water', { level: '8' })    // 类型/状态匹配
 ```
 
-状态对应 Bukkit BlockData 的键值对（值统一为字符串），如 `minecraft:water[level=8]` → `{ type: "minecraft:water", state: { level: "8" } }`。
+状态对应 **Minecraft 原版的方块状态**（键值对枚举，值统一为字符串），如 `minecraft:water[level=8]` → `{ type: "minecraft:water", state: { level: "8" } }`。
 
 ## WorldBlock（世界中的方块）
 
@@ -49,16 +49,16 @@ b.breakNaturallySync()      // boolean
 
 ## 放置方块
 
-`world.setBlock(x, y, z, block, state?)` 接受 **`Block` 描述符或字符串**（兼容）：
+`world.setBlock(x, y, z, block)` 接受 **`Block` 描述符或字符串**（兼容）；带状态的方块请构造 `Block` 对象：
 
 ```ts
 import { World, Block } from 'yeow-api';
 
 const world = World.getSync('world');
 
-await world.setBlock(0, 65, 0, 'minecraft:stone');              // 字符串（兼容）
-await world.setBlock(0, 65, 1, Block.of('minecraft:water', { level: '8' }));
-await world.setBlock(0, 65, 2, 'minecraft:chest', { facing: 'north' });  // 字符串 + 独立状态参数
+await world.setBlock(0, 65, 0, 'minecraft:stone');                                  // 字符串（兼容，无状态）
+await world.setBlock(0, 65, 1, Block.of('minecraft:water', { level: '8' }));        // 描述符（带状态）
+await world.setBlock(0, 65, 2, Block.of('minecraft:chest', { facing: 'north' }));   // 描述符（带状态）
 ```
 
 ## 示例

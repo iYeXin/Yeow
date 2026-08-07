@@ -108,27 +108,23 @@ export class World {
     const r = call<{ x: number; y: number; z: number; type: string; state: BlockState }>('world.getBlock', { world: this.name, x, y, z }, options);
     return r ? new WorldBlock(this.name, r.x, r.y, r.z, r.type, r.state) : null;
   }
-  setBlock(x: number, y: number, z: number, block: Block | string, state?: BlockState, options?: TaskOptions): Promise<void> {
+  setBlock(x: number, y: number, z: number, block: Block | string, options?: TaskOptions): Promise<void> {
     const p: Record<string, unknown> = { world: this.name, x, y, z };
     if (typeof block === 'string') {
       p.blockType = block;
-      if (state) p.state = state;
     } else {
       p.blockType = block.type;
       if (block.state && Object.keys(block.state).length > 0) p.state = block.state;
-      else if (state) p.state = state;
     }
     return post('world.setBlock', p, options);
   }
-  setBlockSync(x: number, y: number, z: number, block: Block | string, state?: BlockState, options?: TaskOptions): void {
+  setBlockSync(x: number, y: number, z: number, block: Block | string, options?: TaskOptions): void {
     const p: Record<string, unknown> = { world: this.name, x, y, z };
     if (typeof block === 'string') {
       p.blockType = block;
-      if (state) p.state = state;
     } else {
       p.blockType = block.type;
       if (block.state && Object.keys(block.state).length > 0) p.state = block.state;
-      else if (state) p.state = state;
     }
     call('world.setBlock', p, options);
   }
