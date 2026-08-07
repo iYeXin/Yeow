@@ -65,8 +65,10 @@ public class CommandTasks {
                 boolean timedOut = !pend.isDone();
                 ProfileSink ps = sink;
                 if (ps != null) ps.onCommand(new CommandMetric(pluginName, cmdName, elapsedNs, timedOut));
-                if (pend.isDone() && pend.getResult() instanceof java.util.List<?> list)
-                    return list.stream().map(Object::toString).toList();
+                var result = (pend.isDone() && pend.getResult() instanceof java.util.List<?> list)
+                    ? list.stream().map(Object::toString).toList() : null;
+                SyncCallbackHelper.remove(compCbId);
+                if (result != null) return result;
                 return super.tabComplete(s, l, a);
             }
         };

@@ -47,8 +47,14 @@ public class SyncCallbackHelper {
         return p;
     }
 
+    /**
+     * 完成一个等待中的回调。**不移除 pending**——等待方（dispatch / tabComplete）
+     * 需要在本方法之后通过 {@link #waitFor} 读取结果；清理（remove）由等待方负责，
+     * 否则 waitFor 在完成后再查询会因 pend 已被移除而拿不到结果（误判超时/丢失 mods）。
+     * 重复 complete 幂等：result 覆盖、latch.countDown 与 onComplete 重复调用无副作用。
+     */
     public static void complete(String id, Object result) {
-        var p = pending.remove(id);
+        var p = pending.get(id);
         if (p != null) { p.result = result; p.latch.countDown(); if (p.onComplete != null) p.onComplete.run(); }
     }
 
