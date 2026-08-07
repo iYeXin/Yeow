@@ -68,7 +68,7 @@ await world.setBlock(0, 65, 2, Block.of('minecraft:chest', { facing: 'north' }))
 
 ## Material（材料级判断）
 
-`Block` 的 `isSolid` / `isLiquid` / `isAir` 委托 `Material` 静态方法；也可直接使用（无需方块实例）：
+`Block` 的 `isSolid` / `isLiquid` / `isAir` 委托 `Material` 上的同名方法；也可直接使用（无需方块实例）：
 
 ```ts
 Material.isSolid('minecraft:stone');   // Promise<boolean>
