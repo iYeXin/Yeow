@@ -218,7 +218,7 @@ public class Tasks {
                 yield Map.of("tps1m", tps[0], "tps5m", tps[1], "tps15m", tps[2]);
             }
             case "server.getMaxPlayers" -> org.bukkit.Bukkit.getMaxPlayers();
-            case "server.setMotd"   -> { org.bukkit.Bukkit.getServer().setMotd(p.get("motd").getAsString()); yield true; }
+            case "server.setMotd"   -> { org.bukkit.Bukkit.getServer().setMotd(TextUtil.toLegacy(TextUtil.parse(p.get("motd").getAsString()))); yield true; }
             // Material
             case "server.getMaterials" -> MaterialTasks.getMaterials(p);
             case "server.getBlocks"    -> MaterialTasks.getBlocks(p);

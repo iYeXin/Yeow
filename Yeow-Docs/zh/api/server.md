@@ -35,7 +35,7 @@ eventOn('serverPing', (e) => {
 });
 ```
 
-MOTD 为 § 颜色码格式；图标为 64x64 PNG 的 base64（不含 `data:image/png;base64,` 前缀），非 64x64 会自动缩放；无效图片忽略。详见 [serverPing 事件](event.md)。
+MOTD 经 Yeow 文本解析（MiniMessage 优先，含 § 时回退 legacy）；图标为 64x64 PNG 的 base64（不含 `data:image/png;base64,` 前缀），非 64x64 会自动缩放；无效图片忽略。详见 [serverPing 事件](event.md)。
 
 ## 服务器信息
 

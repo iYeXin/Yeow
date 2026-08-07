@@ -10,7 +10,7 @@
 | `motd` | string | MOTD 文本 |
 
 **回调回写**：handler 可返回：
-- `{ "motd": "<text>" }` — 修改该次 ping 响应的 MOTD（§ 颜色码格式，与 `server.setMotd` 一致）
+- `{ "motd": "<text>" }` — 修改该次 ping 响应的 MOTD（经 Yeow 文本解析：MiniMessage 优先，含 § 时回退 legacy § 格式）
 - `{ "icon": "<PNG base64>" }` — 修改该次 ping 响应的服务器列表图标（自动缩放至 64×64；无效图片忽略）
 
 Paper 1.20.5+ 移除了运行时 `setServerIcon`，图标只能在 ping 事件中修改。

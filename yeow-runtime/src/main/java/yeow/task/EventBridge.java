@@ -198,7 +198,7 @@ public class EventBridge implements Listener {
                     if (Boolean.TRUE.equals(m.get("cancelled")))
                         cancelled = true;
                     if (m.containsKey("motd"))
-                        motd = String.valueOf(m.get("motd"));
+                        motd = TextUtil.toLegacy(TextUtil.parse(String.valueOf(m.get("motd"))));
                     if (m.containsKey("icon"))
                         iconBase64 = String.valueOf(m.get("icon"));
                 }
@@ -224,7 +224,7 @@ public class EventBridge implements Listener {
             c.setCancelled(Boolean.TRUE.equals(m.get("cancelled")));
         if (ev instanceof PaperServerListPingEvent p) {
             if (m.containsKey("motd"))
-                p.setMotd(String.valueOf(m.get("motd")));
+                p.setMotd(TextUtil.toLegacy(TextUtil.parse(String.valueOf(m.get("motd")))));
             if (m.containsKey("icon")) {
                 var icon = loadPingIcon(String.valueOf(m.get("icon")));
                 if (icon != null) p.setServerIcon(icon);
