@@ -153,6 +153,7 @@ export interface ServerPingEvent {
   address: string;
   numPlayers: number;
   maxPlayers: number;
+  /** MOTD 文本。handler 可返回 `{ motd: "<text>" }` 覆盖该次 ping 响应的 MOTD。 */
   motd: string;
   cancelled?: boolean;
   /**

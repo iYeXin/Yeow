@@ -190,13 +190,15 @@ public class EventBridge implements Listener {
         }
         long now = System.nanoTime();
         boolean cancelled = false;
-        String iconBase64 = null;
+        String motd = null, iconBase64 = null;
         for (var entry : pluginMap.entrySet()) {
             for (var cb : entry.getValue()) {
                 var r = SyncCallbackHelper.waitFor(cb, 0);
                 if (r instanceof Map<?,?> m) {
                     if (Boolean.TRUE.equals(m.get("cancelled")))
                         cancelled = true;
+                    if (m.containsKey("motd"))
+                        motd = String.valueOf(m.get("motd"));
                     if (m.containsKey("icon"))
                         iconBase64 = String.valueOf(m.get("icon"));
                 }
@@ -207,9 +209,12 @@ public class EventBridge implements Listener {
             }
         }
         if (cancelled && ev instanceof Cancellable c) c.setCancelled(true);
-        if (iconBase64 != null && ev instanceof PaperServerListPingEvent p) {
-            var icon = loadPingIcon(iconBase64);
-            if (icon != null) p.setServerIcon(icon);
+        if (ev instanceof PaperServerListPingEvent p) {
+            if (motd != null) p.setMotd(motd);
+            if (iconBase64 != null) {
+                var icon = loadPingIcon(iconBase64);
+                if (icon != null) p.setServerIcon(icon);
+            }
         }
     }
 
@@ -217,9 +222,13 @@ public class EventBridge implements Listener {
     void applyMods(Event ev, Map<?,?> m) {
         if (m.containsKey("cancelled") && ev instanceof Cancellable c)
             c.setCancelled(Boolean.TRUE.equals(m.get("cancelled")));
-        if (m.containsKey("icon") && ev instanceof PaperServerListPingEvent p) {
-            var icon = loadPingIcon(String.valueOf(m.get("icon")));
-            if (icon != null) p.setServerIcon(icon);
+        if (ev instanceof PaperServerListPingEvent p) {
+            if (m.containsKey("motd"))
+                p.setMotd(String.valueOf(m.get("motd")));
+            if (m.containsKey("icon")) {
+                var icon = loadPingIcon(String.valueOf(m.get("icon")));
+                if (icon != null) p.setServerIcon(icon);
+            }
         }
     }
 

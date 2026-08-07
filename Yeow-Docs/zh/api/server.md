@@ -25,17 +25,17 @@ await setMotd('<red>New MOTD</red>')    // Promise — 支持 MiniMessage
 setMotdSync('A Minecraft Server')       // void — 同步
 ```
 
-## 服务器图标
+## 服务器图标与 MOTD
 
-运行时设置服务器列表图标已移除（Paper 1.20.5+ 不再提供运行时 setter）。请在 **`serverPing` 事件**中修改：
+运行时设置服务器列表图标已移除（Paper 1.20.5+ 不再提供运行时 setter），且 MOTD 也可按次覆盖。请在 **`serverPing` 事件**中修改：
 
 ```js
 eventOn('serverPing', (e) => {
-    return { icon: base64Png };   // handler 返回 { icon } 修改图标
+    return { motd: '<green>Hi</green>', icon: base64Png };   // handler 返回 { motd } / { icon } 修改
 });
 ```
 
-图标为 64x64 PNG 的 base64（不含 `data:image/png;base64,` 前缀），非 64x64 会自动缩放；无效图片忽略。详见 [serverPing 事件](event.md)。
+MOTD 为 § 颜色码格式；图标为 64x64 PNG 的 base64（不含 `data:image/png;base64,` 前缀），非 64x64 会自动缩放；无效图片忽略。详见 [serverPing 事件](event.md)。
 
 ## 服务器信息
 
