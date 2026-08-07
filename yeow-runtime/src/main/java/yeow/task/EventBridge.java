@@ -99,9 +99,13 @@ public class EventBridge implements Listener {
         // 死循环插件场景下 N 个监听器 = N × 5s 阻塞主线程。
         // dispatch() 开头已对空订阅短路，空订阅时监听器零开销。
         if (reg.putIfAbsent(et, true) == null) {
-            // ServerListPingEvent（Netty 线程）与 AsyncPlayerChatEvent（Netty 线程）在异步线程触发——
-            // 跳到主线程 dispatch：dispatch 内部的自旋循环会执行调度器 tick（Bukkit API 必须留在主线程）。
-            var async = AsyncPlayerChatEvent.class.isAssignableFrom(c) || ServerListPingEvent.class.isAssignableFrom(c);
+            // AsyncPlayerChatEvent fires on a Netty thread — hop to the main thread before dispatching,
+            // because dispatch() runs the scheduler tick (Bukkit API must stay on the main thread).
+            // ServerListPingEvent 同样在 Netty 线程触发，但**不跳主线程**：
+            // Paper 的 ping 处理同步等待事件完成，阻塞 Netty 线程只影响该次 ping；
+            // 若跳主线程，dispatch 的自旋（最多 5s）会卡死游戏主线程（Can't keep up!）。
+            // 非主线程 dispatch 的自旋等待不调 scheduler.tick()——事件完成由主线程的正常 tick 处理。
+            var async = AsyncPlayerChatEvent.class.isAssignableFrom(c);
             Bukkit.getPluginManager().registerEvent(c, this, EventPriority.NORMAL, (l, e) -> {
                 var ev = (Event) e;
                 if (async && !Bukkit.isPrimaryThread()) {
@@ -149,8 +153,12 @@ public class EventBridge implements Listener {
                     pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data)));
                     long timeout = timeoutMs;
                     var deadline = System.nanoTime() + timeout * 1_000_000;
+                    boolean primary = Bukkit.isPrimaryThread();
                     while (System.nanoTime() < deadline && !pend.isDone()) {
-                        runtime.getScheduler().tick();
+                        // 仅主线程 dispatch 时喂调度器 tick（事件完成依赖它）；
+                        // 非主线程（如 serverPing 的 Netty 线程）纯自旋等待，主线程的正常 tick 处理完成。
+                        if (primary) runtime.getScheduler().tick();
+                        Thread.onSpinWait();
                     }
                     long elapsedNs = System.nanoTime() - t0;
                     boolean timedOut = !pend.isDone();
@@ -184,8 +192,10 @@ public class EventBridge implements Listener {
         }
         long timeout = timeoutMs;
         var deadline = System.nanoTime() + timeout * 1_000_000;
+        boolean primary = Bukkit.isPrimaryThread();
         while (System.nanoTime() < deadline && latch.getCount() > 0) {
-            runtime.getScheduler().tick();
+            // 仅主线程 dispatch 时喂调度器 tick；非主线程纯自旋（主线程正常 tick 处理 event.complete）。
+            if (primary) runtime.getScheduler().tick();
             Thread.onSpinWait();
         }
         long now = System.nanoTime();
