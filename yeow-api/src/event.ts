@@ -349,7 +349,7 @@ function adaptEvent<K extends keyof EventMap>(type: K, data: RawEvent): EventMap
 
 // ── Event Subscription ─────────────────────────────────────────────
 
-type EventHandler<K extends keyof EventMap> = (e: EventMap[K]) => void;
+type EventHandler<K extends keyof EventMap> = (e: EventMap[K]) => unknown;
 type ManualHandler<K extends keyof EventMap> = (
   e: EventMap[K],
   complete: (result?: Record<string, unknown>) => void,
@@ -399,7 +399,10 @@ export function eventOn<K extends keyof EventMap>(
     }
 
     const result = (handler as EventHandler<typeof eventType>)(wrapped);
-    const mods = { cancelled: localMods.cancelled || false };
+    const mods: Record<string, unknown> = {
+      ...(result && typeof result === 'object' ? result : {}),
+    };
+    if (localMods.cancelled) mods.cancelled = true;
     $send('task', { type: 'event.complete', params: { callbackId: cbId, mods }, cb: '' });
   }, { persistent: true });
 

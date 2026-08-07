@@ -148,6 +148,14 @@ eventOn('blockBreak', (e) => {
 });
 ```
 
+handler 的**返回值**会合并到事件回写（mods）——支持 `cancelled` 之外的修改字段（如 `serverPing` 的 `icon`）：
+
+```js
+eventOn('serverPing', (e) => {
+    return { icon: base64Png };   // 合并回写，修改服务器列表图标
+});
+```
+
 async handler 在返回 Promise 时**立即释放**，只有第一个 `await` 前的同步修改生效：
 
 ```js
@@ -157,6 +165,8 @@ eventOn('blockBreak', async (e) => {
     e.cancelled = false;          // ❌ 事件已释放，无效
 });
 ```
+
+注意：自动模式下 `e.icon = ...` 等**非 cancelled 字段的直接赋值无效**——只有 `e.cancelled` 有收集机制，其它字段请通过 handler 返回值回写（或使用手动模式）。
 
 ### 手动模式
 
