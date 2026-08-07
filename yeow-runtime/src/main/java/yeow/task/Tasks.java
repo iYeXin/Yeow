@@ -135,10 +135,11 @@ public class Tasks {
             case "world.playSound"     -> SoundTasks.playWorldSound(p);
             case "world.spawnParticle" -> ParticleTasks.spawnParticle(p);
             // Block
-            case "block.isSolid"  -> BlockTasks.isSolid(p);
-            case "block.isLiquid" -> BlockTasks.isLiquid(p);
-            case "block.isEmpty"  -> BlockTasks.isEmpty(p);
             case "block.breakNaturally" -> BlockTasks.breakNaturally(p);
+            // Material（材料级静态判断）
+            case "material.isSolid"  -> MaterialTasks.isSolid(p);
+            case "material.isLiquid" -> MaterialTasks.isLiquid(p);
+            case "material.isAir"    -> MaterialTasks.isAir(p);
             // Inventory
             case "inventory.getItem"   -> InventoryTasks.getItem(p);
             case "inventory.setItem"   -> InventoryTasks.setItem(p);

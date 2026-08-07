@@ -8,7 +8,7 @@ export { Chunk, ChunkSnapshot, ChunkTopSnapshot } from './chunk.js';
 export type { ChunkData } from './chunk.js';
 export { Entity, LivingEntity } from './entity.js';
 export type { BoundingBox } from './entity.js';
-export { Block, WorldBlock } from './block.js';
+export { Block } from './block.js';
 export type { BlockState } from './block.js';
 export { Inventory } from './inventory.js';
 export { registerCommand } from './command.js';
@@ -85,7 +85,7 @@ export { createBoard as createScoreboard, deleteBoard as deleteScoreboard,
     setTeamFriendlyFire, setTeamSeeInvisible, setTeamOption,
     teamAddEntry, teamRemoveEntry, teamGetEntries,
     setPlayerBoard } from './scoreboard.js';
-export { getMaterials, getBlocks, getItems } from './material.js';
+export { Material, getMaterials, getBlocks, getItems } from './material.js';
 export type { MaterialInfo } from './material.js';
 export { registerService, registerNativeService, request as serviceRequest, subscribe as serviceSubscribe, publish as servicePublish } from './service.js';
 export type { ServiceResult, NativeServiceResult } from './service.js';

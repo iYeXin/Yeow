@@ -43,24 +43,27 @@ world.setGameRuleSync(rule, value)
 ### 方块
 
 ```js
-world.getBlock(x, y, z)             // Promise<WorldBlock | null>（含类型与状态）
-world.getBlockSync(x, y, z)         // WorldBlock | null
+world.getBlock(x, y, z)             // Promise<Block | null>（含类型、状态与 location）
+world.getBlockSync(x, y, z)         // Block | null
 world.setBlock(x, y, z, blockType)  // Promise（blockType 为字符串，兼容，无状态）
-world.setBlock(x, y, z, block)      // Promise（block 为 Block 描述符，可带状态）
+world.setBlock(x, y, z, block)      // Promise（block 为 Block 描述符，可带状态；忽略其 location）
 world.setBlockSync(x, y, z, block)
 ```
 
-`WorldBlock` 对象上的方法：
+`Block` 对象上的方法：
 
 ```js
-block.isSolid(): Promise<boolean>
-block.isLiquid(): Promise<boolean>
-block.isEmpty(): Promise<boolean>
-block.breakNaturally(tool?): Promise<boolean>   // 自然破坏（含掉落物）
+block.isSolid(): Promise<boolean>        // 材料级静态判断（委托 Material）
+block.isSolidSync(): boolean
+block.isLiquid(): Promise<boolean>       // 是否为液体（水/熔岩）
+block.isLiquidSync(): boolean
+block.isAir(): Promise<boolean>          // 是否为空气
+block.isAirSync(): boolean
+block.breakNaturally(tool?): Promise<boolean>   // 自然破坏（含掉落物；需要 location）
 block.breakNaturallySync(tool?): boolean
 ```
 
-`Block` 为**数据描述符**（类型 + 状态），`WorldBlock` 为世界中的方块（含位置）。详见 [Block API](block.md)。
+`Block` 统一表示方块：`type`/`state`/`location` 均为**获取时刻的快照**（需要最新状态请重新 `world.getBlock`）；`getBlock` 返回的 Block 带 `location`（yaw/pitch 恒为 0），`Block.of()` 构造的没有。`isSolid` 等为材料级静态判断，不查询世界。详见 [Block API](block.md)。
 
 `tool` 为可选的 `ItemStack`，用于模拟特定工具的挖掘效果（如 `{ type: 'minecraft:diamond_pickaxe', meta: { enchantments: { fortune: 3 } } }`）。
 

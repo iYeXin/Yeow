@@ -1,9 +1,9 @@
 # Material API
 
-查询 Material、Block、Item 注册表。
+查询 Material、Block、Item 注册表 + 材料级静态判断。
 
 ```js
-import { getMaterials, getBlocks, getItems } from 'yeow-api';
+import { Material, getMaterials, getBlocks, getItems } from 'yeow-api';
 ```
 
 ## 方法
@@ -21,6 +21,26 @@ const blocks = await getBlocks();
 const items = await getItems();
 // → ["minecraft:diamond", "minecraft:apple", ...]
 ```
+
+## Material（材料级静态判断）
+
+`Material` 类提供**基于类型（material）的固有属性判断**——不依赖坐标/状态，不查询世界：
+
+```ts
+Material.isSolid('minecraft:stone');      // Promise<boolean> — 是否为固体
+Material.isSolidSync('minecraft:stone');  // boolean
+Material.isLiquid('minecraft:water');     // Promise<boolean> — 是否为液体
+Material.isLiquidSync('minecraft:water'); // boolean
+Material.isAir('minecraft:air');          // Promise<boolean> — 是否为空气
+Material.isAirSync('minecraft:air');      // boolean
+```
+
+说明：
+
+- `isSolid` / `isAir` 对应 Bukkit `Material.isSolid()` / `Material.isAir()`
+- `isLiquid`：Bukkit 1.13 起移除了 `Material.isLiquid()`，实现为水/熔岩枚举判断——**原版液体方块材质仅此两种**
+- 判断与方块状态无关（如 `minecraft:chest[facing=...]` 任何状态都是固体）
+- `Block` 实例的 `isSolid()` 等即委托此处
 
 ## MaterialInfo
 

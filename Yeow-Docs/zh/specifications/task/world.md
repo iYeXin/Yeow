@@ -96,21 +96,28 @@
 
 | 任务 | 请求 | 返回 |
 |------|------|------|
-| `world.getBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `{ "type": "<key>", "x": <int>, "y": <int>, "z": <int>, "state": { "<状态键>": "<值>" } }`（state 为空对象时表示无状态） |
-| `world.setBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int>, "blockType": "<material>", "state": { "<键>": "<值>" }? }` | `true`（state 存在时按 `type[键=值,...]` 构造 BlockData 放置） |
+| `world.getBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `{ "type": "<key>", "x": <int>, "y": <int>, "z": <int>, "state": { "<状态键>": "<值>" }, "world": "<name>" }`（state 为空对象时表示无状态；world 为所属世界名，用于构造 location） |
+| `world.setBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int>, "blockType": "<material>", "state": { "<键>": "<值>" }? }` | `true`（state 存在时按 `type[键=值,...]` 构造 BlockData 放置；传入 Block 时忽略其 location） |
 
 `type` 和 `blockType` 使用 Material 命名空间 key（如 `minecraft:stone`），也兼容简写 `stone`。
 
-### 方块状态查询
+### 方块破坏（世界操作）
 
 | 任务 | 请求 | 返回 |
 |------|------|------|
-| `block.isSolid` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `boolean` |
-| `block.isLiquid` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `boolean` |
-| `block.isEmpty` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `boolean` |
 | `block.breakNaturally` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int>, "item": <ItemStack> }` | `boolean` |
 
 `block.breakNaturally` 模拟玩家破坏方块并掉落物品。`item` 为可选工具（影响掉落概率和类型，如附魔工具）。
+
+### 材料级判断（Material）
+
+静态判断任务，基于类型（material）判断方块固有属性，**不依赖坐标/状态**，不查询世界：
+
+| 任务 | 请求 | 返回 |
+|------|------|------|
+| `material.isSolid` | `{ "type": "<key>" }` | `boolean`（Bukkit `Material.isSolid()`） |
+| `material.isLiquid` | `{ "type": "<key>" }` | `boolean`（Bukkit 无 `isLiquid`，实现为 `WATER`/`LAVA` 枚举判断——原版液体方块材质仅此两种） |
+| `material.isAir` | `{ "type": "<key>" }` | `boolean`（Bukkit `Material.isAir()`） |
 
 ---
 

@@ -31,4 +31,20 @@ public class MaterialTasks {
         }
         return list;
     }
+
+    // ── 材料级静态判断（不依赖坐标/状态）──
+
+    public static Object isSolid(JsonObject p) {
+        return Material.matchMaterial(p.get("type").getAsString()).isSolid();
+    }
+
+    public static Object isAir(JsonObject p) {
+        return Material.matchMaterial(p.get("type").getAsString()).isAir();
+    }
+
+    /** Bukkit Material 无 isLiquid（1.13 起移除）：原版液体方块材质仅水与熔岩。 */
+    public static Object isLiquid(JsonObject p) {
+        var m = Material.matchMaterial(p.get("type").getAsString());
+        return m == Material.WATER || m == Material.LAVA;
+    }
 }

@@ -2,6 +2,7 @@ import { call, post } from './task.js';
 import type { TaskOptions } from './task.js';
 import { Location } from './location.js';
 import type { ItemStack } from './item.js';
+import { Material } from './material.js';
 
 /** 方块状态（Minecraft 原版键值对枚举，值统一为字符串）。 */
 export interface BlockState {
@@ -9,14 +10,23 @@ export interface BlockState {
 }
 
 /**
- * Block —— **数据层面**的方块描述符（不绑定世界坐标）。
+ * Block —— 方块数据描述符 + 可选的世界位置（location）。
  * 对应 Minecraft 原版的方块概念：类型 + 方块状态（键值对枚举，如
  * `facing`、`waterlogged`、`level` 等，值统一为字符串）。
+ *
+ * **静态数据语义**：`type` / `state` / `location` 均为**获取时刻的快照**，
+ * 之后世界变化不会自动更新；需要最新状态请重新调用 `world.getBlock`。
+ *
+ * 两种来源：
+ * - `Block.of(type, state?)` —— 纯数据描述符，无 location（用于放置/比较）
+ * - `world.getBlock(x, y, z)` —— 世界中的方块，带 location（yaw/pitch 忽略，为 0）
  */
 export class Block {
   constructor(
     public readonly type: string,
     public readonly state?: BlockState,
+    /** 世界位置（由 world.getBlock 返回时存在；yaw/pitch 恒为 0）。 */
+    public readonly location?: Location,
   ) {}
 
   static of(type: string, state?: BlockState): Block {
@@ -25,7 +35,7 @@ export class Block {
 
   /** 派生一个带状态的新描述符（原对象不变）。 */
   withState(state: BlockState): Block {
-    return new Block(this.type, { ...(this.state ?? {}), ...state });
+    return new Block(this.type, { ...(this.state ?? {}), ...state }, this.location);
   }
 
   /** 是否与给定类型/状态相同（忽略空状态差异）。 */
@@ -38,59 +48,36 @@ export class Block {
     }
     return true;
   }
-}
 
-/**
- * WorldBlock —— 世界中的方块（位置 + 数据描述符）。
- * 由 `world.getBlock(x, y, z)` 返回。
- *
- * **实时性语义**：
- * - `type` / `state` 为**获取时刻的快照**——之后世界变化不会自动更新；
- *   如需最新状态请调用 `refresh()` 获取新实例
- * - 方法（`isSolid` / `breakNaturally` 等）按坐标**实时**查询/操作世界
- */
-export class WorldBlock {
-  constructor(
-    public readonly world: string,
-    public readonly x: number,
-    public readonly y: number,
-    public readonly z: number,
-    public readonly type: string,
-    public readonly state?: BlockState,
-  ) {}
+  // ── 材料级静态判断（基于类型，委托 Material；不依赖位置/状态）──
 
-  get location(): Location {
-    return new Location(this.x, this.y, this.z, undefined, undefined, this.world);
+  isSolid(options?: TaskOptions): Promise<boolean> { return Material.isSolid(this.type, options); }
+  isSolidSync(options?: TaskOptions): boolean { return Material.isSolidSync(this.type, options); }
+  isLiquid(options?: TaskOptions): Promise<boolean> { return Material.isLiquid(this.type, options); }
+  isLiquidSync(options?: TaskOptions): boolean { return Material.isLiquidSync(this.type, options); }
+  isAir(options?: TaskOptions): Promise<boolean> { return Material.isAir(this.type, options); }
+  isAirSync(options?: TaskOptions): boolean { return Material.isAirSync(this.type, options); }
+
+  // ── 世界操作（需要 location）──
+
+  private get pos(): { world: string; x: number; y: number; z: number } | null {
+    const l = this.location;
+    if (!l || l.world === undefined) return null;
+    return { world: l.world, x: l.x, y: l.y, z: l.z };
   }
 
-  /** 数据描述符视图（可传给 world.setBlock）。 */
-  toBlock(): Block {
-    return new Block(this.type, this.state);
-  }
-
-  /** 重新获取该位置的最新快照（返回新实例，本对象不变）。 */
-  refresh(options?: TaskOptions): Promise<WorldBlock | null> {
-    return post<{ type: string; state: BlockState }>('world.getBlock', { world: this.world, x: this.x, y: this.y, z: this.z }, options)
-      .then((r) => (r ? new WorldBlock(this.world, this.x, this.y, this.z, r.type, r.state) : null));
-  }
-  refreshSync(options?: TaskOptions): WorldBlock | null {
-    const r = call<{ type: string; state: BlockState }>('world.getBlock', { world: this.world, x: this.x, y: this.y, z: this.z }, options);
-    return r ? new WorldBlock(this.world, this.x, this.y, this.z, r.type, r.state) : null;
-  }
-
-  isSolid(options?: TaskOptions): Promise<boolean> { return post<boolean>('block.isSolid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
-  isSolidSync(options?: TaskOptions): boolean { return call<boolean>('block.isSolid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
-  isLiquid(options?: TaskOptions): Promise<boolean> { return post<boolean>('block.isLiquid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
-  isLiquidSync(options?: TaskOptions): boolean { return call<boolean>('block.isLiquid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
-  isEmpty(options?: TaskOptions): Promise<boolean> { return post<boolean>('block.isEmpty', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
-  isEmptySync(options?: TaskOptions): boolean { return call<boolean>('block.isEmpty', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }
+  /** 按该方块的位置自然破坏并掉落物品（需要 location）。 */
   breakNaturally(tool?: ItemStack, options?: TaskOptions): Promise<boolean> {
-    const p: Record<string, unknown> = { world: this.world, x: this.x, y: this.y, z: this.z };
+    const pos = this.pos;
+    if (!pos) return Promise.reject(new Error('block has no location (create with world.getBlock)'));
+    const p: Record<string, unknown> = { ...pos };
     if (tool) p.item = tool;
     return post<boolean>('block.breakNaturally', p, options);
   }
   breakNaturallySync(tool?: ItemStack, options?: TaskOptions): boolean {
-    const p: Record<string, unknown> = { world: this.world, x: this.x, y: this.y, z: this.z };
+    const pos = this.pos;
+    if (!pos) throw new Error('block has no location (create with world.getBlock)');
+    const p: Record<string, unknown> = { ...pos };
     if (tool) p.item = tool;
     return call<boolean>('block.breakNaturally', p, options);
   }

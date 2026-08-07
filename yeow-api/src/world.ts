@@ -1,7 +1,7 @@
 import { call, post } from './task.js';
 import type { TaskOptions } from './task.js';
 import { Location, LocationData } from './location.js';
-import { WorldBlock, Block } from './block.js';
+import { Block } from './block.js';
 import type { BlockState } from './block.js';
 import { Chunk, ChunkData } from './chunk.js';
 
@@ -100,13 +100,13 @@ export class World {
   getBiomeSync(x: number, y: number, z: number, options?: TaskOptions): string {
     return call<string>('world.getBiome', { world: this.name, x, y, z }, options);
   }
-  getBlock(x: number, y: number, z: number, options?: TaskOptions): Promise<WorldBlock | null> {
-    return post<{ x: number; y: number; z: number; type: string; state: BlockState }>('world.getBlock', { world: this.name, x, y, z }, options)
-      .then((r) => (r ? new WorldBlock(this.name, r.x, r.y, r.z, r.type, r.state) : null));
+  getBlock(x: number, y: number, z: number, options?: TaskOptions): Promise<Block | null> {
+    return post<{ world: string; x: number; y: number; z: number; type: string; state: BlockState }>('world.getBlock', { world: this.name, x, y, z }, options)
+      .then((r) => (r ? new Block(r.type, r.state, new Location(r.x, r.y, r.z, 0, 0, r.world)) : null));
   }
-  getBlockSync(x: number, y: number, z: number, options?: TaskOptions): WorldBlock | null {
-    const r = call<{ x: number; y: number; z: number; type: string; state: BlockState }>('world.getBlock', { world: this.name, x, y, z }, options);
-    return r ? new WorldBlock(this.name, r.x, r.y, r.z, r.type, r.state) : null;
+  getBlockSync(x: number, y: number, z: number, options?: TaskOptions): Block | null {
+    const r = call<{ world: string; x: number; y: number; z: number; type: string; state: BlockState }>('world.getBlock', { world: this.name, x, y, z }, options);
+    return r ? new Block(r.type, r.state, new Location(r.x, r.y, r.z, 0, 0, r.world)) : null;
   }
   setBlock(x: number, y: number, z: number, block: Block | string, options?: TaskOptions): Promise<void> {
     const p: Record<string, unknown> = { world: this.name, x, y, z };

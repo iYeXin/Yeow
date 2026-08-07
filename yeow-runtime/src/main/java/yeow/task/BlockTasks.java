@@ -4,9 +4,8 @@ import com.google.gson.JsonObject;
 import org.bukkit.*;
 
 public class BlockTasks {
-    public static Object isSolid(JsonObject p) { return block(p).getType().isSolid(); }
-    public static Object isLiquid(JsonObject p) { return block(p).isLiquid(); }
-    public static Object isEmpty(JsonObject p) { return block(p).isEmpty(); }
+    // isSolid/isLiquid/isAir 为材料级静态判断，见 MaterialTasks（material.* 任务）；
+    // 本类只保留世界操作（需要坐标）。
 
     public static Object breakNaturally(JsonObject p) {
         var b = block(p);

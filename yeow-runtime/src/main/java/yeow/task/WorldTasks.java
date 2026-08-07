@@ -43,7 +43,8 @@ public class WorldTasks {
                 if (eq > 0) state.put(pair.substring(0, eq), pair.substring(eq + 1));
             }
         }
-        return Map.of("type", b.getType().getKey().toString(), "x", b.getX(), "y", b.getY(), "z", b.getZ(), "state", state);
+        return Map.of("type", b.getType().getKey().toString(), "x", b.getX(), "y", b.getY(), "z", b.getZ(),
+            "state", state, "world", world(p).getName());
     }
     public static Object setBlock(JsonObject p) {
         var mat = Material.matchMaterial(p.get("blockType").getAsString());
