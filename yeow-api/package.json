@@ -1,6 +1,6 @@
 {
     "name": "yeow-api",
-    "version": "0.2.111",
+    "version": "0.2.112",
     "description": "Yeow API",
     "type": "module",
     "main": "./src/index.ts",
