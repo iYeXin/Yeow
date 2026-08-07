@@ -10,7 +10,6 @@
 | `server.getMotd` | `{}` | `string` |
 | `server.setMotd` | `{ "motd": "<text>" }` | `true` |
 | `server.getVersion` | `{}` | `string` |
-| `server.setIcon` | `{ "icon": "<base64>" }` | `true` |
 | `server.getTps` | `{}` | `{ "tps1m": <double>, "tps5m": <double>, "tps15m": <double> }` |
 | `server.getMaxPlayers` | `{}` | `number` |
 

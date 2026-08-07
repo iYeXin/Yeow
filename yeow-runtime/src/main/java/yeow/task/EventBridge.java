@@ -11,11 +11,15 @@ import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.*;
 import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.event.server.ServerListPingEvent;
+import org.bukkit.util.CachedServerIcon;
+import com.destroystokyo.paper.event.server.PaperServerListPingEvent;
 import yeow.YeowRuntime;
 import yeow.channel.SyncCallbackHelper;
 import yeow.profile.instrumentation.EventMetric;
 import yeow.profile.instrumentation.ProfileSink;
 
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -186,11 +190,16 @@ public class EventBridge implements Listener {
         }
         long now = System.nanoTime();
         boolean cancelled = false;
+        String iconBase64 = null;
         for (var entry : pluginMap.entrySet()) {
             for (var cb : entry.getValue()) {
                 var r = SyncCallbackHelper.waitFor(cb, 0);
-                if (r instanceof Map<?,?> m && Boolean.TRUE.equals(m.get("cancelled")))
-                    cancelled = true;
+                if (r instanceof Map<?,?> m) {
+                    if (Boolean.TRUE.equals(m.get("cancelled")))
+                        cancelled = true;
+                    if (m.containsKey("icon"))
+                        iconBase64 = String.valueOf(m.get("icon"));
+                }
                 long start = startNs.getOrDefault(cb, t0);
                 ProfileSink s = sink;
                 if (s != null) s.onEvent(new EventMetric(entry.getKey(), et, now - start, r == null));
@@ -198,12 +207,39 @@ public class EventBridge implements Listener {
             }
         }
         if (cancelled && ev instanceof Cancellable c) c.setCancelled(true);
+        if (iconBase64 != null && ev instanceof PaperServerListPingEvent p) {
+            var icon = loadPingIcon(iconBase64);
+            if (icon != null) p.setServerIcon(icon);
+        }
     }
 
     @SuppressWarnings("unchecked")
     void applyMods(Event ev, Map<?,?> m) {
         if (m.containsKey("cancelled") && ev instanceof Cancellable c)
             c.setCancelled(Boolean.TRUE.equals(m.get("cancelled")));
+        if (m.containsKey("icon") && ev instanceof PaperServerListPingEvent p) {
+            var icon = loadPingIcon(String.valueOf(m.get("icon")));
+            if (icon != null) p.setServerIcon(icon);
+        }
+    }
+
+    /** 将 base64 PNG 解码为服务器列表图标（自动缩放至 64×64；失败返回 null，保持原图标）。 */
+    static CachedServerIcon loadPingIcon(String base64) {
+        try {
+            var img = ImageIO.read(new ByteArrayInputStream(Base64.getDecoder().decode(base64)));
+            if (img == null) return null;
+            if (img.getWidth() != 64 || img.getHeight() != 64) {
+                var scaled = new java.awt.image.BufferedImage(64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var g = scaled.createGraphics();
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.drawImage(img, 0, 0, 64, 64, null);
+                g.dispose();
+                img = scaled;
+            }
+            return Bukkit.getServer().loadServerIcon(img);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     Map<String,Object> eventData(Event ev, String type) {

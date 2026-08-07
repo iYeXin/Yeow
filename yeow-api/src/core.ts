@@ -32,7 +32,7 @@ export type {
 export { onInit, onLoad, onUnload } from './lifecycle.js';
 export {
     broadcast, broadcastSync, dispatchCommand, dispatchCommandSync,
-    setMotd, setMotdSync, setIcon, setIconSync,
+    setMotd, setMotdSync,
     getMotd, getMotdSync, getVersion, getVersionSync,
     getTps, getTpsSync, getMaxPlayers, getMaxPlayersSync,
 } from './server.js';

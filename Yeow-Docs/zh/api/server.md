@@ -1,7 +1,7 @@
 # Server API
 
 ```js
-import { broadcast, broadcastSync, dispatchCommand, dispatchCommandSync, setMotd, setMotdSync, setIcon, setIconSync, getMotd, getVersion } from 'yeow-api';
+import { broadcast, broadcastSync, dispatchCommand, dispatchCommandSync, setMotd, setMotdSync, getMotd, getVersion } from 'yeow-api';
 ```
 
 ## 广播
@@ -27,13 +27,15 @@ setMotdSync('A Minecraft Server')       // void — 同步
 
 ## 服务器图标
 
+运行时设置服务器列表图标已移除（Paper 1.20.5+ 不再提供运行时 setter）。请在 **`serverPing` 事件**中修改：
+
 ```js
-// 平台特异，不保证有效性
-await setIcon(base64Png)                // Promise — base64 编码的 PNG
-setIconSync(base64Png)                  // void — 同步
+eventOn('serverPing', (e) => {
+    return { icon: base64Png };   // handler 返回 { icon } 修改图标
+});
 ```
 
-图标需要 64x64 PNG，以 base64 传入（不含 `data:image/png;base64,` 前缀）。
+图标为 64x64 PNG 的 base64（不含 `data:image/png;base64,` 前缀），非 64x64 会自动缩放；无效图片忽略。详见 [serverPing 事件](event.md)。
 
 ## 服务器信息
 

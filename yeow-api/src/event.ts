@@ -155,6 +155,11 @@ export interface ServerPingEvent {
   maxPlayers: number;
   motd: string;
   cancelled?: boolean;
+  /**
+   * handler 可返回 `{ icon: "<PNG base64>" }` 修改服务器列表图标
+   * （自动缩放至 64×64；无效图片忽略，保持原图标）。
+   */
+  icon?: string;
 }
 export interface PlayerTeleportEvent {
   player: Player;
