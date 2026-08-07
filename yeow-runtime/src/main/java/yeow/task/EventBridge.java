@@ -99,9 +99,9 @@ public class EventBridge implements Listener {
         // 死循环插件场景下 N 个监听器 = N × 5s 阻塞主线程。
         // dispatch() 开头已对空订阅短路，空订阅时监听器零开销。
         if (reg.putIfAbsent(et, true) == null) {
-            // AsyncPlayerChatEvent fires on a Netty thread — hop to the main thread before dispatching,
-            // because dispatch() runs the scheduler tick (Bukkit API must stay on the main thread).
-            var async = AsyncPlayerChatEvent.class.isAssignableFrom(c);
+            // ServerListPingEvent（Netty 线程）与 AsyncPlayerChatEvent（Netty 线程）在异步线程触发——
+            // 跳到主线程 dispatch：dispatch 内部的自旋循环会执行调度器 tick（Bukkit API 必须留在主线程）。
+            var async = AsyncPlayerChatEvent.class.isAssignableFrom(c) || ServerListPingEvent.class.isAssignableFrom(c);
             Bukkit.getPluginManager().registerEvent(c, this, EventPriority.NORMAL, (l, e) -> {
                 var ev = (Event) e;
                 if (async && !Bukkit.isPrimaryThread()) {

@@ -384,7 +384,9 @@ public class YeowRuntime extends JavaPlugin {
             var taskType = obj.get("type").getAsString();
             var params = obj.has("params") ? obj.getAsJsonObject("params") : new JsonObject();
             params.addProperty("_plugin", entity.name()); // ownership for per-plugin cleanup (gui/bossbar etc.)
-            var hasCb = obj.has("cb");
+            // 空字符串 cb（如 `cb: ''` 表示"同步执行，不关心结果"）不视为异步——
+            // 否则 cbId 为空字符串，结果回投匹配不到任何注册的 pend（事件/补全完成会永久超时）。
+            var hasCb = obj.has("cb") && !obj.get("cb").getAsString().isEmpty();
             var priority = parsePriority(obj.has("priority") ? obj.get("priority").getAsString() : null);
             if (hasCb) {
                 var cbId = obj.get("cb").getAsString();
