@@ -27,6 +27,7 @@ public class YeowConfig {
     private final boolean profileScalerEnabled;
     private final double profileScalerFactor;
     private final double profileScalerMax;
+    private final long taskSyncTimeoutMs;
 
     public YeowConfig(File dataFolder) {
         this.dataFolder = dataFolder;
@@ -41,6 +42,8 @@ public class YeowConfig {
         def.set("demote-threshold", 200);
         def.set("idle-spin-us", 100);
         def.set("concurrent-events", true);
+        // 同步 task 调用超时（毫秒）：受服务器负载影响大，默认 10s（高于旧 5s）
+        def.set("task-sync-timeout-ms", 10000);
         def.set("profile.enabled", false);
         def.set("profile.warnings-enabled", true);
         def.set("profile.latency-warn-threshold-ms", 200);
@@ -87,6 +90,7 @@ public class YeowConfig {
         this.profileScalerEnabled = cfg.getBoolean("profile.scaler.enabled", true);
         this.profileScalerFactor = cfg.getDouble("profile.scaler.expansion-factor", 1.3);
         this.profileScalerMax = cfg.getDouble("profile.scaler.max-multiplier", 3.0);
+        this.taskSyncTimeoutMs = cfg.getLong("task-sync-timeout-ms", 10000);
 
         var ratios = cfg.getDoubleList("priority-ratios");
         this.priorityRatios = ratios.size() == 3
@@ -116,6 +120,9 @@ public class YeowConfig {
     public boolean profileScalerEnabled() { return profileScalerEnabled; }
     public double profileScalerFactor() { return profileScalerFactor; }
     public double profileScalerMax() { return profileScalerMax; }
+
+    /** 同步 task 调用超时（毫秒），默认 10000。 */
+    public long taskSyncTimeoutMs() { return taskSyncTimeoutMs; }
 
     /**
      * 原生服务是否需要批准（默认 true；false = 默认批准）。

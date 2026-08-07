@@ -31,8 +31,38 @@ public class WorldTasks {
     public static Object unloadChunk(JsonObject p) { return world(p).unloadChunk(p.get("x").getAsInt(), p.get("z").getAsInt()); }
     public static Object getBlockLightLevel(JsonObject p) { return world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getLightFromBlocks(); }
     public static Object getSkyLightLevel(JsonObject p) { return world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getLightFromSky(); }
-    public static Object getBlock(JsonObject p) { var b = world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()); return Map.of("type",b.getType().getKey().toString(),"x",b.getX(),"y",b.getY(),"z",b.getZ()); }
-    public static Object setBlock(JsonObject p) { world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).setType(Material.matchMaterial(p.get("blockType").getAsString())); return true; }
+    public static Object getBlock(JsonObject p) {
+        var b = world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt());
+        // 从 BlockData.getAsString()（如 "minecraft:stone[waterlogged=true]"）解析结构化状态
+        var str = b.getBlockData().getAsString();
+        var state = new LinkedHashMap<String, String>();
+        var lb = str.indexOf('[');
+        if (lb > 0) {
+            for (var pair : str.substring(lb + 1, str.length() - 1).split(",")) {
+                var eq = pair.indexOf('=');
+                if (eq > 0) state.put(pair.substring(0, eq), pair.substring(eq + 1));
+            }
+        }
+        return Map.of("type", b.getType().getKey().toString(), "x", b.getX(), "y", b.getY(), "z", b.getZ(), "state", state);
+    }
+    public static Object setBlock(JsonObject p) {
+        var mat = Material.matchMaterial(p.get("blockType").getAsString());
+        var b = world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt());
+        if (p.has("state") && p.get("state").isJsonObject() && p.getAsJsonObject("state").size() > 0) {
+            var sb = new StringBuilder(mat.getKey().toString()).append('[');
+            var first = true;
+            for (var e : p.getAsJsonObject("state").entrySet()) {
+                if (!first) sb.append(',');
+                sb.append(e.getKey()).append('=').append(e.getValue().getAsString());
+                first = false;
+            }
+            sb.append(']');
+            b.setBlockData(Bukkit.createBlockData(sb.toString()));
+        } else {
+            b.setType(mat);
+        }
+        return true;
+    }
     public static Object getEntities(JsonObject p) { return world(p).getEntities().stream().map(e -> e.getUniqueId().toString()).toList(); }
     public static Object getPlayers(JsonObject p) { return world(p).getPlayers().stream().map(e -> e.getUniqueId().toString()).toList(); }
     public static Object getNearbyEntities(JsonObject p) { var l = new Location(world(p), p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble()); return world(p).getNearbyEntities(l, p.get("radius").getAsDouble(), p.get("radius").getAsDouble(), p.get("radius").getAsDouble()).stream().map(e -> e.getUniqueId().toString()).toList(); }

@@ -21,15 +21,25 @@
 
 ## 协议概览
 
-**JS → 运行时**：唯一入口 `$_send(channel, jsonString)`，返回 JSON 字符串或 `null`。
+**JS → 运行时**：规范规定 `$send(channel, payload)`——`payload` 为**纯 JS 对象**（运行时负责序列化传输）。`$_send`、底层通信格式（不限于 JSON）与消息循环均属**内部实现**，实现方可自行决策（见[内部实现边界](#内部实现边界)）。
 
-**运行时 → JS**：统一回调消息 `{"t":"cb","p":"<callbackId>","r":<data>}`，由 JS 端 `$hm` 分发。
+**运行时 → JS**：回调投递格式（如 `{"t":"cb","p":"<callbackId>","r":<data>}`）由实现方定义，由 JS 端引导脚本分发。
 
-**生命周期消息**：`INIT` / `LOAD` / `DISABLE` / `RELOAD`，由 `$hm` 处理。
+**生命周期消息**：`INIT` / `LOAD` / `DISABLE` / `RELOAD`，由引导脚本处理。
 
 详细格式见各子目录。
 
 ---
+
+## 内部实现边界
+
+Yeow 平台规范只约定**契约层面**的行为，以下内容**不属于规范约束**，实现方可自行决策：
+
+- **`$_send`**：底层 JS→运行时的原始桥接函数，属于内部实现——规范只保证 `$send(channel, payload)`（接收纯 JS 对象）的语义
+- **通信格式**：JS 与运行时之间的传输格式**不限于 JSON**（如可采用二进制、结构化克隆等），实现方自决；规范中的示例均以 JSON 呈现
+- **消息循环**：JS 侧的消息分发/事件循环机制属于内部实现（如阻塞等待、轮询、事件驱动），规范只要求语义正确（消息最终被处理、回调被投递、生命周期被触发）
+
+> 插件代码**只能依赖** `$send` 及其返回值语义，不得依赖 `$_send`、消息循环时序或具体传输格式。
 
 ## Yeow 插件包结构
 
@@ -73,7 +83,7 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 
 ### `.yeow/main.js` — 插件代码
 
-esbuild 打包的 **IIFE**（`"use strict"; (() => {...})()`），`bundle: true`，`target: es2023`。运行时不解析模块——直接 evaluate 整个文件即可。插件代码执行时注册回调（`onInit`/`onLoad`/`onUnload`、`_registerCallback` 等），不执行游戏操作。
+esbuild 打包的 **IIFE**（`"use strict"; (() => {...})()`），`bundle: true`，`target: esnext`。运行时不解析模块——直接 evaluate 整个文件即可。插件代码执行时注册回调（`onInit`/`onLoad`/`onUnload`、`_registerCallback` 等），不执行游戏操作。
 
 ### `.yeow/dev.json` — 开发模式（可选）
 
@@ -209,9 +219,10 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 | 全局                 | 签名                                                      | 说明                                                                             |
 | -------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `$_send`             | `(channel: string, jsonString: string) => string \| null` | **唯一 JS→运行时桥**。同步通道返回结果 JSON；含 `cb` 的异步通道立即返回 `null`   |
 | `__plugin`           | `{ name, version, author }`                               | 来自 yeow.json，只读                                                             |
 | `$dev`               | `boolean`                                                 | 开发模式标记                                                                     |
+
+> 原生层只需保证引导脚本能实现 `$send` 语义；底层桥接函数（如 `$_send`）属于**内部实现**，不在此列。
 
 ### 引导脚本层（运行时内置 JS 引导脚本）
 
@@ -219,23 +230,23 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 | 全局                                                            | 说明                                              |
 | --------------------------------------------------------------- | ------------------------------------------------- |
-| `$send(channel, payload)`                                       | 包装 `$_send`，自动 JSON 序列化/解析              |
+| `$send(channel, payload)`                                       | JS→运行时入口，接收**纯 JS 对象**（底层序列化由实现自决） |
 | `_registerCallback(fn, opts?)` / `_unregisterCallback(id)`      | 回调注册表（核心异步原语，格式 `cb_N`）           |
 | `console.log/warn/error/info`                                   | 日志，自动添加 `[插件名]` 前缀                    |
 | `setTimeout` / `setInterval` / `clearTimeout` / `clearInterval` | 定时器（经 `timer` 通道）                         |
 | `fetch(url, opts?)`                                             | HTTP 客户端（经 `http` 通道）                     |
-| `$hm(jsonString)`                                               | 消息分发器：解析 JSON → 分发到生命周期/回调处理器 |
 | `_getCurrentCbStack()`                                          | 开发模式栈追踪辅助                                |
 | `reportError(e)`                                                | 错误上报（经 `debug` 通道）                       |
 
-**消息循环**（`$hm` 的宿主实现）：
+**消息循环**（内部实现，语义要求）：
 
 ```
 循环:
-  1. 从运行时拉取下一条消息（可阻塞等待）
-  2. 调用 $hm(msgJson) 处理
+  1. 从运行时拉取下一条消息（可阻塞等待——消息驱动，无消息时不消耗 CPU）
+  2. 调用消息分发器处理（回调 / 生命周期）
   3. 清空微任务队列（Promise.then / FinalizationRegistry 回调）
   4. 若 __yeowGcQueue 非空 → 发送 lifecycle gc-collect
+  5. 队列中仍有消息 → 继续处理；无消息 → 回到阻塞等待
 ```
 
 ---
@@ -381,8 +392,8 @@ JS 端通过 `task` 通道回传补全结果：
 - [ ] **同名唯一**：插件名冲突时拒绝加载并警告（自动扫描 / 命令 / 宿主机制途径一致）
 - [ ] **权限模型**：解析 yeow.json `computedPermissions`；`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 默认拒绝（`fs:plugin.*` 免声明）；未声明调用返回 `Permission denied: <node>`
 - [ ] **加载消息**：插件加载成功时输出加载消息（含插件名、版本、权限声明）
-- [ ] **JS 引擎**：ES2023+，支持 `Promise`/`WeakRef`/`FinalizationRegistry`/`Uint8Array`
-- [ ] **原生注入**：`$_send`、`__plugin`、`$dev`
+- [ ] **JS 引擎**：ES2025+（Sec-Uint8Array），支持 `Promise`/`WeakRef`/`FinalizationRegistry`/`Uint8Array`
+- [ ] **原生注入**：`__plugin`、`$dev`（底层桥接如 `$_send` 为内部实现，不属规范约束）
 - [ ] **引导脚本**：`$send`、`_registerCallback`/`_unregisterCallback`、`console`、定时器、`fetch`、`$hm`
 - [ ] **消息循环**：拉消息 → `$hm` 分发 → 微任务 → GC 队列刷新
 - [ ] **生命周期**：INIT / LOAD / DISABLE / RELOAD，`unloadDone` 确认

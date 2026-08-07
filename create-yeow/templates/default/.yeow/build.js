@@ -71,7 +71,7 @@ async function main() {
         outfile: resolve(outDir, 'main.js'),
         bundle: true,
         format: 'iife',
-        target: 'es2023',
+        target: 'esnext',
         platform: 'neutral',
         mainFields: ['module', 'main'],
         conditions: ['import', 'browser'],

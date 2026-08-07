@@ -1,7 +1,8 @@
 import { call, post } from './task.js';
 import type { TaskOptions } from './task.js';
 import { Location, LocationData } from './location.js';
-import { Block } from './block.js';
+import { WorldBlock, Block } from './block.js';
+import type { BlockState } from './block.js';
 import { Chunk, ChunkData } from './chunk.js';
 
 interface WorldData {
@@ -99,19 +100,37 @@ export class World {
   getBiomeSync(x: number, y: number, z: number, options?: TaskOptions): string {
     return call<string>('world.getBiome', { world: this.name, x, y, z }, options);
   }
-  getBlock(x: number, y: number, z: number, options?: TaskOptions): Promise<Block | null> {
-    return post<{ x: number; y: number; z: number; type: string }>('world.getBlock', { world: this.name, x, y, z }, options)
-      .then((r) => (r ? new Block(this.name, r.x, r.y, r.z, r.type) : null));
+  getBlock(x: number, y: number, z: number, options?: TaskOptions): Promise<WorldBlock | null> {
+    return post<{ x: number; y: number; z: number; type: string; state: BlockState }>('world.getBlock', { world: this.name, x, y, z }, options)
+      .then((r) => (r ? new WorldBlock(this.name, r.x, r.y, r.z, r.type, r.state) : null));
   }
-  getBlockSync(x: number, y: number, z: number, options?: TaskOptions): Block | null {
-    const r = call<{ x: number; y: number; z: number; type: string }>('world.getBlock', { world: this.name, x, y, z }, options);
-    return r ? new Block(this.name, r.x, r.y, r.z, r.type) : null;
+  getBlockSync(x: number, y: number, z: number, options?: TaskOptions): WorldBlock | null {
+    const r = call<{ x: number; y: number; z: number; type: string; state: BlockState }>('world.getBlock', { world: this.name, x, y, z }, options);
+    return r ? new WorldBlock(this.name, r.x, r.y, r.z, r.type, r.state) : null;
   }
-  setBlock(x: number, y: number, z: number, blockType: string, options?: TaskOptions): Promise<void> {
-    return post('world.setBlock', { world: this.name, x, y, z, blockType }, options);
+  setBlock(x: number, y: number, z: number, block: Block | string, state?: BlockState, options?: TaskOptions): Promise<void> {
+    const p: Record<string, unknown> = { world: this.name, x, y, z };
+    if (typeof block === 'string') {
+      p.blockType = block;
+      if (state) p.state = state;
+    } else {
+      p.blockType = block.type;
+      if (block.state && Object.keys(block.state).length > 0) p.state = block.state;
+      else if (state) p.state = state;
+    }
+    return post('world.setBlock', p, options);
   }
-  setBlockSync(x: number, y: number, z: number, blockType: string, options?: TaskOptions): void {
-    call('world.setBlock', { world: this.name, x, y, z, blockType }, options);
+  setBlockSync(x: number, y: number, z: number, block: Block | string, state?: BlockState, options?: TaskOptions): void {
+    const p: Record<string, unknown> = { world: this.name, x, y, z };
+    if (typeof block === 'string') {
+      p.blockType = block;
+      if (state) p.state = state;
+    } else {
+      p.blockType = block.type;
+      if (block.state && Object.keys(block.state).length > 0) p.state = block.state;
+      else if (state) p.state = state;
+    }
+    call('world.setBlock', p, options);
   }
   getEntities(options?: TaskOptions): Promise<string[]> {
     return post<string[]>('world.getEntities', { world: this.name }, options);

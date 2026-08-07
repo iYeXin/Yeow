@@ -393,7 +393,7 @@ public class YeowRuntime extends JavaPlugin {
             }
             var future = new java.util.concurrent.CompletableFuture<String>();
             scheduler.submitGameSync(taskType, params, future, priority, entity.name());
-            try { return future.get(5, TimeUnit.SECONDS); }
+            try { return future.get(config.taskSyncTimeoutMs(), TimeUnit.MILLISECONDS); }
             catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
         } catch (Exception e) {
             return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));

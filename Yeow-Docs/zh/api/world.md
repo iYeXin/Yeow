@@ -43,13 +43,14 @@ world.setGameRuleSync(rule, value)
 ### 方块
 
 ```js
-world.getBlock(x, y, z)             // Promise<Block | null>
-world.getBlockSync(x, y, z)         // Block | null
-world.setBlock(x, y, z, blockType)  // Promise
-world.setBlockSync(x, y, z, blockType)
+world.getBlock(x, y, z)             // Promise<WorldBlock | null>（含类型与状态）
+world.getBlockSync(x, y, z)         // WorldBlock | null
+world.setBlock(x, y, z, blockType)  // Promise（blockType 为字符串，兼容）
+world.setBlock(x, y, z, block, state?)  // Promise（block 为 Block 描述符，可带状态）
+world.setBlockSync(x, y, z, block, state?)
 ```
 
-`Block` 对象上的方法：
+`WorldBlock` 对象上的方法：
 
 ```js
 block.isSolid(): Promise<boolean>
@@ -58,6 +59,8 @@ block.isEmpty(): Promise<boolean>
 block.breakNaturally(tool?): Promise<boolean>   // 自然破坏（含掉落物）
 block.breakNaturallySync(tool?): boolean
 ```
+
+`Block` 为**数据描述符**（类型 + 状态），`WorldBlock` 为世界中的方块（含位置）。详见 [Block API](block.md)。
 
 `tool` 为可选的 `ItemStack`，用于模拟特定工具的挖掘效果（如 `{ type: 'minecraft:diamond_pickaxe', meta: { enchantments: { fortune: 3 } } }`）。
 

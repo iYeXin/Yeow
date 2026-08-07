@@ -177,9 +177,14 @@ public class PluginThread implements Runnable, PluginEntity {
             var prof = yeow.YeowRuntime.inst().getProfiler();
             if (prof != null) prof.registerPlugin(PluginThread.this);
 
+            // 消息驱动的消息循环（原子性由 BlockingQueue 保证，单消费者线程）：
+            //   - 无消息 → 阻塞在 takeJs（循环"未运行"态，零轮询）
+            //   - 收到消息 → 处理 → 队列有剩余立即继续（pollJs），空则回 takeJs
+            // 退出：DISABLE/RELOAD 消息 → JS 侧 unloadDone → running=false → 退出循环。
             while (running) {
-                var raw = queue.pollJs(50);
-                if (raw != null) {
+                var raw = queue.takeJs();
+                while (running) {
+                    if (raw == null) break;
                     try {
                         if (hmFunc != null) {
                             hmFunc.call(raw);
@@ -188,15 +193,16 @@ public class PluginThread implements Runnable, PluginEntity {
                             ctx.evaluate("$hm('" + escaped + "')");
                         }
                     } catch (QuickJSException ex) { handleJSError(ex); } catch (Exception ignored) {}
-                }
-                try {
-                    while (ctx.isJobPending()) ctx.executePendingJob();
-                } catch (QuickJSException ex) {
-                    // A pending job threw (e.g. an async error surfaced by the native wrapper).
-                    // Report it but keep the message loop alive — the plugin must not die here.
-                    handleJSError(ex);
-                } catch (Exception e) {
-                    org.bukkit.Bukkit.getLogger().warning("[" + name + "] job error: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
+                    try {
+                        while (ctx.isJobPending()) ctx.executePendingJob();
+                    } catch (QuickJSException ex) {
+                        // A pending job threw (e.g. an async error surfaced by the native wrapper).
+                        // Report it but keep the message loop alive — the plugin must not die here.
+                        handleJSError(ex);
+                    } catch (Exception e) {
+                        org.bukkit.Bukkit.getLogger().warning("[" + name + "] job error: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
+                    }
+                    raw = queue.pollJs(); // 有剩余立即取；空则退出内层，回到 takeJs 阻塞
                 }
             }
         } catch (QuickJSException e) { handleJSError(e); } catch (Exception e) {

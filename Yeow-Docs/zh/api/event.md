@@ -6,8 +6,6 @@ import { eventOn, eventOff } from 'yeow-api';
 
 ## eventOn(eventType, handler)
 
-订阅 Bukkit 事件。
-
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `eventType` | `string` | 事件类型名 |

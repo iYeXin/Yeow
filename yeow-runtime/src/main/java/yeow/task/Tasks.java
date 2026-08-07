@@ -218,7 +218,7 @@ public class Tasks {
             }
             case "server.getMaxPlayers" -> org.bukkit.Bukkit.getMaxPlayers();
             case "server.setMotd"   -> { org.bukkit.Bukkit.getServer().setMotd(p.get("motd").getAsString()); yield true; }
-            case "server.setIcon"   -> { try { var bytes = java.util.Base64.getDecoder().decode(p.get("icon").getAsString()); var img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes)); var icon = org.bukkit.Bukkit.getServer().loadServerIcon(img); var m = org.bukkit.Bukkit.getServer().getClass().getMethod("setServerIcon", org.bukkit.util.CachedServerIcon.class); m.invoke(org.bukkit.Bukkit.getServer(), icon); } catch(Exception e) { /* icon err */ } yield true; }
+            case "server.setIcon"   -> { try { var bytes = java.util.Base64.getDecoder().decode(p.get("icon").getAsString()); var img = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes)); if (img == null) yield true; if (img.getWidth() != 64 || img.getHeight() != 64) { var scaled = new java.awt.image.BufferedImage(64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB); var g = scaled.createGraphics(); g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR); g.drawImage(img, 0, 0, 64, 64, null); g.dispose(); img = scaled; } var icon = org.bukkit.Bukkit.getServer().loadServerIcon(img); var m = org.bukkit.Bukkit.getServer().getClass().getMethod("setServerIcon", org.bukkit.util.CachedServerIcon.class); m.invoke(org.bukkit.Bukkit.getServer(), icon); } catch(Exception e) { /* icon err */ } yield true; }
             // Material
             case "server.getMaterials" -> MaterialTasks.getMaterials(p);
             case "server.getBlocks"    -> MaterialTasks.getBlocks(p);

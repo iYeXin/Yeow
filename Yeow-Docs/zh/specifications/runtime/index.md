@@ -6,16 +6,17 @@
 
 ## 语言标准
 
-实现必须提供 **ES2023** 及以上版本的 JavaScript 运行时，至少包含以下特性：
+实现必须提供 **ES2025 + Sec-Uint8Array** 及以上版本的 JavaScript 运行时，至少包含以下特性：
 
 - `Promise`、`async`/`await`、`Promise.all`、`Promise.race`
 - `Symbol`、`Proxy`、`Reflect`
 - `WeakRef`、`FinalizationRegistry`（用于资源回收）
 - `ArrayBuffer`、`Uint8Array`（二进制数据处理）
+- `Uint8Array` 章节能力（Sec-Uint8Array）：`Uint8Array.prototype.toBase64()` / `Uint8Array.fromBase64()` 等 base64/hex 编解码
 - `JSON.parse` / `JSON.stringify`
 - `Error`、`SyntaxError`、`TypeError`
 
-> **官方实现引擎版本**：Paper/Bukkit 的 `yeow-runtime` 使用 **QuickJS 2026-06-04**（[iyexin/quickjs](https://github.com/iyexin/quickjs) fork，上游 [bellard/quickjs](https://bellard.org/quickjs/)），额外提供：resizable `ArrayBuffer`、`ArrayBuffer.prototype.transfer`、`Iterator` 对象与 set 方法、`Math.sumPrecise()`、正则重复具名组，以及 ES2026 的 `Uint8Array.prototype.toBase64()` / `Uint8Array.fromBase64()`（参见 [https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array)）。
+> **官方实现引擎版本**：Paper/Bukkit 的 `yeow-runtime` 使用 **QuickJS 2026-06-04**（[iyexin/quickjs](https://github.com/iyexin/quickjs) fork，上游 [bellard/quickjs](https://bellard.org/quickjs/)），额外提供：resizable `ArrayBuffer`、`ArrayBuffer.prototype.transfer`、`Iterator` 对象与 set 方法、`Math.sumPrecise()`、正则重复具名组，以及 `Uint8Array.prototype.toBase64()` / `Uint8Array.fromBase64()`（参见 [https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array)）。
 
 ---
 
@@ -170,10 +171,10 @@ JS 端处理流程：
 (channel: string, payload: any) => any | null
 ```
 
-JS 与运行时的唯一通信入口。
+JS 与运行时的唯一通信入口（规范规定）。**`payload` 为纯 JS 对象**——底层传输格式（JSON 或其他）与 `$_send` 桥接函数均属**内部实现**，实现方自行决策；本规范中的示例以 JSON 呈现。
 
 - `channel`：字符串，指定操作分类。可选值见 [消息通道](#消息通道)。
-- `payload`：对象，运行时在传输前将其序列化为 JSON。
+- `payload`：纯 JS 对象，运行时负责序列化传输。
 
 行为：
 - 对于 `task` 通道的调用：若 `payload` 中包含 `cb`（回调 ID），运行时必须**立即返回 `null`**，不阻塞 JS 执行。任务结果通过回调通道异步返回。

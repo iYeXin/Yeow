@@ -4,12 +4,12 @@
 
 ```
     ┌─────────────────────────────────────────────────┐
-    │              插件 JAR (ZipFile)                  │
+    │          插件包 .yeow.zip / JAR (ZIP)            │
     │  ┌───────────────────────────────────────────┐  │
     │  │ .yeow/main.js     (esbuild 打包的 JS)      │  │
-    │  │ assets/            (静态资源)              │  │
-    │  │ yeow.json          (元信息)                │  │
-    │  │ plugin.yml         (Bukkit 元信息)         │  │
+    │  │ assets/<id>/      (资源，按命名空间分目录)  │  │
+    │  │ yeow.json         (元信息 + 权限 + native) │  │
+    │  │ plugin.yml        (Bukkit 元信息，JAR 需)  │  │
     │  └───────────────────────────────────────────┘  │
     └──────────────────────┬──────────────────────────┘
                            │ YeowRuntime.registerPlugin()
@@ -18,10 +18,11 @@
     │               Yeow Runtime (Java)                │
     │                                                  │
     │  ┌──────────────────┐  ┌─────────────────────┐  │
-    │  │  PluginThread 1   │  │  PluginThread 2     │  │
-    │  │  (QuickJS)        │  │  (QuickJS)          │  │
-    │  │  fs, http, assets │  │  fs, http, assets   │  │
-    │  │  直接处理          │  │  直接处理            │  │
+    │  │  PluginEntity 1   │  │  PluginEntity 2     │  │
+    │  │  (PluginThread)   │  │  (适配器 / Worker)  │  │
+    │  │  QuickJS + 消息    │  │  消息驱动循环        │  │
+    │  │  驱动循环          │  │  fs/http/assets 自处 │  │
+    │  │  fs/http/assets   │  │  理                 │  │
     │  └───────┬──────────┘  └──────┬──────────────┘  │
     │          │                    │                 │
     │  ┌───────┴────────────────────┴──────────────┐  │
@@ -32,7 +33,8 @@
     │                   │                             │
     │  ┌────────────────┴─────────────────────────┐  │
     │  │  EventBridge                              │  │
-    │  │  Bukkit 事件 → JS → applyMods()           │  │
+    │  │  Bukkit 事件 → 插件 → applyMods()         │  │
+    │  │  （未注册自动注册；无订阅自动跳过）        │  │
     │  └──────────────────────────────────────────┘  │
     └──────────────────────┬──────────────────────────┘
                            ↓ Bukkit API
@@ -95,11 +97,13 @@ PluginThread.run()
 | **Timer 线程**（每插件） | 定时器到期后发消息到 JS 线程                       |
 | **Fetch 线程**           | HTTP 请求（每次请求一个线程）                      |
 
-消息队列（MsgQueue）：
+消息队列（MsgQueue，**消息驱动**）：
 
 ```
-Java → JS: postMessage(msg) → JS 线程 pollJs(50ms) 读取
-JS  → Java: queue.sendJava(msg) → Scheduler tick() 处理 game 消息
+Java → 插件: postMessage(msg) → 入队（原子）→ 唤醒插件消息循环
+          插件线程阻塞等待消息（零轮询）；收到即处理；处理完有剩余立即取，
+          无剩余回到阻塞等待（"消息循环停止"，仅语义上的等待态）
+JS  → Java: $_send 通道消息 → Scheduler tick() 处理 game 任务 / 插件线程直接处理 fs 等
 ```
 
 ## 插件实体抽象
@@ -109,6 +113,41 @@ JS  → Java: queue.sendJava(msg) → Scheduler tick() 处理 game 消息
 - **调度器**只认插件名（提交任务、回复回调），不感知执行引擎
 - **Profile** 通过 `ping()` 统一采集响应延迟，in-flight 管理由适配器负责
 - **虚拟插件**（预留）：实现 `PluginEntity` 的 Worker 实体（Worker API / 多语言适配器）可接入全链路；`isVirtual()` 标记用于性能统计与告警的区分
+
+## 开发模式错误回显
+
+开发模式（`npm run dev`，运行时带 `-Dyeow.dev=true`）下，插件错误经过完整链路回显到终端：
+
+```
+插件 JS 错误 → init.js reportError / 未捕获异常 → $_send('debug', {t:'reportError'})
+  → PluginThread 解析（message/stack/fileName/line/column）
+  → dev WebSocket → dev-server（create-yeow 内置，端口 17368）
+  → source-map 库把打包后位置反解回 src/ 原始源码
+  → 终端输出：错误行 ±3 行上下文 + → 定位符 + 异步调用链
+```
+
+**异步栈追踪**（仅开发模式）：每个回调/异步请求在**注册时**捕获用户调用栈，出错时以 `--- cb registered at ---`、`--- promise chain ---`、`--- outer callback ---` 分段附加到错误——多层嵌套回调也能还原来源。`console.log` 不受影响；生产模式无任何栈捕获开销（错误只输出到服务器日志）。
+
+- 手动上报：`logError(e, context?)`（`catch` 块中主动上报，享受同样的 source-map 定位）
+- 详见 [CLI 参考 - 调试体验](cli.md#调试体验)
+
+## 资源路径机制（getAssetsPath）
+
+**解决的问题**：插件（及其依赖包）的资源必须能在运行时被准确定位——而资源路径在打包后不再是源码路径（资源可能来自多个 npm 包、存在同名冲突、路径随构建变化）。
+
+**机制**：
+
+1. **命名空间隔离**：构建器扫描 `node_modules`（主项目 + 满足条件的依赖包），为每个"依赖项"分配唯一 8 位十六进制 id
+2. **原样部署**：各依赖项的 `assets/` 内容原样复制到打包路径 `assets/<id>/...`（不哈希改名——内部相对引用永远有效）
+3. **按 importer 注入**：`getAssetsPath` 来自构建期虚拟模块 `yeow-dev`；esbuild 解析 `import { getAssetsPath } from 'yeow-dev'` 时，按**导入方文件所属的依赖项**注入对应 id——依赖包代码里调用 `getAssetsPath` 自动得到**自己**的命名空间
+4. **运行时读取**：返回 `assets/<id>/<path>` 字符串，运行时按该路径在包内读取（dev 模式从磁盘目录读）
+
+```ts
+import { getAssetsPath } from 'yeow-dev';   // 构建期虚拟模块（非 yeow-api）
+getAssetsPath('native/win/svc.exe')         // → "assets/<依赖项id>/native/win/svc.exe"
+```
+
+**规则**：永远通过 `getAssetsPath()` 获取资源路径（不要硬编码）；id 每次构建随机，仅当前构建产物内有效。详见 [Assets API](api/assets.md) 与 [编写依赖包](package-author.md)。
 
 ## 调度器
 
@@ -174,7 +213,7 @@ entity.teleportSync(loc)
 ```
 
 - 通过 `call()` → `$send` 的 sync 路径提交
-- JS 线程阻塞在 `CompletableFuture.get(5s)`
+- JS 线程阻塞在 `CompletableFuture.get(task-sync-timeout-ms)`（默认 10s，`plugins/Yeow/runtime/config.yml` 可配置）
 - 高优先级：默认高优先级
 - （`call`）会**阻塞 JS 线程**直到任务完成。阻塞期间，JS 线程无法处理其他消息，包括：
 
@@ -358,7 +397,7 @@ for(loc of locs){
 call('player.getPing', {uuid})
   → $send('task', '{"type":"player.getPing","p":{"uuid":"..."}}')
   → PluginThread: scheduler.submitGameSync(pld, future, priority, name)
-  → future.get(5s) [JS 线程阻塞]
+  → future.get(10s) [JS 线程阻塞；超时可由 config 的 task-sync-timeout-ms 调整]
   → 主线程 tick(): 从对应优先级队列取出 → Tasks.execute()
   → future.complete(result) [JS 线程恢复]
 ```
@@ -401,9 +440,9 @@ $send('assets', '{"t":"read","p":{"path":"assets/config.a1b2c3d4.yml"}}')
 call('command.register', {...})
   → $send('task', ...)
   → scheduler.submitGameSync(pld, future)
-  → future.get(5s)             ← JS 线程阻塞，等待主线程 tick
+  → future.get(task-sync-timeout-ms，默认 10s)   ← JS 线程阻塞，等待主线程 tick
   ─────────────────────────────────
-  → 5 秒后主线程 tick 仍未启动 → 超时
+  → 超时（默认 10s，可配置）后主线程 tick 仍未启动 → 超时
 ```
 
 调度器的 tick 由 `Bukkit.getScheduler().runTaskTimer(this, () -> scheduler.tick(), 0L, 1L)` 驱动，它在 `YeowRuntime.onEnable()` 中注册。

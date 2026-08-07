@@ -120,12 +120,18 @@ public class EventBridge implements Listener {
 
     void dispatch(Event ev, String et) {
         var pluginMap = subs.get(et); if (pluginMap == null || pluginMap.isEmpty()) return;
+        // 跳过空回调集合的插件（理论上 subscribe 后至少一个，防御性过滤）
+        var active = new java.util.HashMap<String, Set<String>>();
+        for (var e : pluginMap.entrySet()) {
+            if (e.getValue() != null && !e.getValue().isEmpty()) active.put(e.getKey(), e.getValue());
+        }
+        if (active.isEmpty()) return;
         var data = eventData(ev, et); if (data == null) return;
 
         if (runtime.getYeowConfig().concurrentEvents())
-            dispatchConcurrent(ev, et, pluginMap, data);
+            dispatchConcurrent(ev, et, active, data);
         else
-            dispatchSerial(ev, et, pluginMap, data);
+            dispatchSerial(ev, et, active, data);
     }
 
     private void dispatchSerial(Event ev, String et, Map<String, Set<String>> pluginMap, Map<String,Object> data) {

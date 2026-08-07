@@ -1,45 +1,79 @@
 # Block API
 
-方块对象。由 `world.getBlock()` 获取，默认为异步（`Promise`），同步版本加 `Sync` 后缀。
+Yeow 把"方块"分为两个概念：
+
+| 类 | 语义 | 用途 |
+| --- | ---- | ---- |
+| **`Block`** | **数据层面**的方块描述符（类型 + 状态键值对，对应 Bukkit BlockData），**不绑定坐标** | 构造/描述方块，传给 `world.setBlock` |
+| **`WorldBlock`** | 世界中的方块（位置 + 数据描述符） | 由 `world.getBlock(x, y, z)` 返回，查询/操作世界中的方块 |
 
 ```js
-import { Block } from 'yeow-api';
+import { Block, WorldBlock } from 'yeow-api';
 ```
 
-## 属性
+## Block（数据描述符）
 
 ```ts
-new Block(world, x, y, z, type)
-
-block.world          // 世界名
-block.x / y / z      // 坐标
-block.type           // 方块类型（如 "minecraft:stone"）
-block.location       // Location 对象（同步属性）
+Block.of('minecraft:stone')                         // 无状态
+Block.of('minecraft:water', { level: '8' })         // 带状态（状态值统一为字符串）
+new Block(type, state?)
+block.type          // "minecraft:stone"
+block.state         // { level: "8" } | undefined
+block.withState({ waterlogged: 'true' })            // 派生新描述符（原对象不变）
+block.matches('minecraft:water', { level: '8' })    // 类型/状态匹配
 ```
 
-## 方法
+状态对应 Bukkit BlockData 的键值对（值统一为字符串），如 `minecraft:water[level=8]` → `{ type: "minecraft:water", state: { level: "8" } }`。
+
+## WorldBlock（世界中的方块）
+
+由 `world.getBlock(x, y, z)` 返回：
 
 ```ts
-block.isSolid()              // Promise<boolean> — 是否为固体
-block.isSolidSync()          // boolean
-block.isLiquid()             // Promise<boolean> — 是否为液体
-block.isLiquidSync()         // boolean
-block.isEmpty()              // Promise<boolean> — 是否为空（空气）
-block.isEmptySync()          // boolean
-block.breakNaturally()       // Promise<boolean> — 自然破坏并掉落物品
-block.breakNaturallySync()   // boolean
-block.breakNaturally(tool?)  // 可选 ItemStack 参数指定工具
+const b = await world.getBlock(0, 65, 0);   // WorldBlock | null
+
+b.world / b.x / b.y / b.z   // 位置
+b.type                      // "minecraft:stone"
+b.state                     // { waterlogged: "true" } | undefined
+b.location                  // Location（同步属性）
+b.toBlock()                 // Block 描述符视图（可传给 world.setBlock）
+b.isSolid()                 // Promise<boolean> — 是否为固体
+b.isSolidSync()             // boolean
+b.isLiquid()                // Promise<boolean> — 是否为液体
+b.isLiquidSync()            // boolean
+b.isEmpty()                 // Promise<boolean> — 是否为空（空气）
+b.isEmptySync()             // boolean
+b.breakNaturally()          // Promise<boolean> — 自然破坏并掉落物品
+b.breakNaturallySync()      // boolean
+```
+
+## 放置方块
+
+`world.setBlock(x, y, z, block, state?)` 接受 **`Block` 描述符或字符串**（兼容）：
+
+```ts
+import { World, Block } from 'yeow-api';
+
+const world = World.getSync('world');
+
+await world.setBlock(0, 65, 0, 'minecraft:stone');              // 字符串（兼容）
+await world.setBlock(0, 65, 1, Block.of('minecraft:water', { level: '8' }));
+await world.setBlock(0, 65, 2, 'minecraft:chest', { facing: 'north' });  // 字符串 + 独立状态参数
 ```
 
 ## 示例
 
 ```ts
-import { World } from 'yeow-api';
+import { World, Block } from 'yeow-api';
 
 const world = World.getSync('world');
-const block = world.getBlockSync(0, 65, 0);
+const b = world.getBlockSync(0, 65, 0);
 
-if (block.type === 'minecraft:stone') {
-    await block.breakNaturally();
+if (b?.matches('minecraft:stone')) {
+    await b.breakNaturally();
 }
+
+// 读取状态后原样写回（带状态的水桶放置）
+const water = world.getBlockSync(1, 65, 0);
+await world.setBlock(1, 65, 0, water.toBlock());
 ```

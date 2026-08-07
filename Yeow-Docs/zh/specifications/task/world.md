@@ -96,8 +96,8 @@
 
 | 任务 | 请求 | 返回 |
 |------|------|------|
-| `world.getBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `{ "type": "<key>", "x": <int>, "y": <int>, "z": <int> }` |
-| `world.setBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int>, "blockType": "<material>" }` | `true` |
+| `world.getBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `{ "type": "<key>", "x": <int>, "y": <int>, "z": <int>, "state": { "<状态键>": "<值>" } }`（state 为空对象时表示无状态） |
+| `world.setBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int>, "blockType": "<material>", "state": { "<键>": "<值>" }? }` | `true`（state 存在时按 `type[键=值,...]` 构造 BlockData 放置） |
 
 `type` 和 `blockType` 使用 Material 命名空间 key（如 `minecraft:stone`），也兼容简写 `stone`。
 

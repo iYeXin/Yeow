@@ -282,6 +282,7 @@ priority-ratios: [0.5, 0.3, 0.2] # 三级优先级比例
 auto-demote: true                # 自动降级
 demote-threshold: 200            # 降级阈值（次/秒）
 idle-spin-us: 100                # 空闲自旋（us），0 关闭
+task-sync-timeout-ms: 10000      # 同步 task 调用超时（ms），受服务器负载影响大，默认 10s
 
 native-service-require-approval: true  # 声明原生服务的插件需要批准（默认 true；false = 默认批准）。
                                        # 运行时直接修改即生效（config.yml 为信任源）。
