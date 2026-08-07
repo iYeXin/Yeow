@@ -378,6 +378,7 @@ export function eventOn<K extends keyof EventMap>(
 
   const cbId = _registerCallback((data: RawEvent) => {
     const wrapped = adaptEvent(eventType, data);
+    const dispatchId = data?._dispatchId;
     const cancellable = data?._cancellable;
     const localMods: { cancelled?: boolean } = {};
 
@@ -393,7 +394,7 @@ export function eventOn<K extends keyof EventMap>(
       const complete = (result?: Record<string, unknown>) => {
         $send('task', {
           type: 'event.complete',
-          params: { callbackId: cbId, mods: result },
+          params: { callbackId: cbId, dispatchId, mods: result },
           cb: '',
         });
       };
@@ -406,7 +407,7 @@ export function eventOn<K extends keyof EventMap>(
       ...(result && typeof result === 'object' ? result : {}),
     };
     if (localMods.cancelled) mods.cancelled = true;
-    $send('task', { type: 'event.complete', params: { callbackId: cbId, mods }, cb: '' });
+    $send('task', { type: 'event.complete', params: { callbackId: cbId, dispatchId, mods }, cb: '' });
   }, { persistent: true });
 
   const gh = globalThis as any;
