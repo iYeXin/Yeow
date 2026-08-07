@@ -198,6 +198,9 @@ public class EventBridge implements Listener {
         var latch = new CountDownLatch(total);
         long t0 = System.nanoTime();
         var startNs = new HashMap<String, Long>();
+        // cb → eventId。注意：不同插件的独立 JS 上下文 cbId 各自从 cb_1 计数，
+        // 可能同名（如都是 cb_2）——key 必须含插件名，否则跨插件覆盖导致
+        // waitFor 错位（误判超时）与 pend 泄漏。
         var cbToDispatch = new HashMap<String, String>();
         for (var entry : pluginMap.entrySet()) {
             var pn = entry.getKey();
@@ -205,7 +208,7 @@ public class EventBridge implements Listener {
             if (pt == null) { for (var cb : entry.getValue()) latch.countDown(); continue; }
             for (var cb : entry.getValue()) {
                 var eventId = newEventId(et);
-                cbToDispatch.put(cb, eventId);
+                cbToDispatch.put(pn + "\u0000" + cb, eventId);
                 startNs.put(eventId, System.nanoTime());
                 SyncCallbackHelper.register(eventId, latch::countDown);
                 pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",withEventId(data, eventId),"eventId",eventId)));
@@ -225,7 +228,7 @@ public class EventBridge implements Listener {
         Integer maxPlayers = null, numPlayers = null;
         for (var entry : pluginMap.entrySet()) {
             for (var cb : entry.getValue()) {
-                var eventId = cbToDispatch.get(cb);
+                var eventId = cbToDispatch.get(entry.getKey() + "\u0000" + cb);
                 var r = SyncCallbackHelper.waitFor(eventId, 0);
                 if (r instanceof Map<?,?> m) {
                     if (Boolean.TRUE.equals(m.get("cancelled")))
