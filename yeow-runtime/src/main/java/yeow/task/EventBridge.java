@@ -191,6 +191,7 @@ public class EventBridge implements Listener {
         long now = System.nanoTime();
         boolean cancelled = false;
         String motd = null, iconBase64 = null;
+        Integer maxPlayers = null, numPlayers = null;
         for (var entry : pluginMap.entrySet()) {
             for (var cb : entry.getValue()) {
                 var r = SyncCallbackHelper.waitFor(cb, 0);
@@ -199,6 +200,10 @@ public class EventBridge implements Listener {
                         cancelled = true;
                     if (m.containsKey("motd"))
                         motd = TextUtil.toLegacy(TextUtil.parse(String.valueOf(m.get("motd"))));
+                    if (m.containsKey("maxPlayers"))
+                        maxPlayers = ((Number) m.get("maxPlayers")).intValue();
+                    if (m.containsKey("numPlayers"))
+                        numPlayers = ((Number) m.get("numPlayers")).intValue();
                     if (m.containsKey("icon"))
                         iconBase64 = String.valueOf(m.get("icon"));
                 }
@@ -211,6 +216,8 @@ public class EventBridge implements Listener {
         if (cancelled && ev instanceof Cancellable c) c.setCancelled(true);
         if (ev instanceof PaperServerListPingEvent p) {
             if (motd != null) p.setMotd(motd);
+            if (maxPlayers != null) p.setMaxPlayers(maxPlayers);
+            if (numPlayers != null) p.setNumPlayers(numPlayers);
             if (iconBase64 != null) {
                 var icon = loadPingIcon(iconBase64);
                 if (icon != null) p.setServerIcon(icon);
@@ -225,6 +232,10 @@ public class EventBridge implements Listener {
         if (ev instanceof PaperServerListPingEvent p) {
             if (m.containsKey("motd"))
                 p.setMotd(TextUtil.toLegacy(TextUtil.parse(String.valueOf(m.get("motd")))));
+            if (m.containsKey("maxPlayers"))
+                p.setMaxPlayers(((Number) m.get("maxPlayers")).intValue());
+            if (m.containsKey("numPlayers"))
+                p.setNumPlayers(((Number) m.get("numPlayers")).intValue());
             if (m.containsKey("icon")) {
                 var icon = loadPingIcon(String.valueOf(m.get("icon")));
                 if (icon != null) p.setServerIcon(icon);

@@ -151,7 +151,9 @@ export interface InventoryCloseEvent {
 }
 export interface ServerPingEvent {
   address: string;
+  /** 当前在线人数。handler 可返回 `{ numPlayers: <number> }` 覆盖该次 ping 响应显示的在线人数——**不建议修改**（伪装在线人数可能违反服务器列表政策）。 */
   numPlayers: number;
+  /** 最大玩家数。handler 可返回 `{ maxPlayers: <number> }` 覆盖该次 ping 响应显示的最大玩家数——**不建议修改**（仅影响显示，不改变实际进入限制）。 */
   maxPlayers: number;
   /** MOTD 文本。handler 可返回 `{ motd: "<text>" }` 覆盖该次 ping 响应的 MOTD。 */
   motd: string;
