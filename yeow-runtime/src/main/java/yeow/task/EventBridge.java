@@ -34,10 +34,10 @@ public class EventBridge implements Listener {
     private final Map<String, Map<String, Set<String>>> subs = new ConcurrentHashMap<>();
     /** 事件类型 → 是否已注册 Bukkit 监听器（生命周期 = EventBridge，一经注册永久保留）。 */
     private final Map<String, Boolean> reg = new ConcurrentHashMap<>();
-    /** 每次 dispatch 的唯一 id 生成器：pend key 用 dispatchId 而非 cbId——
+    /** 每次 dispatch 的唯一 id 生成器：pend key 用 eventId 而非 cbId——
      *  同一 cbId 并发/连续触发多次事件时（如 serverPing 多连接同时 ping），
      *  register(cbId) 会互相覆盖，先注册的 pend 永不完成 → 间歇性 event.timeout。
-     *  每次 dispatch 独立 id，事件完成（event.complete）回传 dispatchId 精确匹配。 */
+     *  每次 dispatch 独立 eventId，事件完成（event.complete）回传 eventId 精确匹配。 */
     private final java.util.concurrent.atomic.AtomicLong dispatchSeq = new java.util.concurrent.atomic.AtomicLong();
     private volatile ProfileSink sink;
     private volatile long timeoutMs = 5000;
@@ -148,14 +148,14 @@ public class EventBridge implements Listener {
     }
 
     /** 为一次 dispatch（一个插件的单个回调）生成唯一 pend key。 */
-    private String newDispatchId(String et) {
+    private String newEventId(String et) {
         return et + "#" + dispatchSeq.incrementAndGet();
     }
 
-    /** 事件数据副本 + dispatchId（经 r 传给 JS，event.complete 原样回传匹配 pend）。 */
-    private Map<String, Object> dispatchData(Map<String, Object> data, String dispatchId) {
+    /** 事件数据副本 + eventId（经 r 传给 JS，event.complete 原样回传匹配 pend）。 */
+    private Map<String, Object> withEventId(Map<String, Object> data, String eventId) {
         var d = new java.util.HashMap<String, Object>(data);
-        d.put("_dispatchId", dispatchId);
+        d.put("_eventId", eventId);
         return d;
     }
 
@@ -166,9 +166,9 @@ public class EventBridge implements Listener {
             for (var cb : entry.getValue()) {
                 try {
                     long t0 = System.nanoTime();
-                    var dispatchId = newDispatchId(et);
-                    var pend = SyncCallbackHelper.register(dispatchId);
-                    pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",dispatchData(data, dispatchId),"d",dispatchId)));
+                    var eventId = newEventId(et);
+                    var pend = SyncCallbackHelper.register(eventId);
+                    pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",withEventId(data, eventId),"eventId",eventId)));
                     long timeout = timeoutMs;
                     var deadline = System.nanoTime() + timeout * 1_000_000;
                     boolean primary = Bukkit.isPrimaryThread();
@@ -185,7 +185,7 @@ public class EventBridge implements Listener {
                     if (s != null) s.onEvent(new EventMetric(pn, et, elapsedNs, timedOut));
                     if (pend.isDone() && pend.getResult() instanceof Map<?,?> m)
                         applyMods(ev, m);
-                    SyncCallbackHelper.remove(dispatchId);
+                    SyncCallbackHelper.remove(eventId);
                 } catch (Exception e) { LOG.warning("Event: " + e.getMessage()); }
             }
         }
@@ -204,11 +204,11 @@ public class EventBridge implements Listener {
             var pt = runtime.getPlugin(pn);
             if (pt == null) { for (var cb : entry.getValue()) latch.countDown(); continue; }
             for (var cb : entry.getValue()) {
-                var dispatchId = newDispatchId(et);
-                cbToDispatch.put(cb, dispatchId);
-                startNs.put(dispatchId, System.nanoTime());
-                SyncCallbackHelper.register(dispatchId, latch::countDown);
-                pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",dispatchData(data, dispatchId),"d",dispatchId)));
+                var eventId = newEventId(et);
+                cbToDispatch.put(cb, eventId);
+                startNs.put(eventId, System.nanoTime());
+                SyncCallbackHelper.register(eventId, latch::countDown);
+                pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",withEventId(data, eventId),"eventId",eventId)));
             }
         }
         long timeout = timeoutMs;
@@ -225,8 +225,8 @@ public class EventBridge implements Listener {
         Integer maxPlayers = null, numPlayers = null;
         for (var entry : pluginMap.entrySet()) {
             for (var cb : entry.getValue()) {
-                var dispatchId = cbToDispatch.get(cb);
-                var r = SyncCallbackHelper.waitFor(dispatchId, 0);
+                var eventId = cbToDispatch.get(cb);
+                var r = SyncCallbackHelper.waitFor(eventId, 0);
                 if (r instanceof Map<?,?> m) {
                     if (Boolean.TRUE.equals(m.get("cancelled")))
                         cancelled = true;
@@ -239,10 +239,10 @@ public class EventBridge implements Listener {
                     if (m.containsKey("icon"))
                         iconBase64 = String.valueOf(m.get("icon"));
                 }
-                long start = startNs.getOrDefault(dispatchId, t0);
+                long start = startNs.getOrDefault(eventId, t0);
                 ProfileSink s = sink;
                 if (s != null) s.onEvent(new EventMetric(entry.getKey(), et, now - start, r == null));
-                SyncCallbackHelper.remove(dispatchId);
+                SyncCallbackHelper.remove(eventId);
             }
         }
         if (cancelled && ev instanceof Cancellable c) c.setCancelled(true);

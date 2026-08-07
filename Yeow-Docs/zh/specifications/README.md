@@ -306,18 +306,18 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 ### 触发
 
-游戏事件发生时，运行时提取事件字段（**仅基本类型**：string/number/boolean/object，不传宿主对象引用），投递回调：
+游戏事件发生时，运行时提取事件字段（**仅基本类型**：string/number/boolean/object，不传宿主对象引用），投递回调。`r` 内含 `_cancellable`（是否可取消）与 `_eventId`（**每次分发的唯一 id**，事件完成时原样回传）；顶层 `eventId` 字段同值：
 
 ```json
-{ "t": "cb", "p": "cb_42", "r": { "_cancellable": true, "player": "uuid", "message": "hi", ... } }
+{ "t": "cb", "p": "cb_42", "eventId": "playerJoin#12", "r": { "_cancellable": true, "_eventId": "playerJoin#12", "player": "uuid", "message": "hi", ... } }
 ```
 
 ### 完成
 
-JS 处理器执行完毕（或手动调用 complete）后，通过 `task` 通道回传修改结果：
+JS 处理器执行完毕（或手动调用 complete）后，通过 `task` 通道回传修改结果。`eventId` 为匹配键（**不再需要 callbackId**——同一 cbId 并发触发多次事件时各次 dispatch 独立）：
 
 ```json
-{ "type": "event.complete", "params": { "callbackId": "cb_42", "mods": { "cancelled": true } } }
+{ "type": "event.complete", "params": { "eventId": "playerJoin#12", "mods": { "cancelled": true } } }
 ```
 
 运行时应用 `mods`（如 `cancelled` → 取消宿主事件）。超时策略：推荐 5 秒；超时后释放事件。

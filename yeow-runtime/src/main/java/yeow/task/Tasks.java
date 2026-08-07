@@ -149,11 +149,9 @@ public class Tasks {
             // Event
             case "event.subscribe"   -> { var rt = YeowRuntime.inst(); rt.getEventBridge().subscribe(p.get("pluginName").getAsString(), p.get("eventType").getAsString(), p.get("callbackId").getAsString()); yield true; }
             case "event.unsubscribe" -> { var rt = YeowRuntime.inst(); rt.getEventBridge().unsubscribe(p.get("pluginName").getAsString(), p.get("eventType").getAsString()); yield true; }
-            case "event.complete"    -> { var cb = p.get("callbackId").getAsString();
-                // 优先用 dispatchId（每次 dispatch 唯一）匹配 pend——同一 cbId 并发/连续触发
-                // 多次事件时，register(cbId) 会互相覆盖；dispatchId 保证精确匹配。
-                var key = p.has("dispatchId") && !p.get("dispatchId").isJsonNull() && !p.get("dispatchId").getAsString().isEmpty()
-                    ? p.get("dispatchId").getAsString() : cb;
+            case "event.complete"    -> { var key = p.get("eventId").getAsString();
+                // key = eventId（每次 dispatch 唯一）：同一 cbId 并发/连续触发多次事件时，
+                // register(cbId) 会互相覆盖；eventId 保证精确匹配本次等待。
                 var modsJson = p.has("mods") && !p.get("mods").isJsonNull() ? p.get("mods").toString() : "{}";
                 var mods = new com.google.gson.Gson().fromJson(modsJson, Object.class); yeow.channel.SyncCallbackHelper.complete(key, mods); yield true; }
             case "command.tabComplete" -> { var cb = p.get("callbackId").getAsString(); var compsJson = p.has("completions") && !p.get("completions").isJsonNull() ? p.get("completions").toString() : "[]"; var c = new com.google.gson.Gson().fromJson(compsJson, Object.class); yeow.channel.SyncCallbackHelper.complete(cb, c); yield true; }

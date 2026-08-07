@@ -511,7 +511,7 @@ Bukkit 事件触发
   → JS $hm → _hm → _cbs[cbId].h(r)
   → yeow-api 回调内:
       自动模式:
-        同步 handler: 执行完 → $send('task', {type:'event.complete', params:{callbackId, mods}})
+        同步 handler: 执行完 → $send('task', {type:'event.complete', params:{eventId, mods}})
         返回 Promise: → 立即 $send('event.complete')，只有同步段修改生效
       手动模式:
         handler(e, complete) → 用户调用 complete(mods)
@@ -621,7 +621,7 @@ Java 端通过 `SyncCallbackHelper` 注册等待，JS 通过 `$_send('task')` �
 
 | 场景      | Java 发送                            | JS 响应                                                                         |
 | --------- | ------------------------------------ | ------------------------------------------------------------------------------- |
-| 事件      | `{t:"cb", p:cbId, r:{event data}}`   | `$send('task', {type:'event.complete', params:{callbackId, mods}})`             |
+| 事件      | `{t:"cb", p:cbId, eventId, r:{event data}}` | `$send('task', {type:'event.complete', params:{eventId, mods}})`             |
 | 补全      | `{t:"cb", p:cbId, r:{sender, args}}` | `$send('task', {type:'command.tabComplete', params:{callbackId, completions}})` |
 | 异步 post | `{t:"cb", p:cbId, r:result}`         | 自动 — 回调函数处理 `r`                                                         |
 
