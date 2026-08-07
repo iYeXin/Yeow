@@ -24,7 +24,7 @@ const items = await getItems();
 
 ## Material（材料级静态判断）
 
-`Material` 是**普通对象**（非类），提供**基于类型（material）的固有属性判断**——不依赖坐标/状态，不查询世界：
+`Material` 提供**基于类型（material）的固有属性判断**——不依赖坐标/状态，不查询世界：
 
 ```ts
 Material.isSolid('minecraft:stone');      // Promise<boolean> — 是否为固体
