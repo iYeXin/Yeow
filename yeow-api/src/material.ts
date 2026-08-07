@@ -36,31 +36,31 @@ export async function getItems(options?: TaskOptions): Promise<string[]> {
 }
 
 /**
- * Material —— 材料级静态判断（不依赖坐标/状态）。
+ * Material —— 材料级静态判断对象（不依赖坐标/状态）。
  * 基于方块类型（material）判断其固有属性：固体/液体/空气。
  */
-export class Material {
+export const Material = {
   /** 是否为固体方块（基于类型，状态不影响）。 */
-  static isSolid(type: string, options?: TaskOptions): Promise<boolean> {
+  isSolid(type: string, options?: TaskOptions): Promise<boolean> {
     return post<boolean>('material.isSolid', { type }, options);
-  }
-  static isSolidSync(type: string, options?: TaskOptions): boolean {
+  },
+  isSolidSync(type: string, options?: TaskOptions): boolean {
     return call<boolean>('material.isSolid', { type }, options);
-  }
+  },
 
   /** 是否为液体（水 / 熔岩）。 */
-  static isLiquid(type: string, options?: TaskOptions): Promise<boolean> {
+  isLiquid(type: string, options?: TaskOptions): Promise<boolean> {
     return post<boolean>('material.isLiquid', { type }, options);
-  }
-  static isLiquidSync(type: string, options?: TaskOptions): boolean {
+  },
+  isLiquidSync(type: string, options?: TaskOptions): boolean {
     return call<boolean>('material.isLiquid', { type }, options);
-  }
+  },
 
   /** 是否为空气（空方块）。 */
-  static isAir(type: string, options?: TaskOptions): Promise<boolean> {
+  isAir(type: string, options?: TaskOptions): Promise<boolean> {
     return post<boolean>('material.isAir', { type }, options);
-  }
-  static isAirSync(type: string, options?: TaskOptions): boolean {
+  },
+  isAirSync(type: string, options?: TaskOptions): boolean {
     return call<boolean>('material.isAir', { type }, options);
-  }
-}
+  },
+};
