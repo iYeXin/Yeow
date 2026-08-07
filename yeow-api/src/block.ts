@@ -43,6 +43,11 @@ export class Block {
 /**
  * WorldBlock —— 世界中的方块（位置 + 数据描述符）。
  * 由 `world.getBlock(x, y, z)` 返回。
+ *
+ * **实时性语义**：
+ * - `type` / `state` 为**获取时刻的快照**——之后世界变化不会自动更新；
+ *   如需最新状态请调用 `refresh()` 获取新实例
+ * - 方法（`isSolid` / `breakNaturally` 等）按坐标**实时**查询/操作世界
  */
 export class WorldBlock {
   constructor(
@@ -61,6 +66,16 @@ export class WorldBlock {
   /** 数据描述符视图（可传给 world.setBlock）。 */
   toBlock(): Block {
     return new Block(this.type, this.state);
+  }
+
+  /** 重新获取该位置的最新快照（返回新实例，本对象不变）。 */
+  refresh(options?: TaskOptions): Promise<WorldBlock | null> {
+    return post<{ type: string; state: BlockState }>('world.getBlock', { world: this.world, x: this.x, y: this.y, z: this.z }, options)
+      .then((r) => (r ? new WorldBlock(this.world, this.x, this.y, this.z, r.type, r.state) : null));
+  }
+  refreshSync(options?: TaskOptions): WorldBlock | null {
+    const r = call<{ type: string; state: BlockState }>('world.getBlock', { world: this.world, x: this.x, y: this.y, z: this.z }, options);
+    return r ? new WorldBlock(this.world, this.x, this.y, this.z, r.type, r.state) : null;
   }
 
   isSolid(options?: TaskOptions): Promise<boolean> { return post<boolean>('block.isSolid', { world: this.world, x: this.x, y: this.y, z: this.z }, options); }

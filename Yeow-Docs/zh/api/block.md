@@ -33,19 +33,25 @@ block.matches('minecraft:water', { level: '8' })    // 类型/状态匹配
 const b = await world.getBlock(0, 65, 0);   // WorldBlock | null
 
 b.world / b.x / b.y / b.z   // 位置
-b.type                      // "minecraft:stone"
-b.state                     // { waterlogged: "true" } | undefined
+b.type                      // "minecraft:stone"（获取时刻的快照）
+b.state                     // { waterlogged: "true" } | undefined（获取时刻的快照）
 b.location                  // Location（同步属性）
 b.toBlock()                 // Block 描述符视图（可传给 world.setBlock）
-b.isSolid()                 // Promise<boolean> — 是否为固体
+b.isSolid()                 // Promise<boolean> — 是否为固体（实时查询世界）
 b.isSolidSync()             // boolean
-b.isLiquid()                // Promise<boolean> — 是否为液体
+b.isLiquid()                // Promise<boolean> — 是否为液体（实时）
 b.isLiquidSync()            // boolean
-b.isEmpty()                 // Promise<boolean> — 是否为空（空气）
+b.isEmpty()                 // Promise<boolean> — 是否为空（实时）
 b.isEmptySync()             // boolean
-b.breakNaturally()          // Promise<boolean> — 自然破坏并掉落物品
+b.breakNaturally()          // Promise<boolean> — 自然破坏并掉落物品（实时操作世界）
 b.breakNaturallySync()      // boolean
 ```
+
+### 实时性语义
+
+- **属性是快照**：`type` / `state` 固定为 `getBlock` 获取时刻的值——之后世界变化不会自动更新
+- **方法是实时的**：`isSolid` / `isEmpty` / `breakNaturally` 等按坐标实时查询/操作世界，不受快照影响
+- **获取最新状态**：调用 `refresh()` / `refreshSync()` 返回该位置的最新 `WorldBlock`（原对象不变）；若方块被移除，返回 `null`
 
 ## 放置方块
 
