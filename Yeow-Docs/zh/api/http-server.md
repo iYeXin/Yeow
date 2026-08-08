@@ -81,6 +81,28 @@ app.mount('assets/web/', '/static'); // /static/xxx → plugins/<插件名>/asse
 app.get('/api/data', () => ({ body: 'ok' }));
 ```
 
+**检测 + 自动提取（从资源到文件系统）**：静态文件通常打包在 `assets/`（.zip 内），`mount` 读取的是数据目录——首次启动时检测数据目录缺失则自动从 `assets` 提取，之后直接挂载：
+
+```js
+import { createServer } from 'yeow-utils';
+import { fs, assetsExtractDir } from 'yeow-api';
+
+onLoad(async () => {
+    // ① 检测：数据目录 web/ 已存在（上次已提取）→ 跳过；缺失 → 从 assets 自动提取
+    if (!fs.existsSync('web/index.html')) {
+        await assetsExtractDir('web', 'web');   // assets 的 web/ 目录 → 数据目录 web/
+        console.log('web assets extracted');
+    }
+
+    // ② 挂载静态目录（检测 + 提取完成后）
+    const app = createServer(8080);
+    app.mount('web/');
+});
+```
+
+- 版本更新后 assets 内容变化但数据目录已有旧文件时，可自行加入版本标记比对（如提取后写入 `fs.writeFileSync('web/.version', version)`，检测时比对）决定是否重新提取
+- 也可以不经提取直接响应：`assetsReadBase64` + `bodyBase64`（见[二进制响应](#二进制响应base64)）——适合每次读包、文件较小、无需被其他插件/工具访问的场景
+
 - `dir`：插件数据目录下的目录（可带尾 `/`）；`prefix`：URL 前缀（默认 `/`）
 - 支持常见类型（html/css/js/json/svg/png/jpg/gif/webp/woff2/zip/pdf/wasm 等），未知扩展名回退 `application/octet-stream`
 - **路径穿越防护**：含 `..` 段的请求路径被拒绝（继续后续层 → 404）
