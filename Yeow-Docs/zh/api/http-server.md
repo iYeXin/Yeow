@@ -112,3 +112,30 @@ const { serverId, port } = listen((req) => {
 
 close(serverId);
 ```
+
+### 二进制响应（base64）
+
+`respond` 支持 `bodyBase64`——base64 编码的**二进制**响应体（与 `body` 互斥，优先）。典型场景：从 `assets` 读取资源包等二进制文件并暴露下载 URL：
+
+```js
+import { listen, respond } from 'yeow-api';
+import { assetsReadBase64 } from 'yeow-api';
+
+const { serverId, port } = listen(async (req) => {
+    if (req.path === '/resourcepack') {
+        const data = await assetsReadBase64('pack/resourcepack.zip');   // assets 二进制 → base64
+        respond(req.serverId, req.connId, {
+            status: 200,
+            bodyBase64: data,
+            headers: {
+                'content-type': 'application/zip',
+                'content-disposition': 'attachment; filename="resourcepack.zip"',
+            },
+        });
+    } else {
+        respond(req.serverId, req.connId, { status: 404, body: 'Not Found' });
+    }
+}, 8080);
+
+// 玩家/客户端可直接下载: http://<服务器地址>:8080/resourcepack
+```

@@ -7,6 +7,18 @@ interface HttpResult {
   err?: string;
 }
 
+/** HTTP 响应选项（respond）。 */
+export interface RespondOptions {
+  /** HTTP 状态码（默认 200）。 */
+  status?: number;
+  /** 文本响应体（UTF-8）。 */
+  body?: string;
+  /** base64 编码的**二进制**响应体（与 body 互斥，优先）——如从 assets 读取的资源包等。 */
+  bodyBase64?: string;
+  /** 响应头。 */
+  headers?: Record<string, string>;
+}
+
 function _sendHttp(payload: Record<string, unknown>): HttpResult {
   const r = $send('http', payload);
   if (!r) return {};
@@ -31,7 +43,7 @@ export function listen(callback: (req: Record<string, unknown>) => void, port?: 
   return result;
 }
 
-export function respond(serverId: string, connId: string, opts: Record<string, unknown> = {}): void {
+export function respond(serverId: string, connId: string, opts: RespondOptions = {}): void {
   _sendHttp({ t: 'respond', p: { serverId, connId, ...opts } });
 }
 

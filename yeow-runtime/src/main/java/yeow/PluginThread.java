@@ -443,17 +443,24 @@ public class PluginThread implements Runnable, PluginEntity {
                     if (conn != null) {
                         try {
                             var status = p.has("status") ? p.get("status").getAsInt() : 200;
-                            var body = p.has("body") ? p.get("body").getAsString() : "";
                             if (p.has("headers") && !p.get("headers").isJsonNull()) {
                                 var hs = p.getAsJsonObject("headers");
                                 hs.entrySet().forEach(e2 -> conn.exchange().getResponseHeaders().add(e2.getKey(), e2.getValue().getAsString()));
                             }
-                            if (body.isEmpty()) {
-                                conn.exchange().sendResponseHeaders(status, -1);
-                            } else {
-                                var bytes = body.getBytes(StandardCharsets.UTF_8);
+                            if (p.has("bodyBase64") && !p.get("bodyBase64").isJsonNull() && !p.get("bodyBase64").getAsString().isEmpty()) {
+                                // 二进制响应：base64 解码后原样写出（如资源包等 assets 二进制）
+                                var bytes = Base64.getDecoder().decode(p.get("bodyBase64").getAsString());
                                 conn.exchange().sendResponseHeaders(status, bytes.length);
                                 try (var os = conn.exchange().getResponseBody()) { os.write(bytes); }
+                            } else {
+                                var body = p.has("body") ? p.get("body").getAsString() : "";
+                                if (body.isEmpty()) {
+                                    conn.exchange().sendResponseHeaders(status, -1);
+                                } else {
+                                    var bytes = body.getBytes(StandardCharsets.UTF_8);
+                                    conn.exchange().sendResponseHeaders(status, bytes.length);
+                                    try (var os = conn.exchange().getResponseBody()) { os.write(bytes); }
+                                }
                             }
                         } catch (Exception ignored) {}
                         finally { try { conn.exchange().close(); } catch (Exception ignored) {} }

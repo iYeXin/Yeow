@@ -99,6 +99,18 @@ HTTP 客户端和简易 HTTP 服务端。
 ```
 - **返回**：`"true"`
 
+**二进制响应**：`bodyBase64` 字段（base64 编码的原始字节）与 `body` 互斥、优先——存在时按字节原样写出（Content-Length = 解码后字节数），用于资源包等二进制文件：
+
+```json
+{
+  "serverId": "<serverId>",
+  "connId": "<connId>",
+  "status": 200,
+  "headers": { "Content-Type": "application/zip", "Content-Disposition": "attachment; filename=\"rp.zip\"" },
+  "bodyBase64": "<base64 编码的二进制内容>"
+}
+```
+
 ### `close`
 
 关闭 HTTP 服务器。
