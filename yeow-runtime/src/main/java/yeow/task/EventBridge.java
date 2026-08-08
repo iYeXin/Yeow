@@ -168,19 +168,27 @@ public class EventBridge implements Listener {
         return Map.of("text", text);
     }
 
-    /** 死亡消息方法（反射：兼容不同 Bukkit 版本 getDeathMessage() 的返回类型——Component 或 String）。 */
-    private static java.lang.reflect.Method DEATH_MESSAGE_METHOD;
+    /** 死亡消息方法（反射）：Bukkit 的 `getDeathMessage()` 返回 String（已格式化文本，翻译 key 丢失）；
+     *  Paper 的 `deathMessage()` 返回 Component（可翻译组件）——优先使用后者。 */
+    private static java.lang.reflect.Method DEATH_MESSAGE_COMPONENT;
+    private static java.lang.reflect.Method DEATH_MESSAGE_STRING;
     static {
-        try { DEATH_MESSAGE_METHOD = PlayerDeathEvent.class.getMethod("getDeathMessage"); }
-        catch (Exception ignored) {}
+        try { DEATH_MESSAGE_COMPONENT = PlayerDeathEvent.class.getMethod("deathMessage"); } catch (Exception ignored) {}
+        try { DEATH_MESSAGE_STRING = PlayerDeathEvent.class.getMethod("getDeathMessage"); } catch (Exception ignored) {}
     }
 
-    /** 读取死亡消息为 Component：1.19.4+ 返回 Component；1.21.10+（String API）按文本解析。 */
+    /** 读取死亡消息为 Component：优先 `deathMessage()`（Component，可翻译 key 完整）；
+     *  回退 `getDeathMessage()`（String，按文本解析）。 */
     private static net.kyori.adventure.text.Component deathMessageComponent(PlayerDeathEvent e) {
         try {
-            var r = DEATH_MESSAGE_METHOD.invoke(e);
-            if (r instanceof net.kyori.adventure.text.Component c) return c;
-            if (r != null) return TextUtil.parse(String.valueOf(r));
+            if (DEATH_MESSAGE_COMPONENT != null) {
+                var r = DEATH_MESSAGE_COMPONENT.invoke(e);
+                if (r instanceof net.kyori.adventure.text.Component c) return c;
+            }
+            if (DEATH_MESSAGE_STRING != null) {
+                var r = DEATH_MESSAGE_STRING.invoke(e);
+                if (r != null) return TextUtil.parse(String.valueOf(r));
+            }
         } catch (Exception ignored) {}
         return null;
     }
