@@ -59,6 +59,12 @@
 | [HTTP](http.md) | 底层 HTTP 客户端 |
 | [HTTP Server](http-server.md) | HTTP 服务端（`yeow-utils` `createServer`） |
 
+## 多线程
+
+| 文档 | 说明 |
+|------|------|
+| ⭐ [Worker](worker.md) | 虚拟插件（独立线程）：`createWorker`、消息通信 |
+
 ## 文件与数据
 
 | 文档 | 说明 |

@@ -276,7 +276,21 @@ function startHotReload() {
         });
     }
 
-    info(`Watching src/ + assets/ for changes (WebSocket hot reload)`);
+    // Worker 源码目录（dev.worker[].entry 所在目录）变化 → 重建（worker 随主插件热重载重建）
+    const workerCfg = (cfg.dev && cfg.dev.worker) || [];
+    const watchedWorkerDirs = new Set();
+    for (const w of workerCfg) {
+        if (!w?.entry) continue;
+        const dir = resolve(ROOT, dirname(w.entry));
+        if (!existsSync(dir) || watchedWorkerDirs.has(dir)) continue;
+        watchedWorkerDirs.add(dir);
+        watch(dir, { recursive: true }, (event, file) => {
+            if (!file || !/\.(ts|js|mjs)$/.test(file)) return;
+            rebuildAndNotify();
+        });
+    }
+
+    info(`Watching src/ + assets/${watchedWorkerDirs.size > 0 ? ' + worker dirs' : ''} for changes (WebSocket hot reload)`);
 }
 
 // ── Source-Mapped Error Display ─────────────────────────────────
@@ -292,30 +306,58 @@ async function getSourceMapConsumer() {
     } catch { return null; }
 }
 
+/** Worker 的 source-map（产物位于 dist/.dev/.assets/<id>/worker/<name>.js(.map)）。 */
+let _workerConsumers = {};
+async function getWorkerSourceMapConsumer(workerName) {
+    if (_workerConsumers[workerName]) return _workerConsumers[workerName];
+    const assetsRoot = resolve(ROOT, 'dist', '.dev', '.assets');
+    if (!existsSync(assetsRoot)) return null;
+    try {
+        for (const id of readdirSync(assetsRoot)) {
+            const mapFile = resolve(assetsRoot, id, 'worker', workerName + '.js.map');
+            if (existsSync(mapFile)) {
+                const raw = JSON.parse(readFileSync(mapFile, 'utf-8'));
+                _workerConsumers[workerName] = await new SourceMapConsumer(raw);
+                return _workerConsumers[workerName];
+            }
+        }
+    } catch { /* 未找到 */ }
+    _workerConsumers[workerName] = null;
+    return null;
+}
+
 async function printFormattedError(err) {
     const c = { r: '\x1b[0m', R: '\x1b[31m', Y: '\x1b[33m', C: '\x1b[36m', B: '\x1b[1m', D: '\x1b[2m', g: '\x1b[32m' };
-    let out = `\n${c.R}${c.B}  JS Error [${err.plugin}]${c.r}\n`;
+    const isWorker = err.origin && err.origin !== 'main';
+    let out = isWorker
+        ? `\n${c.R}${c.B}  JS Error in Worker [${err.origin}]${c.r}\n`
+        : `\n${c.R}${c.B}  JS Error [${err.plugin}]${c.r}\n`;
     if (err.context) out += `  ${c.D}context: ${err.context}${c.r}\n`;
     out += `  ${c.Y}${err.message}${c.r}\n`;
 
-    const hasMainJs = err.stack?.match(/main\.js:\d+:\d+/) || err.fileName === 'main.js';
+    // 产物文件名：主插件 main.js；Worker <name>.js
+    const bundleName = isWorker ? err.origin + '.js' : 'main.js';
+    const bundleRe = new RegExp(bundleName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':(\\d+):(\\d+)');
+    const hasBundle = err.stack?.match(bundleRe) || err.fileName === bundleName;
     let consumer = null;
-    if (hasMainJs) {
-        consumer = await getSourceMapConsumer();
+    if (hasBundle) {
+        consumer = isWorker ? await getWorkerSourceMapConsumer(err.origin) : await getSourceMapConsumer();
     }
-    if (hasMainJs && !consumer) {
-    const mapFile = resolve(ROOT, 'dist', '.dev', 'main.js.map');
+    if (hasBundle && !consumer) {
+        const mapFile = isWorker
+            ? resolve(ROOT, 'dist', '.dev', '.assets', '**', 'worker', err.origin + '.js.map')
+            : resolve(ROOT, 'dist', '.dev', 'main.js.map');
         out += `  ${c.D}(source-map not found: ${existsSync(mapFile) ? 'exists but failed to parse' : 'missing at ' + mapFile})${c.r}\n`;
     }
 
     const frames = [];
     if (err.stack) {
         for (const rawLine of err.stack.split('\n')) {
-            const m = rawLine.match(/at\s+(?:\S+\s+)?\(?main\.js:(\d+):(\d+)\)?/);
-            if (m && consumer) {
-                const orig = consumer.originalPositionFor({ line: parseInt(m[1]), column: parseInt(m[2]) });
+            const m = rawLine.match(/at\s+(?:\S+\s+)?\(?([^\\/\s()]+\.js):(\d+):(\d+)\)?/);
+            if (m && consumer && (isWorker ? m[1] === bundleName : m[1] === 'main.js')) {
+                const orig = consumer.originalPositionFor({ line: parseInt(m[2]), column: parseInt(m[3]) });
                 if (!orig?.source) {
-                    const orig2 = consumer.originalPositionFor({ line: parseInt(m[1]), column: parseInt(m[2]) - 1 });
+                    const orig2 = consumer.originalPositionFor({ line: parseInt(m[2]), column: parseInt(m[3]) - 1 });
                     if (orig2?.source) { orig.source = orig2.source; orig.line = orig2.line; orig.column = orig2.column; }
                 }
                 frames.push({ orig, raw: rawLine });

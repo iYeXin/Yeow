@@ -58,6 +58,35 @@ async function main() {
     // ── 资产准备（id 分配 + 部署；与插件共享，保证路径一致）──
     const prepared = prepareAssets(root, pkgJson, outDir);
 
+    // ── Worker 打包（dev.worker 配置：先打包各 worker，再打包主插件）──
+    // 产物输出到主项目资产目录（assets/<rootId>/<dist 去 assets/ 前缀>），
+    // 主插件经 getAssetsPath(dist) 读取；dev 模式带 sourcemap（错误回显反解）。
+    const workers = (cfg.dev && cfg.dev.worker) || [];
+    for (const w of workers) {
+        if (!w?.name || !w?.entry || !w?.dist) {
+            console.warn('  ! dev.worker entry incomplete (name/entry/dist required): ' + JSON.stringify(w));
+            continue;
+        }
+        const distRel = String(w.dist).replace(/^assets\//, '');
+        const outfile = resolve(prepared.assetsOutDir, prepared.rootId, distRel);
+        mkdirSync(dirname(outfile), { recursive: true });
+        await esbuild.build({
+            entryPoints: [resolve(root, w.entry)],
+            outfile,
+            bundle: true,
+            format: 'iife',
+            target: 'esnext',
+            platform: 'neutral',
+            mainFields: ['module', 'main'],
+            conditions: ['import', 'browser'],
+            treeShaking: true,
+            minify: false,
+            sourcemap: isDev ? 'linked' : false,
+            plugins: [makeDedupePlugin(root), makeAssetPlugin({ root, pkgJson, outDir, prepared })],
+        });
+        console.log('  \u2713 Worker bundled: ' + w.name + ' (' + w.entry + ' \u2192 ' + w.dist + ')');
+    }
+
     // ── 原生服务可信性声明（native manifest：打包后路径 → SHA-256）──
     const nativeManifest = computeNativeManifest(prepared);
     if (nativeManifest.length > 0) {

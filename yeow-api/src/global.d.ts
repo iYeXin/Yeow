@@ -11,6 +11,7 @@ declare global {
   function _unregisterCallback(id: string): void;
   function _getCurrentCbStack(): { stack: string; outer: unknown } | null;
   function _attachCbStack(err: unknown): void;
+  function reportError(e: unknown): void;
 
   // ── init.js 注入的标准环境（lib 为 ESNext，不含 DOM——自行声明）──
   interface YeowConsole {

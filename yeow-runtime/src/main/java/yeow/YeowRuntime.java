@@ -620,7 +620,7 @@ public class YeowRuntime extends JavaPlugin {
                         if (!s.hasPermission("yeow.admin")) { s.sendMessage("No permission."); yield true; }
                         if (a.length < 2) { s.sendMessage("Usage: /yeow unload <plugin|all>"); yield true; }
                         if ("all".equals(a[1])) {
-                            for (var n : new java.util.ArrayList<>(plugins.keySet())) unloadPlugin(n);
+                            for (var n : realPluginNames()) unloadPlugin(n);
                             s.sendMessage("All plugins unloaded");
                         } else if (unloadPlugin(a[1])) {
                             s.sendMessage("Unloaded: " + a[1]);
@@ -680,7 +680,7 @@ public class YeowRuntime extends JavaPlugin {
                         if (!s.hasPermission("yeow.admin")) { s.sendMessage("No permission."); yield true; }
                         if (a.length < 2) { s.sendMessage("Usage: /yeow reload <plugin|all> [path]"); yield true; }
                         if ("all".equals(a[1])) {
-                            var names = new java.util.ArrayList<>(plugins.keySet());
+                            var names = realPluginNames();
                             for (var n : names) reloadPlugin(n, null);
                             s.sendMessage("Reloaded " + names.size() + " plugins");
                         } else {
@@ -741,10 +741,10 @@ public class YeowRuntime extends JavaPlugin {
                     out.add("approve"); out.add("profile"); out.add("track");
                 } else if (a.length == 2) {
                     switch (a[0]) {
-                        case "unload", "reload" -> { out.add("all"); out.addAll(plugins.keySet()); }
-                        case "uninstall" -> out.addAll(plugins.keySet());
+                        case "unload", "reload" -> { out.add("all"); out.addAll(realPluginNames()); }
+                        case "uninstall" -> out.addAll(realPluginNames());
                         case "load" -> out.addAll(pluginFileCandidates());
-                        case "track" -> out.addAll(plugins.keySet());
+                        case "track" -> out.addAll(realPluginNames());
                     }
                 } else if (a.length == 3 && "reload".equals(a[0])) {
                     out.addAll(pluginFileCandidates());
@@ -772,6 +772,15 @@ public class YeowRuntime extends JavaPlugin {
         cmd.setUsage("/yeow load|unload|reload|profile|track");
         cmd.setPermission("yeow.admin");
         map.register("yeow", cmd);
+    }
+
+    /** 非虚拟插件名列表（/yeow 管理命令不覆盖虚拟插件/Worker）。 */
+    private java.util.List<String> realPluginNames() {
+        var out = new java.util.ArrayList<String>();
+        for (var e : plugins.entrySet()) {
+            if (!e.getValue().isVirtual()) out.add(e.getKey());
+        }
+        return out;
     }
 
     public void sendDevMessage(String json) {

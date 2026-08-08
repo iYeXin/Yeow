@@ -123,7 +123,7 @@ public final class Profiler implements AutoCloseable {
             sender.sendMessage("Not enough data yet (" + windows.size() + "/5 windows) — wait a few seconds and try again.");
             return true;
         }
-        var snap = ProfileSnapshot.build(windows, cfg.eventSlowMs(), cfg.tabSlowMs());
+        var snap = ProfileSnapshot.build(windows, cfg.eventSlowMs(), cfg.tabSlowMs(), plugins);
         String summary = ProfileFormatter.compact(snap);
         LOG.info(summary);
         sender.sendMessage(summary);

@@ -23,6 +23,8 @@ public class PluginThread implements Runnable, PluginEntity {
     private String initCode;
     private volatile String userCode;
     private final Scheduler scheduler;
+    /** 依附于本插件的 Worker（虚拟插件）：key = worker 名；主插件卸载时连带卸载。 */
+    private final ConcurrentHashMap<String, WorkerThread> workers = new ConcurrentHashMap<>();
     private final Set<String> permissions;
     private final Map<String, String> nativeHashes; // 打包后路径(assets/<id>/...) → SHA-256（yeow.json native 声明）
     private volatile QuickJSContext ctx;
@@ -138,6 +140,13 @@ public class PluginThread implements Runnable, PluginEntity {
     }
 
     private void cleanupResources() {
+        // 先卸载依附的 Worker（虚拟插件：完整清理经 YeowRuntime.unloadPlugin）
+        var rt = YeowRuntime.inst();
+        for (var w : new ArrayList<>(workers.values())) {
+            if (rt != null) { try { rt.unloadPlugin(w.name()); } catch (Exception ignored) {} }
+            else w.stopAndWait();
+        }
+        workers.clear();
         timerFutures.forEach(f -> f.cancel(false));
         timerFutures.clear();
         if (timer != null) timer.shutdownNow();
@@ -228,7 +237,10 @@ public class PluginThread implements Runnable, PluginEntity {
             try {
                 var channel = String.valueOf(args[0]); var pld = String.valueOf(args.length > 1 ? args[1] : "{}");
                 var rt = yeow.YeowRuntime.inst();
-                if ("task".equals(channel)) {
+                if ("worker".equals(channel)) {
+                    // Worker 通道（内部控制，不受权限模型约束）：创建/卸载/投递/重载主插件的 Worker
+                    return handleWorker(pld);
+                } else if ("task".equals(channel)) {
                     // task 通道为共有接口（适配器同一入口：YeowRuntime.submitTask）
                     return rt != null ? rt.submitTask(PluginThread.this, pld) : gson.toJson(Map.of("err", "runtime unavailable"));
                 } else if ("timer".equals(channel)) {
@@ -338,6 +350,99 @@ public class PluginThread implements Runnable, PluginEntity {
         }
         return null;
     }
+
+    // ── Worker 通道（内部控制）与公共包装（WorkerThread 委托）─────────────
+
+    /**
+     * Worker 通道：主插件 JS 侧的 createWorker/load/unload/postMessage/reload。
+     * 请求：{ "t": "create|unload|post|reload|postToMain", "p": {...} }——p 含 cb（异步回调 ok/err）。
+     */
+    private String handleWorker(String pld) {
+        try {
+            var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
+            var t = obj.get("t").getAsString();
+            var p = obj.has("p") ? obj.getAsJsonObject("p") : new JsonObject();
+            var cb = p.has("cb") ? p.get("cb").getAsString() : null;
+            java.util.function.Consumer<String> respond = (result) -> {
+                if (cb != null) queue.sendJs(gson.toJson(Map.of("t","cb","p",cb,"r",result)));
+            };
+            return switch (t) {
+                case "create" -> {
+                    var wname = p.get("name").getAsString();
+                    if (wname.isEmpty() || "main".equals(wname) || workers.containsKey(wname)) {
+                        respond.accept("{\"err\":\"invalid or duplicate worker name: " + wname + "\"}");
+                        yield null;
+                    }
+                    var code = workerCode(p);
+                    if (code == null) { respond.accept("{\"err\":\"worker entry not found\"}"); yield null; }
+                    var w = new WorkerThread(wname, wname, PluginThread.this, initCode, code);
+                    if (p.has("msgCb") && !p.get("msgCb").isJsonNull()) w.setMainMessageCb(p.get("msgCb").getAsString());
+                    workers.put(wname, w);
+                    w.start();
+                    long deadline = System.currentTimeMillis() + 5000;
+                    while (System.currentTimeMillis() < deadline && (w.messageCbId() == null || !w.isRunning())) {
+                        try { Thread.sleep(10); } catch (InterruptedException e) { break; }
+                    }
+                    respond.accept("true");
+                    yield null;
+                }
+                case "unload" -> {
+                    var w = workers.remove(p.get("name").getAsString());
+                    if (w != null && YeowRuntime.inst() != null) YeowRuntime.inst().unloadPlugin(w.name());
+                    respond.accept("true");
+                    yield null;
+                }
+                case "post" -> {
+                    var w = workers.get(p.get("name").getAsString());
+                    if (w == null) { respond.accept("{\"err\":\"worker not found\"}"); yield null; }
+                    var msg = p.has("msg") ? p.get("msg") : JsonNull.INSTANCE;
+                    w.postMessage(gson.toJson(Map.of("t","cb","p",w.messageCbId(),"r", gson.fromJson(msg.toString(), Object.class))));
+                    respond.accept("true");
+                    yield null;
+                }
+                case "reload" -> {
+                    var w = workers.get(p.get("name").getAsString());
+                    if (w == null) { respond.accept("{\"err\":\"worker not found\"}"); yield null; }
+                    var code = workerCode(p);
+                    if (code == null) { respond.accept("{\"err\":\"worker entry not found\"}"); yield null; }
+                    w.reload(code);
+                    long deadline = System.currentTimeMillis() + 5000;
+                    while (System.currentTimeMillis() < deadline && (w.messageCbId() == null || !w.isRunning())) {
+                        try { Thread.sleep(10); } catch (InterruptedException e) { break; }
+                    }
+                    respond.accept("true");
+                    yield null;
+                }
+                default -> gson.toJson(Map.of("err", "Unknown worker op: " + t));
+            };
+        } catch (Exception e) {
+            return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
+    }
+
+    /** 从 code 或 entry（assets 资源路径）读取 worker 代码；失败返回 null。 */
+    private String workerCode(JsonObject p) {
+        if (p.has("code") && !p.get("code").isJsonNull() && !p.get("code").getAsString().isEmpty())
+            return p.get("code").getAsString();
+        if (p.has("entry") && !p.get("entry").isJsonNull()) {
+            var entry = p.get("entry").getAsString();
+            var raw = handleAssetsPublic(gson.toJson(Map.of("t","read","p",Map.of("path", entry))));
+            var j = gson.fromJson(raw, JsonObject.class);
+            if (j != null && j.has("data")) return j.get("data").getAsString();
+        }
+        return null;
+    }
+
+    /** 数据目录（fs plugin 级 base；Worker 共享）。 */
+    public String getDataDirPublic() { return "plugins/" + name; }
+    public Scheduler getSchedulerRef() { return scheduler; }
+    public String checkChannelPermissionPublic(String channel, String op) { return checkChannelPermission(channel, op); }
+    public String handleFsPublic(String pld) { return handleFs(pld); }
+    public String handleAssetsPublic(String pld) { return handleAssets(pld); }
+    public String handleHttpPublic(String pld) { return handleHttp(pld); }
+    public Object toJsonValuePublic(String json) { return toJsonValue(json); }
+    public void handleJSReportPublic(String pld, String origin) { handleJSReport(pld, origin); }
+    public void handleJSErrorPublic(QuickJSException e, String origin) { handleJSError(e, origin); }
 
     /** 禁止对 Yeow 运行时配置目录（含 approve.json / config.yml）的修改——fs 写操作（全部级别）一律拦截。 */
     private void assertNotRuntimeDir(Path path) throws SecurityException {
@@ -592,7 +697,9 @@ public class PluginThread implements Runnable, PluginEntity {
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
     }
 
-    private void handleJSReport(String pld) {
+    private void handleJSReport(String pld) { handleJSReport(pld, name); }
+
+    private void handleJSReport(String pld, String origin) {
         try {
             var json = gson.fromJson(pld, JsonObject.class);
             var msg = json.has("message") ? json.get("message").getAsString() : "unknown";
@@ -603,6 +710,7 @@ public class PluginThread implements Runnable, PluginEntity {
             if (devMode) {
                 var errPayload = new LinkedHashMap<String,Object>();
                 errPayload.put("type", "js-error"); errPayload.put("plugin", name); errPayload.put("message", msg);
+                errPayload.put("origin", origin); // main 或 worker 名（dev-server 按 origin 选 source-map）
                 if (json.has("context") && !json.get("context").isJsonNull()) errPayload.put("context", json.get("context").getAsString());
                 var stackToSend = (stack != null && !stack.isEmpty()) ? stack : msg + (fileName != null && line > 0 ? "\n    at " + fileName + ":" + line + ":" + col : "");
                 errPayload.put("stack", stackToSend);
@@ -612,7 +720,7 @@ public class PluginThread implements Runnable, PluginEntity {
             }
             var log = org.bukkit.Bukkit.getLogger();
             var loc = fileName != null && line > 0 ? " at " + fileName + ":" + line + ":" + col : "";
-            var sb = "[" + name + "] JS Error: " + msg + loc;
+            var sb = "[" + name + (origin != null && !origin.equals(name) ? ":" + origin : "") + "] JS Error: " + msg + loc;
             if (stack != null && !stack.isEmpty()) {
                 var limit = stack.lines().limit(3).collect(java.util.stream.Collectors.joining("\n[" + name + "]   "));
                 sb += "\n[" + name + "]   " + limit;
@@ -641,7 +749,9 @@ public class PluginThread implements Runnable, PluginEntity {
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
     }
 
-    private void handleJSError(QuickJSException e) {
+    private void handleJSError(QuickJSException e) { handleJSError(e, name); }
+
+    private void handleJSError(QuickJSException e, String origin) {
         try {
             var msgText = e.getMessage();
             String msg, stack, fileName;
@@ -675,6 +785,7 @@ public class PluginThread implements Runnable, PluginEntity {
             if (devMode) {
                 var errPayload = new LinkedHashMap<String,Object>();
                 errPayload.put("type", "js-error"); errPayload.put("plugin", name); errPayload.put("message", msg != null ? msg : "");
+                errPayload.put("origin", origin);
                 var stackToSend = (stack != null && !stack.isEmpty()) ? stack : (msg != null ? msg : "") + (fileName != null && line > 0 ? "\n    at " + fileName + ":" + line + ":" + col : "");
                 errPayload.put("stack", stackToSend);
                 errPayload.put("fileName", fileName != null ? fileName : "main.js");
@@ -684,7 +795,7 @@ public class PluginThread implements Runnable, PluginEntity {
             }
             var log = org.bukkit.Bukkit.getLogger();
             var loc = fileName != null && line > 0 ? " at " + fileName + ":" + line + ":" + col : "";
-            var sb = "[" + name + "] JS Error: " + (msg != null ? msg : "unknown") + loc;
+            var sb = "[" + name + (origin != null && !origin.equals(name) ? ":" + origin : "") + "] JS Error: " + (msg != null ? msg : "unknown") + loc;
             if (stack != null && !stack.isEmpty()) {
                 var limit = stack.lines().limit(3).collect(java.util.stream.Collectors.joining("\n[" + name + "]   "));
                 sb += "\n[" + name + "]   " + limit;

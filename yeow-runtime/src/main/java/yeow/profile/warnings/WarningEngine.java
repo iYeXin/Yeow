@@ -75,7 +75,11 @@ public final class WarningEngine {
         sb.append("  [Yeow] ").append(color).append(w.code()).append(RESET)
             .append(" · ").append(w.title());
         if (w.plugin() != null && !w.plugin().isEmpty()) {
-            sb.append("  — ").append(w.plugin());
+            var rt = yeow.YeowRuntime.inst();
+            var entity = rt != null ? rt.getPlugin(w.plugin()) : null;
+            String tag = entity != null && entity.isVirtual() && entity.source() != null
+                ? " (worker of " + entity.source() + ")" : "";
+            sb.append("  — ").append(w.plugin()).append(tag);
         }
         sb.append("\n");
         for (String l : w.lines()) {

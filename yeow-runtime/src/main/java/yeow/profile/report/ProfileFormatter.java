@@ -30,8 +30,9 @@ public final class ProfileFormatter {
         if (s.jsThreads != null && !s.jsThreads.isEmpty()) {
             for (var js : s.jsThreads) {
                 String status = js.hung() ? "[!] hung" : js.slow() ? "[!] slow" : "[ok]";
-                sb.append(String.format("  JS Thread  %-18s  avg %-7s p95 %-7s max %-7s %s\n",
-                    js.plugin(), ms(js.avgMs()), ms(js.p95Ms()), ms(js.maxMs()), status));
+                String tag = js.virtual() && js.createdBy() != null ? " (worker of " + js.createdBy() + ")" : "";
+                sb.append(String.format("  JS Thread  %-18s  avg %-7s p95 %-7s max %-7s %s%s\n",
+                    js.plugin(), ms(js.avgMs()), ms(js.p95Ms()), ms(js.maxMs()), status, tag));
             }
             sb.append("\n");
         }

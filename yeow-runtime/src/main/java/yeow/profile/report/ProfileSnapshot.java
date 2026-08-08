@@ -58,7 +58,8 @@ public final class ProfileSnapshot {
         String plugin,
         long baselineUs,
         double avgMs, double p50Ms, double p95Ms, double maxMs,
-        int samples, boolean slow, boolean hung
+        int samples, boolean slow, boolean hung,
+        boolean virtual, String createdBy
     ) {}
 
     public record LatencyStats(
@@ -73,7 +74,8 @@ public final class ProfileSnapshot {
         public String level() { return score >= 80 ? "ok" : score >= 50 ? "warn" : "bad"; }
     }
 
-    public static ProfileSnapshot build(List<WindowMetrics> windows, int lowMsThreshold, int cmdMsThreshold) {
+    public static ProfileSnapshot build(List<WindowMetrics> windows, int lowMsThreshold, int cmdMsThreshold,
+                                        Map<String, yeow.PluginEntity> entities) {
         var s = new ProfileSnapshot();
         if (windows.isEmpty()) return s;
         s.windowCount = windows.size();
@@ -101,7 +103,7 @@ public final class ProfileSnapshot {
         s.hn = tier(hnHist, hnSum, hnMax);
         s.low = tier(lowHist, lowSum, lowMax);
         s.plugins = buildPlugins(windows, s.hn);
-        s.jsThreads = buildJsThreads(windows);
+        s.jsThreads = buildJsThreads(windows, entities);
         s.events = buildLatencies(windows, true, lowMsThreshold);
         s.commands = buildLatencies(windows, false, cmdMsThreshold);
         s.health = computeHealth(s);
@@ -186,7 +188,7 @@ public final class ProfileSnapshot {
         return out.subList(0, Math.min(10, out.size()));
     }
 
-    private static List<JsThreadStats> buildJsThreads(List<WindowMetrics> windows) {
+    private static List<JsThreadStats> buildJsThreads(List<WindowMetrics> windows, Map<String, yeow.PluginEntity> entities) {
         // plugin → 跨窗口 ping 值列表（按窗口对齐，缺失窗口视为无响应）
         Map<String, List<Long>> series = new LinkedHashMap<>();
         for (var w : windows) {
@@ -207,7 +209,10 @@ public final class ProfileSnapshot {
             double max = sorted[sorted.length - 1] / 1_000_000.0;
             boolean slow = max > 200;
             boolean hung = windows.size() >= 30 && vals.size() < windows.size() / 2;
-            out.add(new JsThreadStats(e.getKey(), -1, avg, p50, p95, max, sorted.length, slow, hung));
+            var entity = entities != null ? entities.get(e.getKey()) : null;
+            boolean virtual = entity != null && entity.isVirtual();
+            String createdBy = virtual && entity != null ? entity.source() : null;
+            out.add(new JsThreadStats(e.getKey(), -1, avg, p50, p95, max, sorted.length, slow, hung, virtual, createdBy));
         }
         out.sort((a, b) -> Double.compare(b.avgMs, a.avgMs));
         return out;
