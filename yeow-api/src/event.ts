@@ -1,6 +1,7 @@
 import { call } from './task.js';
 import { Player } from './player.js';
 import { Location } from './location.js';
+import type { Message } from './message.js';
 
 // ── Event Data Interfaces ──────────────────────────────────────────
 
@@ -40,12 +41,8 @@ export interface PlayerCommandEvent {
 }
 export interface PlayerDeathEvent {
   player: Player;
-  /** 死亡消息纯文本（legacy 格式）。 */
-  deathMessage: string;
-  /** 死亡消息的可翻译组件（如有）：翻译键（如 `death.attack.player`）。 */
-  deathKey?: string;
-  /** 死亡消息的可翻译组件参数（纯文本）。 */
-  deathArgs?: string[];
+  /** 死亡消息（Message 对象）：`{key, args}` 可翻译组件（客户端本地化）或 `{text}` 纯文本。 */
+  deathMessage: Message;
   deathType: string;
   cancelled?: boolean;
 }

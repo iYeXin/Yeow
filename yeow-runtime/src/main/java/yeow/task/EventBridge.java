@@ -310,14 +310,14 @@ public class EventBridge implements Listener {
                 if(e.getClickedBlock()!=null){var b=e.getClickedBlock();m.put("block",Map.of("x",b.getX(),"y",b.getY(),"z",b.getZ(),"type",b.getType().getKey().toString()));} break; }
             case "playerCommand":{ var e=(PlayerCommandPreprocessEvent)ev; putP(m,e.getPlayer()); m.put("message",e.getMessage()); break; }
             case "playerDeath":{ var e=(PlayerDeathEvent)ev; putP(m,e.getPlayer());
-                // 死亡消息：text 为纯文本（legacy），key/args 为可翻译组件（如有）
+                // 死亡消息直接传 Message 对象：{key,args} 可翻译组件 或 {text} 纯文本
                 var dm = e.getDeathMessage();
-                m.put("deathMessage", dm != null ? TextUtil.toLegacy(dm) : null);
                 if (dm instanceof net.kyori.adventure.text.TranslatableComponent tc) {
-                    m.put("deathKey", tc.key());
                     var args = new java.util.ArrayList<String>();
                     for (var a : tc.args()) args.add(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(a));
-                    m.put("deathArgs", args);
+                    m.put("deathMessage", Map.of("key", tc.key(), "args", args));
+                } else {
+                    m.put("deathMessage", dm != null ? Map.of("text", TextUtil.toLegacy(dm)) : null);
                 }
                 m.put("deathType",e.getDamageSource()!=null?e.getDamageSource().getDamageType().getKey().getKey():"UNKNOWN"); break; }
             case "playerRespawn":{ var e=(PlayerRespawnEvent)ev; putP(m,e.getPlayer()); m.put("respawnLocation",pos(e.getRespawnLocation())); break; }

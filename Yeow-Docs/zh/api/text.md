@@ -67,15 +67,11 @@ const motd = userText.replace(/\\n/g, '\n');   // 字面 \n → 真实换行
 - `key` 与 `text` 同时存在时 **`key` 优先**
 - 纯字符串等价于 `{ text: "<string>" }`
 - 发送消息 API（`player.sendMessage`、`player.sendActionBar`、`broadcast`）均接受
-- 事件侧：`playerDeath` 的 `deathMessage` 为纯文本，同时提供 `deathKey`/`deathArgs`（死亡消息为可翻译组件时）
+- 事件侧：`playerDeath` 的 `deathMessage` 直接就是 Message 对象（`{key, args}` 或 `{text}`）
 
 ```js
-// 死亡消息本地化转发
+// 死亡消息本地化转发——Message 对象直接透传
 eventOn('playerDeath', (e) => {
-    if (e.deathKey) {
-        broadcast({ key: e.deathKey, args: e.deathArgs });
-    } else {
-        broadcast(e.deathMessage);
-    }
+    broadcast(e.deathMessage);   // 客户端按语言本地化（可翻译组件）或直接显示（纯文本）
 });
 ```

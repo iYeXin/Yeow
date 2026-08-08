@@ -78,7 +78,7 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 | `playerMove` | player, from, to | ✔ |
 | `playerInteract` | player, action, material, block | ✔ |
 | `playerCommand` | player, message | ✔ |
-| `playerDeath` | player, deathMessage, deathKey?, deathArgs?, deathType | |
+| `playerDeath` | player, deathMessage(Message), deathType | |
 | `playerRespawn` | player, respawnLocation | |
 | `playerTeleport` | player, from, to, cause | ✔ |
 | `playerItemConsume` | player, itemType | |
