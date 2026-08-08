@@ -152,6 +152,22 @@ public class EventBridge implements Listener {
         return et + "#" + dispatchSeq.incrementAndGet();
     }
 
+    /**
+     * Component → Message 对象（协议层可翻译组件载荷）：
+     * 可翻译组件 → `{ "key", "args", "text" }`（key 本地化 + text 纯文本兜底，同时传递）；
+     * 否则 → `{ "text" }`。null → null。
+     */
+    static Object componentToMessage(net.kyori.adventure.text.Component c) {
+        if (c == null) return null;
+        var text = TextUtil.toLegacy(c);
+        if (c instanceof net.kyori.adventure.text.TranslatableComponent tc) {
+            var args = new java.util.ArrayList<String>();
+            for (var a : tc.args()) args.add(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(a));
+            return Map.of("key", tc.key(), "args", args, "text", text);
+        }
+        return Map.of("text", text);
+    }
+
     /** 事件数据副本 + eventId（经 r 传给 JS，event.complete 原样回传匹配 pend）。 */
     private Map<String, Object> withEventId(Map<String, Object> data, String eventId) {
         var d = new java.util.HashMap<String, Object>(data);
@@ -311,15 +327,7 @@ public class EventBridge implements Listener {
             case "playerCommand":{ var e=(PlayerCommandPreprocessEvent)ev; putP(m,e.getPlayer()); m.put("message",e.getMessage()); break; }
             case "playerDeath":{ var e=(PlayerDeathEvent)ev; putP(m,e.getPlayer());
                 // 死亡消息：Message 对象——key/args 可翻译组件（如有）+ text 纯文本兜底，两者同时传递
-                var dm = e.getDeathMessage();
-                var text = dm != null ? TextUtil.toLegacy(dm) : "";
-                if (dm instanceof net.kyori.adventure.text.TranslatableComponent tc) {
-                    var args = new java.util.ArrayList<String>();
-                    for (var a : tc.args()) args.add(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(a));
-                    m.put("deathMessage", Map.of("key", tc.key(), "args", args, "text", text));
-                } else {
-                    m.put("deathMessage", text.isEmpty() ? null : Map.of("text", text));
-                }
+                m.put("deathMessage", componentToMessage(e.getDeathMessage()));
                 m.put("deathType",e.getDamageSource()!=null?e.getDamageSource().getDamageType().getKey().getKey():"UNKNOWN"); break; }
             case "playerRespawn":{ var e=(PlayerRespawnEvent)ev; putP(m,e.getPlayer()); m.put("respawnLocation",pos(e.getRespawnLocation())); break; }
             case "playerDropItem":{ var e=(PlayerDropItemEvent)ev; putP(m,e.getPlayer());
@@ -332,11 +340,12 @@ public class EventBridge implements Listener {
             case "playerLevelChange":{ var e=(PlayerLevelChangeEvent)ev; putP(m,e.getPlayer()); m.put("oldLevel",e.getOldLevel()); m.put("newLevel",e.getNewLevel()); break; }
             case "playerGameModeChange":{ var e=(PlayerGameModeChangeEvent)ev; putP(m,e.getPlayer()); m.put("newGameMode",e.getNewGameMode().name()); break; }
             case "playerAdvancementDone":{ var e=(PlayerAdvancementDoneEvent)ev; putP(m,e.getPlayer()); m.put("advancement",e.getAdvancement().getKey().toString());
-                // 进度标题/描述：Message 对象（Bukkit 仅提供 legacy 文本，传 {text}）
+                // 进度标题/描述：Paper 的 AdvancementDisplay 提供 Component（title()/description()）——
+                // 可翻译组件（{key,args,text}）或纯文本（{text}）
                 var disp = e.getAdvancement().getDisplay();
                 if (disp != null) {
-                    m.put("title", Map.of("text", (Object) disp.getTitle()));
-                    m.put("description", Map.of("text", (Object) disp.getDescription()));
+                    m.put("title", componentToMessage(disp.title()));
+                    m.put("description", componentToMessage(disp.description()));
                 }
                 break; }
             case "playerToggleSneak":{ var e=(PlayerToggleSneakEvent)ev; putP(m,e.getPlayer()); m.put("sneaking",e.isSneaking()); break; }

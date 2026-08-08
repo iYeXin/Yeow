@@ -137,7 +137,7 @@
 |------|------|------|
 | `player` | string (UUID) | 玩家 |
 | `advancement` | string | 进度命名空间 key（如 `minecraft:story/root`） |
-| `title` | [Message 对象](../task/player.md#message-对象可翻译组件) (可选) | 进度标题（`{ "text": "<纯文本>" }`；隐藏进度时缺失） |
+| `title` | [Message 对象](../task/player.md#message-对象可翻译组件) (可选) | 进度标题：可翻译组件（`{key, args, text}`，原版进度标题为可翻译组件）或纯文本（`{text}`）；隐藏进度时缺失 |
 | `description` | [Message 对象](../task/player.md#message-对象可翻译组件) (可选) | 进度描述（同上） |
 
 ## `playerToggleSneak`

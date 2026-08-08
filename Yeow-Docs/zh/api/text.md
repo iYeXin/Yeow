@@ -67,7 +67,7 @@ const motd = userText.replace(/\\n/g, '\n');   // 字面 \n → 真实换行
 - `key` 与 `text` **同时存在**：`key` 用于客户端本地化，`text` 为纯文本兜底（如跨实现转发时）
 - 纯字符串等价于 `{ text: "<string>" }`
 - 发送消息 API（`player.sendMessage`、`player.sendActionBar`、`broadcast`）均接受
-- 事件侧：`playerDeath` 的 `deathMessage` 为 Message 对象（`{key, args, text}` 或 `{text}`）；`playerAdvancementDone` 的 `title`/`description` 为 Message 对象（`{text}`）
+- 事件侧：`playerDeath` 的 `deathMessage` 为 Message 对象（`{key, args, text}` 或 `{text}`）；`playerAdvancementDone` 的 `title`/`description` 为 Message 对象（原版进度标题/描述为可翻译组件）
 
 ```js
 // 死亡消息本地化转发——Message 对象直接透传（key 本地化 + text 兜底）
@@ -75,8 +75,8 @@ eventOn('playerDeath', (e) => {
     broadcast(e.deathMessage);
 });
 
-// 进度达成提示
+// 进度达成提示（title/description 可能为可翻译组件）
 eventOn('playerAdvancementDone', (e) => {
-    if (e.title) player.sendTitle(e.title.text, e.description?.text);
+    broadcast(e.title ?? e.description);
 });
 ```
