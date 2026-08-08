@@ -36,6 +36,14 @@ server.close()                  // 关闭服务器
 
 **执行顺序**：`use` / 路由 / `mount` 按**注册顺序**组成中间件链（洋葱模型）——每个层可返回响应（短路）或调用 `next()` 进入下一层；路由 handler 不返回时同样继续后续层；全部层未产生响应 → 404。
 
+**返回值规范化**（中间件与路由一致）：
+
+| 返回 | 处理 |
+|------|------|
+| 字符串 | 文本响应（`{ body }`） |
+| `{ status, body, bodyBase64, headers }`（含任一字段） | 响应选项，原样使用 |
+| **其他普通对象**（如 `{ ok: true }`） | **自动 JSON 序列化**（`body` + `content-type: application/json`） |
+
 ### 中间件（洋葱模型）
 
 ```js
@@ -59,7 +67,7 @@ app.use((req, next) => {
     return next();
 });
 
-app.get('/api/data', (req) => ({ body: JSON.stringify({ ok: true }) }));
+app.get('/api/data', (req) => ({ ok: true }));   // 自动 JSON 序列化 → {"ok":true} + application/json
 ```
 
 - `next()` 调用链中下一层，返回其响应（无下一层时 `undefined`）

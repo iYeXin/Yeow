@@ -112,6 +112,22 @@ function compile(path: string): { regex: RegExp; paramNames: string[] } {
   return { regex: new RegExp(regexStr, 'i'), paramNames };
 }
 
+/**
+ * 把中间件/路由的返回值规范化为响应选项：
+ * - 字符串 → 文本响应 `{ body }`
+ * - 含 `status`/`body`/`bodyBase64`/`headers` 之一的对象 → 视为响应选项，原样使用
+ * - 其他普通对象 → **自动 JSON 序列化**（`body` + `content-type: application/json`）
+ */
+function normalizeResult(result: string | ResponseBody): ResponseBody {
+  if (typeof result === 'string') return { body: result };
+  const o = result as Record<string, unknown>;
+  if (o !== null && typeof o === 'object' &&
+      ('status' in o || 'body' in o || 'bodyBase64' in o || 'headers' in o)) {
+    return result;
+  }
+  return { body: JSON.stringify(result), headers: { 'content-type': 'application/json' } };
+}
+
 export function createServer(port?: number): Server {
   /** 中间件链：use / 路由 / mount 按注册顺序压入。 */
   const middleware: Middleware[] = [];
@@ -126,8 +142,7 @@ export function createServer(port?: number): Server {
     try {
       const result = await next();
       if (result !== undefined) {
-        const opts = typeof result === 'string' ? { body: result } : result;
-        respond(req.serverId, req.connId, opts);
+        respond(req.serverId, req.connId, normalizeResult(result));
         return;
       }
     } catch (e) {
