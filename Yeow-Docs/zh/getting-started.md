@@ -315,3 +315,8 @@ profile:
 
 - 运行时警告（心跳超时、事件超时等）→ [运行时警告指南](runtime-warning.md)
 - 详细架构与线程模型 → [进阶知识](advanced.md)
+
+## 文档压缩包与站点地图
+
+- **站点地图**：全部文档页面的结构（标题 + 摘要 + URL），便于 AI 代理 / Vibe Coding 快速定位资料：[站点地图](/sitemap)
+- **文档压缩包**：全部 Markdown 源码（含站点地图）打包下载，供离线查阅 / 喂给 AI：[docs.zip](/docs.zip)（构建时生成，zip 格式）

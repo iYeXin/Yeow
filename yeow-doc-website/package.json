@@ -7,11 +7,13 @@
     "scripts": {
         "setup:docs": "node scripts/setup-docs.mjs",
         "postinstall": "node scripts/setup-docs.mjs",
+        "docs:zip": "node scripts/build-docs-zip.mjs",
         "dev": "vitepress dev .",
-        "build": "vitepress build .",
+        "build": "node scripts/build-docs-zip.mjs && vitepress build .",
         "preview": "vitepress preview ."
     },
     "devDependencies": {
+        "adm-zip": "^0.6.0",
         "vitepress": "^1.6.3"
     }
 }
