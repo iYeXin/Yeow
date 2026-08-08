@@ -107,7 +107,7 @@
 |------|------|------|
 | `block.breakNaturally` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int>, "item": <ItemStack> }` | `boolean` |
 
-`block.breakNaturally` 模拟玩家破坏方块并掉落物品。`item` 为可选工具（影响掉落概率和类型，如附魔工具）。
+`block.breakNaturally` 模拟玩家破坏方块并掉落物品。`item` 为可选工具（**数据快照**，模拟工具属性，不消耗真实物品耐久），影响掉落概率和类型，如附魔工具。
 
 ### 材料级判断（Material）
 

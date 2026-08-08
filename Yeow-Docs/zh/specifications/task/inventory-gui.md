@@ -81,6 +81,8 @@ GUI 由插件通过 `gui.create` 创建。插件负责其生命周期，通过 `
 
 ### ItemStack 完整格式
 
+`ItemStack` 为**纯数据**载荷（值语义快照，不绑定真实物品）——字段与语义见 [ItemStack API](../../api/item.md)：
+
 ```json
 {
   "type": "minecraft:diamond_sword",

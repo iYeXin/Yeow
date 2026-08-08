@@ -41,6 +41,8 @@ await destroyGUI(gui);
 
 ## ItemStack
 
+`ItemStack` 为**纯数据**描述符（值语义，不绑定真实物品）——完整字段与语义见 [ItemStack](item.md)：
+
 ```ts
 interface ItemStack {
   type: string;

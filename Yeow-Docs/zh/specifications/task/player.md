@@ -128,7 +128,7 @@
 | `player.getItemInMainHand` | `{ "uuid": "<uuid>" }` | `ItemStack` \| `null` | 读取主手物品，空手返回 `null` |
 | `player.getItemInOffHand` | `{ "uuid": "<uuid>" }` | `ItemStack` \| `null` | 读取副手物品，空手返回 `null` |
 
-`ItemStack` 返回格式：
+`ItemStack` 返回格式（**纯数据**，值为读取时刻的快照）：
 
 ```json
 {

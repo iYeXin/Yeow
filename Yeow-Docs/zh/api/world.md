@@ -65,7 +65,7 @@ block.breakNaturallySync(tool?): boolean
 
 `Block` 统一表示方块：`type`/`state`/`location` 均为**获取时刻的快照**（需要最新状态请重新 `world.getBlock`）；`getBlock` 返回的 Block 带 `location`（yaw/pitch 恒为 0），`Block.of()` 构造的没有。`isSolid` 等为材料级静态判断，不查询世界。详见 [Block API](block.md)。
 
-`tool` 为可选的 `ItemStack`，用于模拟特定工具的挖掘效果（如 `{ type: 'minecraft:diamond_pickaxe', meta: { enchantments: { fortune: 3 } } }`）。
+`tool` 为可选的 `ItemStack`（**数据快照**，模拟工具属性，不消耗真实物品耐久），用于模拟特定工具的挖掘效果（如 `{ type: 'minecraft:diamond_pickaxe', meta: { enchantments: { fortune: 3 } } }`）。详见 [ItemStack](item.md)。
 
 ### 生物群系与光照
 

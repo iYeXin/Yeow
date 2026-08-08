@@ -110,7 +110,7 @@ player.getItemInOffHand()           // Promise<ItemStack | null>
 player.getItemInOffHandSync()       // ItemStack | null
 ```
 
-返回完整 `ItemStack`（含 meta），手心为空时返回 `null`。
+返回完整 `ItemStack`（含 meta），手心为空时返回 `null`。`ItemStack` 为纯数据（快照），详见 [ItemStack](item.md)。
 
 ### ActionBar 与资源包
 
