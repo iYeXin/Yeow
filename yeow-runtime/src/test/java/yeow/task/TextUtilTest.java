@@ -4,10 +4,10 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** TextUtil 转义规则测试：真实换行 / MiniMessage <newline> / 字面反斜杠序列。 */
+/** TextUtil 测试：文本按 MiniMessage 规范解析（转义生效），真实控制字符不消失。 */
 class TextUtilTest {
 
-    /** 真实换行（MiniMessage 文本节点）→ legacy 往返后必须保留为真实换行。 */
+    /** 真实换行 → 换行（不消失）。 */
     @Test void realNewlineSurvives() {
         var out = TextUtil.toLegacy(TextUtil.parse("<gold>a</gold>\n<b>c</b>"));
         assertTrue(out.contains("\n"), "real newline preserved: " + out.replace("\n", "<NL>"));
@@ -20,23 +20,37 @@ class TextUtilTest {
         assertTrue(out.contains("\n"), "newline tag -> real newline: " + out.replace("\n", "<NL>"));
     }
 
-    /** 用户字面输入 \n（反斜杠+n 两字符）必须保留为字面，不能变换行。 */
-    @Test void literalBackslashNPreserved() {
+    /** 字面 `\n`（两字符）按 MiniMessage 规范是**字面文本**（MiniMessage 只转义标签字符
+     *  `\\` / `\<` 等，`\n` 不转义）——不会被隐式变换行。 */
+    @Test void literalBackslashNStaysLiteral() {
         var out = TextUtil.toLegacy(TextUtil.parse("a\\nb"));
         assertEquals("a\\nb", out, "literal \\n stays literal");
-        assertFalse(out.contains("\n"), "literal input must not become newline");
+        assertFalse(out.contains("\n"), "must not become newline");
     }
 
-    /** 字面反斜杠（无转义字母）保留。 */
-    @Test void literalBackslashPreserved() {
-        var out = TextUtil.toLegacy(TextUtil.parse("a\\b"));
-        assertEquals("a\\b", out);
+    /** `\<` 按 MiniMessage 规范：字面 `<`（反斜杠被消耗）。 */
+    @Test void escapedAngleLiteral() {
+        var out = TextUtil.toLegacy(TextUtil.parse("a\\<b"));
+        assertEquals("a<b", out);
     }
 
-    /** Windows 路径等含 \n 字面序列的文本不被破坏。 */
-    @Test void windowsPathPreserved() {
-        var out = TextUtil.toLegacy(TextUtil.parse("C:\\new\\data"));
-        assertEquals("C:\\new\\data", out);
+    /** `\<red>` 不解析为颜色标签（字面 `<red>`）。 */
+    @Test void escapedAngleTagLiteral() {
+        var out = TextUtil.toLegacy(TextUtil.parse("a\\<red>b"));
+        assertEquals("a<red>b", out, "\\<red> stays literal");
+    }
+
+    /** `\\` 按 MiniMessage 规范：字面反斜杠（且不被误还原）。 */
+    @Test void doubleBackslashLiteral() {
+        var out = TextUtil.toLegacy(TextUtil.parse("a\\\\b"));
+        assertEquals("a\\b", out, "\\\\ -> literal backslash");
+    }
+
+    /** `\\n`（双反斜杠 + n）按 MiniMessage 规范：字面 `\` + `n`——不被误还原为换行。 */
+    @Test void doubleBackslashNStaysLiteral() {
+        var out = TextUtil.toLegacy(TextUtil.parse("a\\\\nb"));
+        assertEquals("a\\nb", out, "\\\\n stays literal");
+        assertFalse(out.contains("\n"), "must not become newline");
     }
 
     /** 含 § 的 legacy 输入（真实换行）往返保留。 */
@@ -45,40 +59,16 @@ class TextUtilTest {
         assertTrue(out.contains("\n"), "legacy section input newline preserved: " + out.replace("\n", "<NL>"));
     }
 
-    /** legacy 输入中的字面 \n 同样保留为字面（legacy 转义与 MiniMessage 转义均被保护）。 */
+    /** legacy 输入中的字面 `\n`（两字符）同样保持字面（legacy deserialize 不还原转义）。 */
     @Test void legacySectionLiteralBackslashN() {
         var out = TextUtil.toLegacy(TextUtil.parse("§6a\\nb"));
-        assertTrue(out.contains("\\n"), "legacy literal \\n stays literal: " + out.replace("\n", "<NL>"));
-        assertFalse(out.contains("\n"), "no newline");
+        assertEquals("§6a\\nb", out, "legacy literal \\n stays literal");
+        assertFalse(out.contains("\n"), "must not become newline");
     }
 
     /** 真实 tab 往返。 */
     @Test void tabRoundTrip() {
         var out = TextUtil.toLegacy(TextUtil.parse("a\tb"));
         assertEquals("a\tb", out, "real tab round-trips");
-    }
-
-    /** 用户文本中的单个 PUA 字符（标记组合的一部分）不受影响——标记是双字符组合。 */
-    @Test void singlePuaCharUntouched() {
-        var out = TextUtil.toLegacy(TextUtil.parse("a\uE000b"));
-        assertEquals("a\uE000b", out);
-    }
-
-    /** 输出中不残留标记。 */
-    @Test void noMarkLeak() {
-        var out = TextUtil.toLegacy(TextUtil.parse("a\\nb"));
-        assertFalse(out.contains("\uE000"), "no mark leak: " + out);
-    }
-
-    /** `\<` 原样放行给 MiniMessage：其语义是"字面 <"（反斜杠被消耗）。 */
-    @Test void escapedAngleGoesToMiniMessage() {
-        var out = TextUtil.toLegacy(TextUtil.parse("a\\<b"));
-        assertEquals("a<b", out, "\\< -> literal <");
-    }
-
-    /** `\<red>` 不解析为颜色标签（字面 `<red>`）。 */
-    @Test void escapedAngleTagLiteral() {
-        var out = TextUtil.toLegacy(TextUtil.parse("a\\<red>b"));
-        assertEquals("a<red>b", out, "\\<red> stays literal");
     }
 }
