@@ -1,6 +1,6 @@
 {
     "name": "create-yeow",
-    "version": "0.2.117",
+    "version": "0.2.118",
     "description": "Scaffold a Yeow plugin project",
     "type": "module",
     "bin": {

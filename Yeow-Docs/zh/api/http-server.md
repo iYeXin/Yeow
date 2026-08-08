@@ -25,12 +25,67 @@ createServer(port?: number): Server
 
 ```ts
 server.port: number             // 实际端口号
+server.use(mw)                  // 注册通用中间件（洋葱模型）
 server.get(path, handler)       // 注册 GET 路由
 server.post(path, handler)      // 注册 POST 路由
 server.put(path, handler)       // 注册 PUT 路由
 server.del(path, handler)       // 注册 DELETE 路由
+server.mount(dir, prefix?)      // 挂载静态文件目录（插件数据目录）
 server.close()                  // 关闭服务器
 ```
+
+**执行顺序**：`use` / 路由 / `mount` 按**注册顺序**组成中间件链（洋葱模型）——每个层可返回响应（短路）或调用 `next()` 进入下一层；路由 handler 不返回时同样继续后续层；全部层未产生响应 → 404。
+
+### 中间件（洋葱模型）
+
+```js
+import { createServer } from 'yeow-utils';
+
+const app = createServer(8080);
+
+// 日志中间件：先记录请求，next() 进入下一层，返回后记录耗时
+app.use(async (req, next) => {
+    const t = Date.now();
+    const result = await next();
+    console.log(`${req.method} ${req.path} — ${Date.now() - t}ms`);
+    return result;              // 透传下层响应
+});
+
+// 鉴权中间件：不满足条件直接返回响应（短路，不再进入后续层）
+app.use((req, next) => {
+    if (!req.headers['x-token']) {
+        return { status: 401, body: 'Unauthorized' };
+    }
+    return next();
+});
+
+app.get('/api/data', (req) => ({ body: JSON.stringify({ ok: true }) }));
+```
+
+- `next()` 调用链中下一层，返回其响应（无下一层时 `undefined`）
+- 中间件返回响应对象/字符串 → 短路返回；返回 `undefined`（或不返回）→ 等效 `next()`
+- 类型：`Middleware = (req, next) => string | ResponseBody | undefined | Promise<...>`（`NextFn`）
+
+### 静态文件挂载（mount）
+
+`mount(dir, prefix?)` 把**插件数据目录**（`plugins/<插件名>/`）下的目录挂载为静态文件服务（base64 二进制传输 + Content-Type 按扩展名推断）：
+
+```js
+import { createServer } from 'yeow-utils';
+
+const app = createServer(8080);
+
+app.mount('web/');                  // /index.html → plugins/<插件名>/web/index.html
+app.mount('assets/web/', '/static'); // /static/xxx → plugins/<插件名>/assets/web/xxx
+
+app.get('/api/data', () => ({ body: 'ok' }));
+```
+
+- `dir`：插件数据目录下的目录（可带尾 `/`）；`prefix`：URL 前缀（默认 `/`）
+- 支持常见类型（html/css/js/json/svg/png/jpg/gif/webp/woff2/zip/pdf/wasm 等），未知扩展名回退 `application/octet-stream`
+- **路径穿越防护**：含 `..` 段的请求路径被拒绝（继续后续层 → 404）
+- 文件不存在时继续后续层（可被后续路由/404 接管）
+- 静态文件建议放入 `assets/` 打包（`assetsReadBase64` + 缓存）或挂载由服主放入数据目录的文件（`fs` 通道 plugin 级免权限）
 
 路由 handler 接收 `RouteRequest` 对象：
 
@@ -177,6 +232,6 @@ eventOn('playerJoin', async (e) => {
 
 `sendResourcePack` 的 `hash` 为 **SHA-1 十六进制**（可选但建议提供，客户端据此校验完整性）；`hash`/`prompt`/`force` 均可省略。`hash` 需插件自行提供（如构建时对资源包文件计算后写入配置）。
 
-> **公网地址配置**：`url` 必须由**玩家客户端**可访问——插件作者应让**服主在配置中填写公网可达的 IP 或域名**（含端口），并在插件文档中说明：端口需放行防火墙、如在内网/家宽需做端口转发。
+> **公网地址配置**：`url` 必须由**玩家客户端**可访问——插件作者应让**服主在配置中填写公网可达的 IP 或域名**，以及可用端口，并在插件文档中说明：端口需放行防火墙、如在内网/家宽需做端口转发。
 
 > **⚠ 生产环境建议**：资源包**理论上应当通过 CDN 分发**（如对象存储 + CDN、GitHub Releases 等）。**本示例（插件自带 HTTP 服务器直出）仅用于临时场景**，或用户自定义资源包的情形。
