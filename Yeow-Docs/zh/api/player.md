@@ -97,7 +97,7 @@ player.giveExpSync(amount)
 ```js
 player.hasPermission(node)          // Promise<boolean>
 player.hasPermissionSync(node)      // boolean
-player.performCommand(cmd)          // Promise<boolean> —— 以玩家身份执行命令（含 / 前缀）
+player.performCommand(cmd)          // Promise<boolean> —— 以玩家身份执行命令（不含 / 前缀，如 'say hi'）
 player.performCommandSync(cmd)      // boolean
 player.teleport(loc)                // Promise
 player.teleportSync(loc)

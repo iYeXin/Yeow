@@ -94,7 +94,7 @@
 | `player.kick` | `{ "uuid": "<uuid>", "reason": "<text>" }` | `true` | 踢出玩家 |
 | `player.giveExp` | `{ "uuid": "<uuid>", "amount": <int> }` | `true` | 给予经验值 |
 | `player.hasPermission` | `{ "uuid": "<uuid>", "permission": "<node>" }` | `boolean` | 检查权限 |
-| `player.performCommand` | `{ "uuid": "<uuid>", "command": "<cmd>" }` | `boolean` | 以玩家身份执行命令（含 `/` 前缀；与服务器 `command.dispatch`（控制台）相对） |
+| `player.performCommand` | `{ "uuid": "<uuid>", "command": "<cmd>" }` | `boolean` | 以玩家身份执行命令（**不含 `/` 前缀**，如 `say hi`；与服务器 `command.dispatch`（控制台）相对） |
 
 ### Message 对象（可翻译组件）
 

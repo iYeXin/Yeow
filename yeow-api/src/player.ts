@@ -141,12 +141,12 @@ export class Player {
   hasPermissionSync(node: string, options?: TaskOptions): boolean {
     return call<boolean>('player.hasPermission', { uuid: this.uuid, permission: node }, options);
   }
-  /** 以玩家身份执行命令（含 `/` 前缀；与服务器 `dispatchCommand`（控制台）相对）。 */
+  /** 以玩家身份执行命令（**不含 `/` 前缀**，如 `say hi`；前缀会自动剥离；与服务器 `dispatchCommand`（控制台）相对）。 */
   performCommand(cmd: string, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('player.performCommand', { uuid: this.uuid, command: cmd }, options);
+    return post<boolean>('player.performCommand', { uuid: this.uuid, command: cmd.replace(/^\//, '') }, options);
   }
   performCommandSync(cmd: string, options?: TaskOptions): boolean {
-    return call<boolean>('player.performCommand', { uuid: this.uuid, command: cmd }, options);
+    return call<boolean>('player.performCommand', { uuid: this.uuid, command: cmd.replace(/^\//, '') }, options);
   }
   teleport(loc: Location, options?: TaskOptions): Promise<void> { return post('player.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
   teleportSync(loc: Location, options?: TaskOptions): void { call('player.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
