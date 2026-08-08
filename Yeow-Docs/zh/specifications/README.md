@@ -154,7 +154,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 - **节点匹配**：精确节点（`fs:server.readFile`）；**整组通配** `fs:server.*` 命中该前缀全部节点；**通道通配** `fs:*` 命中 fs 通道全部节点——构建时 `fs:*` 在 `computedPermissions` 中**自动展开**为 `fs:outer.*, fs:server.*`（语义等价）
 - **默认允许**：上述默认拒绝节点之外的节点（如 `service:request`、`service:register`、`assets:read`、`fs:plugin.readFile`）无需声明
 - **拒绝行为**：未声明调用返回错误 `Permission denied: <node>`。同步调用直接返回错误 JSON；异步调用（含 `cb`）通过回调投递 `{"err":"Permission denied: <node>"}`，JS 侧表现为 Promise reject
-- **其他通道**（`task`/`timer`/`log`/`now`/`dir`/`debug`/`lifecycle`）不受权限模型约束
+- **其他通道**（`task`/`timer`/`log`/`env`/`dir`/`debug`/`lifecycle`）不受权限模型约束
 - 权限在插件加载时读取并**固定**（运行时不可变更），加载消息中打印声明内容——打印时 `fs:*` 会**展开为 `fs:outer.*, fs:server.*`**（仅展示，便于服主理解影响范围；权限校验仍按原值 `fs:*`）
 
 **`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:...`、`X:段.*` 覆盖 `X:段.<op>`；`fs:*` 展开为 `fs:outer.*, fs:server.*`）写入 `yeow.json` 的 `computedPermissions`。运行时读取该字段。运行时只校验通配/节点匹配，无需理解节点命名段含义。
@@ -402,7 +402,7 @@ JS 端通过 `task` 通道回传补全结果：
 - [ ] **任务执行器**：`task` type → 宿主平台操作，同步/异步语义
 - [ ] **事件桥**：subscribe/unsubscribe、事件数据提取（仅基本类型）、event.complete 应用
 - [ ] **命令桥**：register/execute/tabComplete
-- [ ] **通道实现**：timer / fs / http / assets / service / log / now / dir / debug / lifecycle
+- [ ] **通道实现**：timer / fs / http / assets / service / log / env / dir / debug / lifecycle
 - [ ] **资源访问**：按 `assets/<命名空间id>/` 读取 JAR 内资源
 - [ ] **错误处理**：JS 异常捕获、`debug` 通道上报
 - [ ] **健康检测**（推荐）：`debug` ping-pong 心跳、回调超时告警

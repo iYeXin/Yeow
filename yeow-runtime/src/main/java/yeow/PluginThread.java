@@ -306,7 +306,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     running = false; return null;
                 } else if ("log".equals(channel)) {
                     var o = gson.fromJson(pld, JsonObject.class); org.bukkit.Bukkit.getLogger().info(o.has("message") ? o.get("message").getAsString() : pld); return null;
-                } else if ("now".equals(channel)) { return String.valueOf(System.nanoTime()); }
+                } else if ("env".equals(channel)) { return handleEnv(); }
                 else if ("service".equals(channel)) {
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var denied = checkChannelPermission("service", obj.has("t") ? obj.get("t").getAsString() : "");
@@ -458,6 +458,36 @@ public class PluginThread implements Runnable, PluginEntity {
     public Object toJsonValuePublic(String json) { return toJsonValue(json); }
     public void handleJSReportPublic(String pld, String origin) { handleJSReport(pld, origin); }
     public void handleJSErrorPublic(QuickJSException e, String origin) { handleJSError(e, origin); }
+    public String handleEnvPublic() { return handleEnv(); }
+
+    /**
+     * env 通道（同步）：运行时环境信息 + 微秒时间戳。
+     * - cpus：CPU 逻辑核心数
+     * - memory：JVM 总内存（字节）
+     * - arch：系统架构（如 windows-x64 / linux-x64 / linux-arm64）
+     * - minecraftVersion：Minecraft 版本（如 1.21.4）
+     * - yeow：运行时信息 { platform, version }
+     * - now：epoch 微秒时间戳（通信开销在微秒级，纳秒无意义）
+     */
+    private String handleEnv() {
+        var osName = System.getProperty("os.name").toLowerCase();
+        String os = osName.contains("win") ? "windows" : osName.contains("mac") ? "macos" : "linux";
+        var archRaw = System.getProperty("os.arch").toLowerCase();
+        String arch = archRaw.contains("aarch64") || archRaw.contains("arm64") ? "arm64"
+            : archRaw.contains("x86_64") || archRaw.contains("amd64") ? "x64"
+            : archRaw.contains("arm") ? "armv7" : archRaw;
+        var now = java.time.Instant.now();
+        long nowUs = now.getEpochSecond() * 1_000_000L + now.getNano() / 1000L;
+        var rt = YeowRuntime.inst();
+        String yeowVersion = rt != null && rt.getDescription() != null ? rt.getDescription().getVersion() : "0.1.0";
+        return gson.toJson(Map.of(
+            "cpus", Runtime.getRuntime().availableProcessors(),
+            "memory", Runtime.getRuntime().totalMemory(),
+            "arch", os + "-" + arch,
+            "minecraftVersion", org.bukkit.Bukkit.getMinecraftVersion(),
+            "yeow", Map.of("platform", "paper", "version", yeowVersion),
+            "now", nowUs));
+    }
 
     /** 禁止对 Yeow 运行时配置目录（含 approve.json / config.yml）的修改——fs 写操作（全部级别）一律拦截。 */
     private void assertNotRuntimeDir(Path path) throws SecurityException {

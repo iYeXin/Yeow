@@ -151,15 +151,15 @@ Worker 是**虚拟插件**——`PluginEntity` 的一个具体实现（`WorkerTh
 
 ### 接入其他系统
 
-| 系统 | 接入方式 |
-|------|----------|
-| 调度器 | Worker 内 `call/post` 走 task 通道，`_plugin` 注入注册名——独立队列统计与 purge |
-| 事件桥 | `eventOn` 以注册名订阅（EventBridge.subs 按注册名）；卸载时 `unsubscribeAll` |
-| 命令桥 | `registerCommand` 以注册名注册；卸载时 `unregisterAll` |
-| Service | `registerService` 以注册名注册（`ServiceManager.requestPlugin` 经实体投递）；卸载时 `purgePluginServices` |
-| Profile | `registerPluginEntity` 时注册心跳统计；`isVirtual()` + `source()`（主插件名）在报告/告警中标记 |
-| /yeow 管理 | `realPluginNames()` 过滤 `isVirtual()`——unload/reload/uninstall/track/tabComplete 均不覆盖 |
-| 生命周期 | 主插件 `cleanupResources` 逐个 `unloadPlugin(worker)`（完整清理）+ `workers.clear()` |
+| 系统       | 接入方式                                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------------- |
+| 调度器     | Worker 内 `call/post` 走 task 通道，`_plugin` 注入注册名——独立队列统计与 purge                            |
+| 事件桥     | `eventOn` 以注册名订阅（EventBridge.subs 按注册名）；卸载时 `unsubscribeAll`                              |
+| 命令桥     | `registerCommand` 以注册名注册；卸载时 `unregisterAll`                                                    |
+| Service    | `registerService` 以注册名注册（`ServiceManager.requestPlugin` 经实体投递）；卸载时 `purgePluginServices` |
+| Profile    | `registerPluginEntity` 时注册心跳统计；`isVirtual()` + `source()`（主插件名）在报告/告警中标记            |
+| /yeow 管理 | `realPluginNames()` 过滤 `isVirtual()`——unload/reload/uninstall/track/tabComplete 均不覆盖                |
+| 生命周期   | 主插件 `cleanupResources` 逐个 `unloadPlugin(worker)`（完整清理）+ `workers.clear()`                      |
 
 ### 开发工具链
 
@@ -586,7 +586,7 @@ Bukkit 事件触发
 
 当多个插件订阅同一事件时，Yeow 支持串行（默认）和并发两种模式：
 
-| 模式           | 行为                                           | runtime/config.yml 配置            |
+| 模式           | 行为                                           | runtime/config.yml 配置           |
 | -------------- | ---------------------------------------------- | --------------------------------- |
 | 串行           | 逐个发送事件给每个插件，等待一个完成再发下一个 | `concurrent-events: false`        |
 | 并发（实验性） | 同时发送给所有订阅插件，等待最慢的完成         | `concurrent-events: true`（默认） |
@@ -681,11 +681,11 @@ if (t === 'cb' || t === 'CALLBACK') {
 
 Java 端通过 `SyncCallbackHelper` 注册等待，JS 通过 `$_send('task')` 发回响应：
 
-| 场景      | Java 发送                            | JS 响应                                                                         |
-| --------- | ------------------------------------ | ------------------------------------------------------------------------------- |
-| 事件      | `{t:"cb", p:cbId, eventId, r:{event data}}` | `$send('task', {type:'event.complete', params:{eventId, mods}})`             |
-| 补全      | `{t:"cb", p:cbId, r:{sender, args}}` | `$send('task', {type:'command.tabComplete', params:{callbackId, completions}})` |
-| 异步 post | `{t:"cb", p:cbId, r:result}`         | 自动 — 回调函数处理 `r`                                                         |
+| 场景      | Java 发送                                   | JS 响应                                                                         |
+| --------- | ------------------------------------------- | ------------------------------------------------------------------------------- |
+| 事件      | `{t:"cb", p:cbId, eventId, r:{event data}}` | `$send('task', {type:'event.complete', params:{eventId, mods}})`                |
+| 补全      | `{t:"cb", p:cbId, r:{sender, args}}`        | `$send('task', {type:'command.tabComplete', params:{callbackId, completions}})` |
+| 异步 post | `{t:"cb", p:cbId, r:result}`                | 自动 — 回调函数处理 `r`                                                         |
 
 响应消息均经过 Scheduler 的 `Tasks.execute()` → `SyncCallbackHelper.complete()`，不新增 JNI 函数。
 
@@ -795,19 +795,19 @@ PluginThread 在 JS 上下文只注册一个底层函数：
 
 支持的消息通道：
 
-| 通道          | 用途                                   | 处理位置               |
-| ------------- | -------------------------------------- | ---------------------- |
-| `task`        | 游戏任务（请求/获取方块/传送等）       | 主线程调度器           |
-| `timer`       | 定时器（setTimeout/setInterval）       | 插件线程 Timer 线程池  |
-| `fs`          | 文件系统读写                           | 插件线程直接处理       |
-| `http`        | HTTP 服务器/客户端                     | 插件线程直接处理       |
-| `assets`      | 插件内置资源读取                       | 插件线程直接处理       |
-| `service`     | 服务注册/请求/订阅/发布               | ServiceManager        |
-| `debug`       | 错误上报 / 心跳 ping-pong              | 插件线程直接处理       |
-| `log`         | 控制台日志（自动添加 `[插件名]` 前缀） | 插件线程直接处理       |
-| `now`         | 纳秒时间戳                             | 插件线程直接处理       |
-| `dir`         | 插件数据目录路径                       | 插件线程直接处理       |
-| `lifecycle`   | 生命周期确认（unloadDone）             | 插件线程直接处理       |
+| 通道        | 用途                                   | 处理位置              |
+| ----------- | -------------------------------------- | --------------------- |
+| `task`      | 游戏任务（请求/获取方块/传送等）       | 主线程调度器          |
+| `timer`     | 定时器（setTimeout/setInterval）       | 插件线程 Timer 线程池 |
+| `fs`        | 文件系统读写                           | 插件线程直接处理      |
+| `http`      | HTTP 服务器/客户端                     | 插件线程直接处理      |
+| `assets`    | 插件内置资源读取                       | 插件线程直接处理      |
+| `service`   | 服务注册/请求/订阅/发布                | ServiceManager        |
+| `debug`     | 错误上报 / 心跳 ping-pong              | 插件线程直接处理      |
+| `log`       | 控制台日志（自动添加 `[插件名]` 前缀） | 插件线程直接处理      |
+| `env`       | 运行时环境信息 + 微秒时间戳            | 插件线程直接处理      |
+| `dir`       | 插件数据目录路径                       | 插件线程直接处理      |
+| `lifecycle` | 生命周期确认（unloadDone）             | 插件线程直接处理      |
 
 ### `$send` 封装层
 
@@ -975,14 +975,14 @@ API 用法见 [Service API](api/service.md)。
 
 预警引擎默认启用（`profile.warnings-enabled: true`），按 1s 窗口聚合检测，双语告警输出（上下两条彩色分隔线，随级别变色）：
 
-| code | 触发 |
-|------|------|
-| `heartbeat.timeout` | JS 线程单次心跳 >200ms |
-| `plugin.hung` | >30s 持续无响应（线程已死） |
-| `event.slow` / `event.timeout` | 事件响应 >2s / 等待 >5s 被释放 |
-| `tab.slow` / `tab.timeout` | 补全响应 >500ms / 等待 >1s |
+| code                                   | 触发                                      |
+| -------------------------------------- | ----------------------------------------- |
+| `heartbeat.timeout`                    | JS 线程单次心跳 >200ms                    |
+| `plugin.hung`                          | >30s 持续无响应（线程已死）               |
+| `event.slow` / `event.timeout`         | 事件响应 >2s / 等待 >5s 被释放            |
+| `tab.slow` / `tab.timeout`             | 补全响应 >500ms / 等待 >1s                |
 | `budget.congested` / `budget.restored` | 40 tick 内 HIGH/NORMAL 积压 ≥35 次 / 恢复 |
-| `scheduler.saturated` | HIGH/NORMAL 执行占 tick >80% |
+| `scheduler.saturated`                  | HIGH/NORMAL 执行占 tick >80%              |
 
 同类警告冷却 30 分钟（可配置）。详见 [运行时警告指南](runtime-warning.md)。
 

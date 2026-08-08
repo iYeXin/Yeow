@@ -154,7 +154,7 @@ JS 端处理流程：
 | `assets`    | 是      | `$send` 阻塞，直到 IO 完成                       | `$send` 立即返回 `null`，IO 线程完成后发送回调             |
 | `lifecycle` | 否      | `$send` 返回 `null`（fire-and-forget）           | —                                                          |
 | `log`       | 否      | `$send` 返回 `null`（fire-and-forget）           | —                                                          |
-| `now`       | 否      | `$send` 直接返回时间戳字符串                     | —                                                          |
+| `env`       | 否      | `$send` 直接返回环境信息 JSON（同步）            | —                                                          |
 | `dir`       | 否      | `$send` 直接返回目录路径字符串                   | —                                                          |
 | `debug`     | 否      | `$send` 返回 `null`（fire-and-forget）           | —                                                          |
 | `service`   | 是      | 注册/请求/订阅/发布。request 异步，register 同步 | —                                                          |
@@ -390,7 +390,7 @@ string[]
 | `assets`    | 内置资源                | 直接处理。异步时使用 IO 线程 | 是      | [assets 通道](../message/assets.md)       |
 | `lifecycle` | 生命周期确认 / 资源回收 | 直接处理                     | 否      | [lifecycle 通道](../message/lifecycle.md) |
 | `log`       | 日志                    | 直接处理                     | 否      | [log 通道](../message/log.md)             |
-| `now`       | 纳秒时间戳              | 直接处理                     | 否      | —                                         |
+| `env`       | 运行时环境信息 + 微秒时间戳 | 直接处理（同步）         | 否      | —                                         |
 | `dir`       | 插件数据目录路径        | 直接处理                     | 否      | —                                         |
 | `debug`     | 调试 / 错误上报 / Ping  | 直接处理                     | 否      | —                                         |
 | `service`   | 服务注册/请求/订阅/发布 | 直接处理 / 跨线程路由        | 是      | [service 通道](../message/service.md)     |
@@ -419,4 +419,28 @@ string[]
 - **通配**：声明 `channel:*` 命中该通道全部节点；**整组通配** `channel:段.*` 命中该前缀全部节点；**节点级**：声明 `channel:段.op` 只命中该操作
 - **默认允许**：上述默认拒绝节点之外的节点（`service:request`、`service:register`、`assets:read`、`assets:readBase64`、`fs:plugin.readFile` 等）无需声明
 - **拒绝行为**：未声明调用返回 `Permission denied: <channel>:<op>`——同步调用以错误 JSON 返回；含 `cb` 的异步调用通过回调投递 `{"err": "Permission denied: <channel>:<op>"}`（JS 侧 Promise reject）
-- `task` / `timer` / `log` / `now` / `dir` / `debug` / `lifecycle` 通道不受约束
+- `task` / `timer` / `log` / `env` / `dir` / `debug` / `lifecycle` 通道不受约束
+
+### `env` 通道
+
+同步返回运行时环境信息（JSON，`$send('env', {})`）：
+
+```json
+{
+  "cpus": 16,
+  "memory": 17179869184,
+  "arch": "windows-x64",
+  "minecraftVersion": "1.21.4",
+  "yeow": { "platform": "paper", "version": "0.1.0" },
+  "now": 1723100000000000
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `cpus` | number | CPU 逻辑核心数 |
+| `memory` | number | JVM 总内存（字节） |
+| `arch` | string | 系统架构（`<os>-<arch>`，如 `windows-x64` / `linux-x64` / `linux-arm64`） |
+| `minecraftVersion` | string | Minecraft 版本（如 `1.21.4`） |
+| `yeow` | object | 运行时信息：`{ "platform": "paper", "version": "<运行时版本>" }` |
+| `now` | number | **epoch 微秒**时间戳（通信开销在微秒级，纳秒无意义） |

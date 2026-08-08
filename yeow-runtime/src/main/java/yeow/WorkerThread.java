@@ -294,7 +294,7 @@ public class WorkerThread implements PluginEntity, Runnable {
                 if ("log".equals(channel)) {
                     var o = gson.fromJson(pld, JsonObject.class); org.bukkit.Bukkit.getLogger().info(o.has("message") ? o.get("message").getAsString() : pld); return null;
                 }
-                if ("now".equals(channel)) { return String.valueOf(System.nanoTime()); }
+                if ("env".equals(channel)) { return main.handleEnvPublic(); }
                 if ("dir".equals(channel)) { return main.getDataDirPublic(); }
                 return null;
             } catch (Exception ex) {
