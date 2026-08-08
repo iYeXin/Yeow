@@ -9,7 +9,7 @@
     },
     "dependencies": {
         "yeow-api": "^0.2.113",
-        "yeow-utils": "^0.1.17"
+        "yeow-utils": "^0.1.18"
     },
     "devDependencies": {
         "esbuild": "^0.25.0",

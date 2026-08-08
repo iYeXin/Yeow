@@ -1,4 +1,4 @@
-import { listen, respond, close, fs } from 'yeow-api';
+import { listen, respond, close, fs, assetsReadBase64 } from 'yeow-api';
 import type { RespondOptions } from 'yeow-api';
 
 /** 响应体：字符串（文本）或完整响应选项（含 bodyBase64 二进制）。 */
@@ -44,6 +44,13 @@ export interface Server {
    * `mount('web/', '/static')` → `/static/<file>`。文件不存在时继续后续层（最终 404）。
    */
   mount(dir: string, prefix?: string): Server;
+  /**
+   * 挂载**打包资源**（assets，.zip 内）为静态文件服务，无需提取到磁盘：
+   * `mountAssets(getAssetsPath('web'))` → `/<file>` 从打包资源直接读取。
+   * 性能略差（每次请求从 .zip 读取单个文件），适合小文件/低频访问；大文件或高频请用
+   * `mount`（先提取到数据目录）。
+   */
+  mountAssets(dir: string, prefix?: string): Server;
   close(): void;
 }
 
@@ -145,43 +152,52 @@ export function createServer(port?: number): Server {
     del(path, handler) { return route('DELETE', path, handler); },
 
     mount(dir, prefix = '/') {
-      // 规范化：'web/' → 'web'；URL 前缀 '/' → ''，'/static/' → '/static'
-      const baseDir = String(dir || '').replace(/\/+$/, '');
-      const base = String(prefix || '/').replace(/\/+$/, '');
-      middleware.push(async (req, next) => {
-        const p = req.path || '/';
-        // 解析相对文件路径（防穿越：拒绝含 .. 段的路径）
-        let rel: string | null = null;
-        if (base === '' || base === '/') {
-          rel = p.startsWith('/') ? p.slice(1) : p;
-        } else if (p.startsWith(base + '/')) {
-          rel = p.slice(base.length + 1);
-        } else if (p === base) {
-          rel = '';
-        }
-        if (rel === null) return next();
-        if (rel.split('/').includes('..')) return next();
-        if (rel === '') return next();
-        const filePath = baseDir + '/' + rel;
-        let data: string;
-        try {
-          data = await fs.readFileBase64(filePath);
-        } catch {
-          return next(); // 文件不存在 → 继续后续层（最终 404）
-        }
-        const dot = rel.lastIndexOf('.');
-        const ext = dot >= 0 ? rel.slice(dot).toLowerCase() : '';
-        return {
-          status: 200,
-          bodyBase64: data,
-          headers: { 'content-type': MIME[ext] || 'application/octet-stream' },
-        };
-      });
-      return api;
+      return mountStatic(fs.readFileBase64, dir, prefix);
+    },
+
+    mountAssets(dir, prefix = '/') {
+      return mountStatic(assetsReadBase64, dir, prefix);
     },
 
     close() { if (srv.serverId) close(srv.serverId); },
   };
+
+  /** 静态文件中间件（共享 mount / mountAssets）：路径解析（防穿越）+ Content-Type 推断 + base64 响应。 */
+  function mountStatic(read: (filePath: string) => Promise<string>, dir: string, prefix: string): Server {
+    // 规范化：'web/' → 'web'；URL 前缀 '/' → ''，'/static/' → '/static'
+    const baseDir = String(dir || '').replace(/\/+$/, '');
+    const base = String(prefix || '/').replace(/\/+$/, '');
+    middleware.push(async (req, next) => {
+      const p = req.path || '/';
+      // 解析相对文件路径（防穿越：拒绝含 .. 段的路径）
+      let rel: string | null = null;
+      if (base === '' || base === '/') {
+        rel = p.startsWith('/') ? p.slice(1) : p;
+      } else if (p.startsWith(base + '/')) {
+        rel = p.slice(base.length + 1);
+      } else if (p === base) {
+        rel = '';
+      }
+      if (rel === null) return next();
+      if (rel.split('/').includes('..')) return next();
+      if (rel === '') return next();
+      const filePath = baseDir + '/' + rel;
+      let data: string;
+      try {
+        data = await read(filePath);
+      } catch {
+        return next(); // 文件不存在 → 继续后续层（最终 404）
+      }
+      const dot = rel.lastIndexOf('.');
+      const ext = dot >= 0 ? rel.slice(dot).toLowerCase() : '';
+      return {
+        status: 200,
+        bodyBase64: data,
+        headers: { 'content-type': MIME[ext] || 'application/octet-stream' },
+      };
+    });
+    return api;
+  }
 
   function route(method: string, path: string, handler: RouteHandler): Server {
     const cr = compile(path);

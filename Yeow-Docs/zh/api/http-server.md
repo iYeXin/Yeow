@@ -103,6 +103,26 @@ onLoad(async () => {
 - 版本更新后 assets 内容变化但数据目录已有旧文件时，可自行加入版本标记比对（如提取后写入 `fs.writeFileSync('web/.version', version)`，检测时比对）决定是否重新提取
 - 也可以不经提取直接响应：`assetsReadBase64` + `bodyBase64`（见[二进制响应](#二进制响应base64)）——适合每次读包、文件较小、无需被其他插件/工具访问的场景
 
+### 打包资源挂载（mountAssets）
+
+`mountAssets(dir, prefix?)` 把**打包资源**（assets，.zip 内）直接挂载为静态文件服务——**无需提取到磁盘**，每次请求从 .zip 读取单个文件：
+
+```js
+import { createServer } from 'yeow-utils';
+import { getAssetsPath } from 'yeow-dev';   // 构建期虚拟模块
+
+const app = createServer(8080);
+
+// /index.html → 打包资源 assets/<id>/web/index.html（直接读 .zip）
+app.mountAssets(getAssetsPath('web'));
+app.mountAssets(getAssetsPath('web'), '/static');   // 带 URL 前缀
+```
+
+- `dir` 应使用 `getAssetsPath()` 获取（构建期注入命名空间 id），不要硬编码
+- 与 `mount` 相同的路径穿越防护与 Content-Type 推断
+- **性能略差但可接受**：Zip 支持读取单个文件——每次请求从 .zip 解压目标文件；适合**小文件 / 低频访问**（如页面、图标、小脚本）
+- **大文件或高频访问**请用 `mount`（先检测 + 提取到数据目录），或缓存 `assetsReadBase64` 结果
+
 - `dir`：插件数据目录下的目录（可带尾 `/`）；`prefix`：URL 前缀（默认 `/`）
 - 支持常见类型（html/css/js/json/svg/png/jpg/gif/webp/woff2/zip/pdf/wasm 等），未知扩展名回退 `application/octet-stream`
 - **路径穿越防护**：含 `..` 段的请求路径被拒绝（继续后续层 → 404）
