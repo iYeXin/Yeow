@@ -44,6 +44,7 @@ export default defineConfig({
                 items: [
                     { text: '概览', link: '/overview' },
                     { text: '快速开始', link: '/getting-started' },
+                    { text: 'AI 启动指南', link: '/ai-agent' },
                     { text: 'CLI 参考', link: '/cli' },
                     { text: '构建与分发', link: '/distribution' },
                     { text: '运行时警告', link: '/runtime-warning' },

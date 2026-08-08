@@ -4,6 +4,9 @@
 
 > 如果 Modrinth 上的 Yeow 项目仍未结束 Under Review 状态，可以[点此下载](https://raw.githubusercontent.com/iYeXin/Yeow/main/create-yeow/templates/default/.yeow/assets/yeow-runtime-0.1.0.jar) Yeow 运行时插件。
 
+> [!TIP]
+> **AI 辅助编程**：本页为人工阅读版。若你正在使用 AI 编程助手（Codex、OpenCode、Zcode、Trae 等 Harness 产品），建议先让 AI 阅读 [AI 辅助启动指南](/ai-agent)——在任何 Harness 产品中，**复制该链接或页面内容发送给 AI**，并描述你的需求（如"创建一个带 /back 命令的插件"），AI 将带领你完成项目创建、开发与调试。完整文档亦可打包下载（[docs.zip](/docs.zip)）喂给 AI。
+
 ## 创建项目
 
 ```bash
