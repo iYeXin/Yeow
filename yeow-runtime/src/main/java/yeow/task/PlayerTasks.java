@@ -53,6 +53,7 @@ public class PlayerTasks {
         return true;
     }
     public static Object giveExp(JsonObject p) { player(p).giveExp(p.get("amount").getAsInt()); return true; }
+    public static Object performCommand(JsonObject p) { return player(p).performCommand(p.get("command").getAsString()); }
     public static Object hasPermission(JsonObject p) { return player(p).hasPermission(p.get("permission").getAsString()); }
     public static Object teleport(JsonObject p) { player(p).teleport(new Location(Bukkit.getWorld(p.get("world").getAsString()),p.get("x").getAsDouble(),p.get("y").getAsDouble(),p.get("z").getAsDouble(),(float)p.get("yaw").getAsDouble(),(float)p.get("pitch").getAsDouble())); return true; }
     public static Object sendActionBar(JsonObject p) { player(p).sendActionBar(TextUtil.parseMessage(p.get("message"))); return true; }

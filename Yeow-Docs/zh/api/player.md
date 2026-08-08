@@ -92,11 +92,13 @@ player.giveExp(amount)              // Promise
 player.giveExpSync(amount)
 ```
 
-### 权限与传送
+### 权限、命令与传送
 
 ```js
 player.hasPermission(node)          // Promise<boolean>
 player.hasPermissionSync(node)      // boolean
+player.performCommand(cmd)          // Promise<boolean> —— 以玩家身份执行命令（含 / 前缀）
+player.performCommandSync(cmd)      // boolean
 player.teleport(loc)                // Promise
 player.teleportSync(loc)
 ```

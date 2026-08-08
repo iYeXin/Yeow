@@ -48,6 +48,7 @@ public class Tasks {
             case "player.stopAllSounds" -> SoundTasks.stopAllSounds(p);
             case "player.giveExp"      -> PlayerTasks.giveExp(p);
             case "player.hasPermission"-> PlayerTasks.hasPermission(p);
+            case "player.performCommand" -> PlayerTasks.performCommand(p);
             case "player.teleport"     -> PlayerTasks.teleport(p);
             case "player.sendActionBar" -> PlayerTasks.sendActionBar(p);
             case "player.sendResourcePack" -> PlayerTasks.sendResourcePack(p);
