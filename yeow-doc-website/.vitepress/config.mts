@@ -102,6 +102,13 @@ export default defineConfig({
                         ],
                     },
                     {
+                        text: '物品',
+                        collapsed: true,
+                        items: [
+                            { text: 'ItemStack', link: '/api/item' },
+                        ],
+                    },
+                    {
                         text: '服务与网络',
                         collapsed: true,
                         items: [
@@ -117,6 +124,13 @@ export default defineConfig({
                             { text: 'FS', link: '/api/fs' },
                             { text: 'Assets', link: '/api/assets' },
                             { text: 'PDC', link: '/api/pdc' },
+                        ],
+                    },
+                    {
+                        text: '文本',
+                        collapsed: true,
+                        items: [
+                            { text: 'Text', link: '/api/text' },
                         ],
                     },
                     { text: 'Log', link: '/api/log' },
