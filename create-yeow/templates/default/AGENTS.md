@@ -19,6 +19,34 @@
 - **运行时**：`yeow-runtime`（Java 21，Paper 插件）——仓库 `yeow-runtime/`；本模板 `.yeow/assets/` 内置其 jar
 - **Worker（虚拟插件）**：`createWorker` 提供独立线程；配置见 `yeow.config.json` 的 `dev.worker`
 
+> [!IMPORTANT]
+> **强烈建议优先选用 TypeScript**——尤其对于 AI 辅助编程：`yeow-api` 提供完整类型推断（命令参数、事件 payload、API 返回值），AI/编辑器获得完善类型支持，杜绝静态错误与"模型幻觉"（编造不存在的 API/字段/类型）。新建项目用 `npm create yeow@latest -- -y --ts`。
+
+### 将 JS 项目改造为 TS 项目
+
+1. 把 `src/index.js` 重命名为 `src/index.ts`
+2. 创建 `tsconfig.json`：
+
+```json
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "lib": ["ESNext"],
+        "module": "ES2022",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "noEmit": true
+    },
+    "include": ["src/**/*.ts"]
+}
+```
+
+3. 在 `yeow.config.json` 中把 `typecheck` 改为 `true`（构建时自动 `tsc --noEmit` 检查）
+
+`tsconfig.json` 只做类型检查（`noEmit`），打包仍由 esbuild 完成。
+
 ## 关键文档（在线）
 
 | 资料 | 地址 |

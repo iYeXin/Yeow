@@ -13,6 +13,9 @@ cd my-plugin
 npm install
 ```
 
+> [!IMPORTANT]
+> **强烈建议优先选用 TypeScript**——尤其是** AI 辅助编程**：完整的类型推断（命令参数、事件 payload、API 返回值）让编辑器与 AI 获得完善的类型支持，杜绝静态错误，显著降低"模型幻觉"（编造不存在的 API/字段/类型）。`npm create yeow@latest -- -y --ts` 一步创建。
+
 ![创建 Yeow 项目](assets/create-yeow.png)
 
 ## 开发
