@@ -57,4 +57,16 @@ class TextUtilTest {
         var out = TextUtil.toLegacy(TextUtil.parse("a\tb"));
         assertEquals("a\tb", out, "real tab round-trips");
     }
+
+    /** 用户文本中的单个 PUA 字符（标记组合的一部分）不受影响——标记是双字符组合。 */
+    @Test void singlePuaCharUntouched() {
+        var out = TextUtil.toLegacy(TextUtil.parse("a\uE000b"));
+        assertEquals("a\uE000b", out);
+    }
+
+    /** 输出中不残留标记。 */
+    @Test void noMarkLeak() {
+        var out = TextUtil.toLegacy(TextUtil.parse("a\\nb"));
+        assertFalse(out.contains("\uE000"), "no mark leak: " + out);
+    }
 }
