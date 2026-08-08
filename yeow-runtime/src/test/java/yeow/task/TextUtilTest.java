@@ -69,4 +69,16 @@ class TextUtilTest {
         var out = TextUtil.toLegacy(TextUtil.parse("a\\nb"));
         assertFalse(out.contains("\uE000"), "no mark leak: " + out);
     }
+
+    /** `\<` 原样放行给 MiniMessage：其语义是"字面 <"（反斜杠被消耗）。 */
+    @Test void escapedAngleGoesToMiniMessage() {
+        var out = TextUtil.toLegacy(TextUtil.parse("a\\<b"));
+        assertEquals("a<b", out, "\\< -> literal <");
+    }
+
+    /** `\<red>` 不解析为颜色标签（字面 `<red>`）。 */
+    @Test void escapedAngleTagLiteral() {
+        var out = TextUtil.toLegacy(TextUtil.parse("a\\<red>b"));
+        assertEquals("a<red>b", out, "\\<red> stays literal");
+    }
 }

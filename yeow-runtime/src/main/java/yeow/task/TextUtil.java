@@ -9,16 +9,16 @@ public class TextUtil {
     private static final MiniMessage MM = MiniMessage.miniMessage();
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
     /**
-     * 字面反斜杠的临时保护标记：私有区（PUA）双字符组合，正常文本不会出现，
-     * 且非控制字符——不受 MiniMessage / legacy 序列化的转义或特殊处理影响；
-     * 解析/序列化前后替换，使 `\n` `\b` 等字面反斜杠序列不被当作转义，也不被下游还原。
+     * 字面反斜杠 + 常见转义字母的临时保护标记（私有区 PUA 双字符组合 + 原字母）：
+     * 使 `\n` `\t` 等字面反斜杠序列不被 MiniMessage 当作转义，也不被下游还原。
+     * `\<` 等其余反斜杠序列**原样放行**给 MiniMessage（`\<` 是其"字面 `<`"转义）。
      */
     private static final String BS_MARK = "\uE000\uE001";
 
     public static Component parse(String t) {
         if (t == null || t.isEmpty())
             return Component.empty();
-        var protectedText = t.replace("\\", BS_MARK);
+        var protectedText = protectBackslash(t);
         try {
             var parsed = MM.deserialize(protectedText);
             // MiniMessage succeeded — but if the result is just literal text
@@ -33,26 +33,44 @@ public class TextUtil {
     }
 
     public static String toLegacy(Component c) {
-        return unescapeLegacy(LEGACY.serialize(markBackslash(c))).replace(BS_MARK, "\\");
+        return restoreBackslashText(unescapeLegacy(LEGACY.serialize(markBackslash(c))));
     }
 
     /** 递归恢复 Component 文本中的反斜杠标记（解析后调用）。 */
     private static Component restoreBackslash(Component c) {
         if (c instanceof TextComponent t) {
             var children = t.children().stream().map(TextUtil::restoreBackslash).toList();
-            return t.content(t.content().replace(BS_MARK, "\\")).children(children);
+            return t.content(restoreBackslashText(t.content())).children(children);
         }
         return c;
     }
 
+    /** 常见转义组合的字面反斜杠 → 标记（`\` + 转义字母整体保护）。 */
+    private static String protectBackslash(String s) {
+        return s.replace("\\n", BS_MARK + "n")
+                .replace("\\t", BS_MARK + "t")
+                .replace("\\r", BS_MARK + "r")
+                .replace("\\b", BS_MARK + "b")
+                .replace("\\f", BS_MARK + "f");
+    }
+
+    /** 标记 → 字面反斜杠序列（恢复）。 */
+    private static String restoreBackslashText(String s) {
+        return s.replace(BS_MARK + "n", "\\n")
+                .replace(BS_MARK + "t", "\\t")
+                .replace(BS_MARK + "r", "\\r")
+                .replace(BS_MARK + "b", "\\b")
+                .replace(BS_MARK + "f", "\\f");
+    }
+
     /**
-     * 递归把 Component 文本中的字面反斜杠替换为标记（序列化前调用），
+     * 递归把 Component 文本中的常见转义组合（`\n` 等）替换为标记（序列化前调用），
      * 使序列化的控制字符转义（真实换行 → `\n`）与用户字面反斜杠序列可区分。
      */
     private static Component markBackslash(Component c) {
         if (c instanceof TextComponent t) {
             var children = t.children().stream().map(TextUtil::markBackslash).toList();
-            return t.content(t.content().replace("\\", BS_MARK)).children(children);
+            return t.content(protectBackslash(t.content())).children(children);
         }
         return c;
     }
