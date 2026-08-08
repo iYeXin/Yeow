@@ -168,6 +168,23 @@ public class EventBridge implements Listener {
         return Map.of("text", text);
     }
 
+    /** 死亡消息方法（反射：兼容不同 Bukkit 版本 getDeathMessage() 的返回类型——Component 或 String）。 */
+    private static java.lang.reflect.Method DEATH_MESSAGE_METHOD;
+    static {
+        try { DEATH_MESSAGE_METHOD = PlayerDeathEvent.class.getMethod("getDeathMessage"); }
+        catch (Exception ignored) {}
+    }
+
+    /** 读取死亡消息为 Component：1.19.4+ 返回 Component；1.21.10+（String API）按文本解析。 */
+    private static net.kyori.adventure.text.Component deathMessageComponent(PlayerDeathEvent e) {
+        try {
+            var r = DEATH_MESSAGE_METHOD.invoke(e);
+            if (r instanceof net.kyori.adventure.text.Component c) return c;
+            if (r != null) return TextUtil.parse(String.valueOf(r));
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     /** 事件数据副本 + eventId（经 r 传给 JS，event.complete 原样回传匹配 pend）。 */
     private Map<String, Object> withEventId(Map<String, Object> data, String eventId) {
         var d = new java.util.HashMap<String, Object>(data);
@@ -327,7 +344,7 @@ public class EventBridge implements Listener {
             case "playerCommand":{ var e=(PlayerCommandPreprocessEvent)ev; putP(m,e.getPlayer()); m.put("message",e.getMessage()); break; }
             case "playerDeath":{ var e=(PlayerDeathEvent)ev; putP(m,e.getPlayer());
                 // 死亡消息：Message 对象——key/args 可翻译组件（如有）+ text 纯文本兜底，两者同时传递
-                m.put("deathMessage", componentToMessage(e.getDeathMessage()));
+                m.put("deathMessage", componentToMessage(deathMessageComponent(e)));
                 m.put("deathType",e.getDamageSource()!=null?e.getDamageSource().getDamageType().getKey().getKey():"UNKNOWN"); break; }
             case "playerRespawn":{ var e=(PlayerRespawnEvent)ev; putP(m,e.getPlayer()); m.put("respawnLocation",pos(e.getRespawnLocation())); break; }
             case "playerDropItem":{ var e=(PlayerDropItemEvent)ev; putP(m,e.getPlayer());
