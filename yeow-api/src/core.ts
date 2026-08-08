@@ -90,3 +90,4 @@ export type { MaterialInfo } from './material.js';
 export { registerService, registerNativeService, request as serviceRequest, subscribe as serviceSubscribe, publish as servicePublish } from './service.js';
 export type { ServiceResult, NativeServiceResult } from './service.js';
 export { log, Logger } from './log.js';
+export type { Message } from './message.js';

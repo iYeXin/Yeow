@@ -49,10 +49,18 @@ import { Player } from 'yeow-api';
 ### 消息
 
 ```js
-player.sendMessage(msg)             // Promise
+player.sendMessage(msg)             // Promise —— msg 为纯文本或 Message 对象（可翻译组件）
 player.sendMessageSync(msg)
 player.kick(reason?)                 // Promise
 player.kickSync(reason?)
+```
+
+`msg` 接受 [Message 对象](text.md#message-对象可翻译组件) 或纯字符串：
+
+```js
+await p.sendMessage('欢迎回来！');                                   // 纯文本（MiniMessage）
+await p.sendMessage({ text: '<red>你死了！</red>' });                // 纯文本（等价）
+await p.sendMessage({ key: 'death.attack.player', args: ['Steve'] }); // 可翻译组件（客户端本地化）
 ```
 
 ### 标题与音效
@@ -107,7 +115,7 @@ player.getItemInOffHandSync()       // ItemStack | null
 ### ActionBar 与资源包
 
 ```js
-player.sendActionBar(message)       // Promise
+player.sendActionBar(message)       // Promise —— message 为纯文本或 Message 对象
 player.sendActionBarSync(message)
 player.sendResourcePack(url, hash?, prompt?, force?)  // Promise
 ```

@@ -13,7 +13,7 @@ public class PlayerTasks {
     public static Object setGamemode(JsonObject p) { player(p).setGameMode(GameMode.valueOf(p.get("value").getAsString())); return true; }
     public static Object getHealth(JsonObject p) { return player(p).getHealth(); }
     public static Object setHealth(JsonObject p) { player(p).setHealth(p.get("value").getAsDouble()); return true; }
-    public static Object sendMessage(JsonObject p) { player(p).sendMessage(TextUtil.parse(p.get("message").getAsString())); return true; }
+    public static Object sendMessage(JsonObject p) { player(p).sendMessage(TextUtil.parseMessage(p.get("message"))); return true; }
     public static Object kick(JsonObject p) { player(p).kickPlayer(p.has("reason")?p.get("reason").getAsString():null); return true; }
     public static Object getFood(JsonObject p) { return player(p).getFoodLevel(); }
     public static Object setFood(JsonObject p) { player(p).setFoodLevel(p.get("value").getAsInt()); return true; }
@@ -55,7 +55,7 @@ public class PlayerTasks {
     public static Object giveExp(JsonObject p) { player(p).giveExp(p.get("amount").getAsInt()); return true; }
     public static Object hasPermission(JsonObject p) { return player(p).hasPermission(p.get("permission").getAsString()); }
     public static Object teleport(JsonObject p) { player(p).teleport(new Location(Bukkit.getWorld(p.get("world").getAsString()),p.get("x").getAsDouble(),p.get("y").getAsDouble(),p.get("z").getAsDouble(),(float)p.get("yaw").getAsDouble(),(float)p.get("pitch").getAsDouble())); return true; }
-    public static Object sendActionBar(JsonObject p) { player(p).sendActionBar(TextUtil.parse(p.get("message").getAsString())); return true; }
+    public static Object sendActionBar(JsonObject p) { player(p).sendActionBar(TextUtil.parseMessage(p.get("message"))); return true; }
     public static Object sendResourcePack(JsonObject p) {
         var pl = player(p);
         var url = p.get("url").getAsString();

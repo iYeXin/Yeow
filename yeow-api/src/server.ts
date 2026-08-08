@@ -1,8 +1,9 @@
 import { call, post } from './task.js';
 import type { TaskOptions } from './task.js';
+import type { Message } from './message.js';
 
-export function broadcast(msg: string, options?: TaskOptions): Promise<void> { return post('server.broadcast', { message: msg }, options); }
-export function broadcastSync(msg: string, options?: TaskOptions): void { call('server.broadcast', { message: msg }, options); }
+export function broadcast(msg: string | Message, options?: TaskOptions): Promise<void> { return post('server.broadcast', { message: msg }, options); }
+export function broadcastSync(msg: string | Message, options?: TaskOptions): void { call('server.broadcast', { message: msg }, options); }
 export function dispatchCommand(cmd: string, options?: TaskOptions): Promise<boolean> { return post<boolean>('command.dispatch', { command: cmd }, options); }
 export function dispatchCommandSync(cmd: string, options?: TaskOptions): boolean { return call<boolean>('command.dispatch', { command: cmd }, options); }
 export function setMotd(motd: string, options?: TaskOptions): Promise<void> { return post('server.setMotd', { motd }, options); }

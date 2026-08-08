@@ -212,7 +212,7 @@ public class Tasks {
             case "scoreboard.teamGetEntries" -> ScoreboardTasks.teamGetEntries(p);
             case "scoreboard.setPlayerBoard" -> ScoreboardTasks.setPlayerBoard(p);
             // Server
-            case "server.broadcast" -> { org.bukkit.Bukkit.broadcast(TextUtil.parse(p.get("message").getAsString())); yield true; }
+            case "server.broadcast" -> { org.bukkit.Bukkit.broadcast(TextUtil.parseMessage(p.get("message"))); yield true; }
             case "server.getMotd"   -> org.bukkit.Bukkit.getMotd();
             case "server.getVersion" -> org.bukkit.Bukkit.getVersion();
             // TPS 为 Paper 平台指标（Bukkit.getTPS）；其他平台运行时不保证可用，

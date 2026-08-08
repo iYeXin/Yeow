@@ -51,8 +51,12 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 死亡的玩家 |
-| `deathMessage` | string | 死亡消息 |
+| `deathMessage` | string | 死亡消息纯文本（legacy 格式） |
+| `deathKey` | string (可选) | 死亡消息的**可翻译组件**翻译键（如 `death.attack.player`）——若原始死亡消息为可翻译组件 |
+| `deathArgs` | string[] (可选) | 翻译参数（纯文本） |
 | `deathType` | string | 伤害类型 key |
+
+> `deathKey`/`deathArgs` 用于按客户端语言本地化死亡消息；插件可直接构造 [Message 对象](../task/player.md#message-对象可翻译组件) 转发。
 
 ## `playerRespawn`
 

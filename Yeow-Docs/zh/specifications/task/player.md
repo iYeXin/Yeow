@@ -85,8 +85,8 @@
 
 | 任务 | 请求 | 返回 | 说明 |
 |------|------|------|------|
-| `player.sendMessage` | `{ "uuid": "<uuid>", "message": "<text>" }` | `true` | 发送消息（支持 MiniMessage 和 `§` 格式） |
-| `player.sendActionBar` | `{ "uuid": "<uuid>", "message": "<text>" }` | `true` | 发送操作栏消息 |
+| `player.sendMessage` | `{ "uuid": "<uuid>", "message": <Message> }` | `true` | 发送消息（`message` 为 [Message 对象](#message-对象可翻译组件) 或纯文本） |
+| `player.sendActionBar` | `{ "uuid": "<uuid>", "message": <Message> }` | `true` | 发送操作栏消息（同上） |
 | `player.sendTitle` | `{ "uuid": "<uuid>", "title": "<text>", "subtitle": "<text>", "fadeIn": <int>, "stay": <int>, "fadeOut": <int> }` | `true` | 发送标题/副标题。`fadeIn`/`stay`/`fadeOut` 单位为 tick（默认 10/70/20） |
 | `player.playSound` | `{ "uuid": "<uuid>", "sound": "<key>", "volume": <float>, "pitch": <float> }` | `true` | 播放音效（sound 为 Bukkit Sound 枚举名，如 `block.note_block.pling`） |
 | `player.stopSound` | `{ "uuid": "<uuid>", "sound": "<key>" }` | `true` | 停止指定音效 |
@@ -94,6 +94,26 @@
 | `player.kick` | `{ "uuid": "<uuid>", "reason": "<text>" }` | `true` | 踢出玩家 |
 | `player.giveExp` | `{ "uuid": "<uuid>", "amount": <int> }` | `true` | 给予经验值 |
 | `player.hasPermission` | `{ "uuid": "<uuid>", "permission": "<node>" }` | `boolean` | 检查权限 |
+
+### Message 对象（可翻译组件）
+
+涉及文本的载荷（如 `message` 字段）接受 **Message 对象** 或纯字符串：
+
+```json
+// 可翻译组件（客户端按语言本地化）
+{ "key": "death.attack.player", "args": ["Steve", "Zombie"] }
+// 纯文本（MiniMessage/legacy 解析）
+{ "text": "<red>你死了</red>" }
+// 纯字符串等价于 { "text": "<string>" }
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `key` | string | Minecraft 翻译键（如 `death.attack.player`）；存在时构造可翻译组件 |
+| `args` | array | 翻译参数：string / number / 嵌套 Message（可选） |
+| `text` | string | 纯文本（`key` 缺失时使用） |
+
+`key` 与 `text` 同时存在时 `key` 优先。**实现建议**：所有实现至少应支持 `text` 字段（纯文本）；`key`/`args` 为可翻译组件支持。
 
 ### 资源包
 

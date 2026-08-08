@@ -1,9 +1,13 @@
 package yeow.task;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+
+import java.util.ArrayList;
 
 public class TextUtil {
     private static final MiniMessage MM = MiniMessage.miniMessage();
@@ -30,6 +34,39 @@ public class TextUtil {
             return parsed;
         } catch (Exception ignored) {}
         return LEGACY.deserialize(t);
+    }
+
+    /**
+     * 解析消息载荷（Message 对象，跨实现建议支持）：
+     * - 字符串 → 纯文本（MiniMessage/legacy 解析）
+     * - `{ "key": "<翻译键>", "args": [<string|number|Message>...] }` → 可翻译组件
+     * - `{ "text": "<纯文本>" }` → 纯文本（MiniMessage/legacy 解析）
+     * - `key` 与 `text` 同时存在时 `key` 优先
+     */
+    public static Component parseMessage(JsonElement e) {
+        if (e == null || e.isJsonNull()) return Component.empty();
+        if (e.isJsonPrimitive()) return parse(e.getAsString());
+        if (e.isJsonObject()) {
+            var o = e.getAsJsonObject();
+            if (o.has("key") && !o.get("key").isJsonNull() && !o.get("key").getAsString().isEmpty()) {
+                var comp = Component.translatable(o.get("key").getAsString());
+                if (o.has("args") && o.get("args").isJsonArray() && o.getAsJsonArray("args").size() > 0) {
+                    var args = new ArrayList<Component>();
+                    for (var a : o.getAsJsonArray("args")) {
+                        if (a.isJsonObject() || a.isJsonPrimitive())
+                            args.add(parseMessage(a));
+                        else
+                            args.add(Component.text(a.toString()));
+                    }
+                    comp = comp.args(args);
+                }
+                return comp;
+            }
+            if (o.has("text") && !o.get("text").isJsonNull())
+                return parse(o.get("text").getAsString());
+            return Component.empty();
+        }
+        return Component.empty();
     }
 
     public static String toLegacy(Component c) {

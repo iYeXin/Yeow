@@ -2,6 +2,7 @@ import { call, post } from './task.js';
 import type { TaskOptions } from './task.js';
 import { Location, LocationData } from './location.js';
 import type { ItemStack } from './item.js';
+import type { Message } from './message.js';
 
 interface PlayerData {
   uuid: string;
@@ -116,8 +117,8 @@ export class Player {
   get totalExperience(): number { return call<number>('player.getTotalExperience', { uuid: this.uuid }); }
   getTotalExperience(options?: TaskOptions): Promise<number> { return post<number>('player.getTotalExperience', { uuid: this.uuid }, options); }
 
-  sendMessage(msg: string, options?: TaskOptions): Promise<void> { return post('player.sendMessage', { uuid: this.uuid, message: msg }, options); }
-  sendMessageSync(msg: string, options?: TaskOptions): void { call('player.sendMessage', { uuid: this.uuid, message: msg }, options); }
+  sendMessage(msg: string | Message, options?: TaskOptions): Promise<void> { return post('player.sendMessage', { uuid: this.uuid, message: msg }, options); }
+  sendMessageSync(msg: string | Message, options?: TaskOptions): void { call('player.sendMessage', { uuid: this.uuid, message: msg }, options); }
   kick(reason?: string, options?: TaskOptions): Promise<void> { return post('player.kick', { uuid: this.uuid, reason }, options); }
   kickSync(reason?: string, options?: TaskOptions): void { call('player.kick', { uuid: this.uuid, reason }, options); }
   sendTitle(title?: string, subtitle?: string, fadeIn?: number, stay?: number, fadeOut?: number, options?: TaskOptions): Promise<void> {
@@ -142,8 +143,8 @@ export class Player {
   }
   teleport(loc: Location, options?: TaskOptions): Promise<void> { return post('player.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
   teleportSync(loc: Location, options?: TaskOptions): void { call('player.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
-  sendActionBar(message: string, options?: TaskOptions): Promise<void> { return post('player.sendActionBar', { uuid: this.uuid, message }, options); }
-  sendActionBarSync(message: string, options?: TaskOptions): void { call('player.sendActionBar', { uuid: this.uuid, message }, options); }
+  sendActionBar(message: string | Message, options?: TaskOptions): Promise<void> { return post('player.sendActionBar', { uuid: this.uuid, message }, options); }
+  sendActionBarSync(message: string | Message, options?: TaskOptions): void { call('player.sendActionBar', { uuid: this.uuid, message }, options); }
   sendResourcePack(url: string, hash?: string, prompt?: string, force?: boolean, options?: TaskOptions): Promise<void> {
     return post('player.sendResourcePack', { uuid: this.uuid, url, hash, prompt, force }, options);
   }

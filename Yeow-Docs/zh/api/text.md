@@ -45,3 +45,37 @@ const motd = userText.replace(/\\n/g, '\n');   // 字面 \n → 真实换行
 ```
 
 即：把"用户输入的转义约定"翻译成 Yeow 的真实换行语义。
+
+## Message 对象（可翻译组件）
+
+涉及文本的载荷支持 **Message 对象**——可翻译组件（客户端按语言本地化）或纯文本：
+
+```js
+// 可翻译组件：Minecraft 翻译键 + 参数
+{ key: 'death.attack.player', args: ['Steve', 'Zombie'] }
+
+// 纯文本（MiniMessage/legacy 解析）
+{ text: '<red>你死了</red>' }
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `key` | string | Minecraft 翻译键（如 `death.attack.player`）；存在时构造可翻译组件 |
+| `args` | (string \| number \| Message)[] | 翻译参数（可选，可嵌套 Message） |
+| `text` | string | 纯文本（`key` 缺失时使用） |
+
+- `key` 与 `text` 同时存在时 **`key` 优先**
+- 纯字符串等价于 `{ text: "<string>" }`
+- 发送消息 API（`player.sendMessage`、`player.sendActionBar`、`broadcast`）均接受
+- 事件侧：`playerDeath` 的 `deathMessage` 为纯文本，同时提供 `deathKey`/`deathArgs`（死亡消息为可翻译组件时）
+
+```js
+// 死亡消息本地化转发
+eventOn('playerDeath', (e) => {
+    if (e.deathKey) {
+        broadcast({ key: e.deathKey, args: e.deathArgs });
+    } else {
+        broadcast(e.deathMessage);
+    }
+});
+```

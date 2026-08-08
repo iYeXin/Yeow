@@ -1,5 +1,6 @@
 package yeow.task;
 
+import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -70,5 +71,43 @@ class TextUtilTest {
     @Test void tabRoundTrip() {
         var out = TextUtil.toLegacy(TextUtil.parse("a\tb"));
         assertEquals("a\tb", out, "real tab round-trips");
+    }
+
+    // ── Message 对象（可翻译组件）──
+
+    @Test void messageString() {
+        assertEquals("hello", TextUtil.toLegacy(TextUtil.parseMessage(JsonParser.parseString("\"hello\""))));
+    }
+
+    @Test void messageKey() {
+        var c = TextUtil.parseMessage(JsonParser.parseString("{\"key\":\"death.attack.player\",\"args\":[\"Steve\"]}"));
+        assertTrue(c instanceof net.kyori.adventure.text.TranslatableComponent, "translatable component");
+        var tc = (net.kyori.adventure.text.TranslatableComponent) c;
+        assertEquals("death.attack.player", tc.key());
+        assertEquals(1, tc.args().size());
+        assertEquals("Steve", net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(tc.args().get(0)));
+    }
+
+    @Test void messageKeyNoArgs() {
+        var c = TextUtil.parseMessage(JsonParser.parseString("{\"key\":\"death.attack.generic\"}"));
+        assertTrue(c instanceof net.kyori.adventure.text.TranslatableComponent);
+        assertEquals(0, ((net.kyori.adventure.text.TranslatableComponent) c).args().size());
+    }
+
+    @Test void messageText() {
+        var out = TextUtil.toLegacy(TextUtil.parseMessage(JsonParser.parseString("{\"text\":\"<red>死了</red>\"}")));
+        assertEquals("§c死了", out);
+    }
+
+    @Test void messageKeyPrecedesText() {
+        var c = TextUtil.parseMessage(JsonParser.parseString("{\"key\":\"k\",\"text\":\"ignored\"}"));
+        assertTrue(c instanceof net.kyori.adventure.text.TranslatableComponent);
+    }
+
+    @Test void messageNestedArgs() {
+        var c = TextUtil.parseMessage(JsonParser.parseString("{\"key\":\"k\",\"args\":[{\"text\":\"<green>x</green>\"}]}"));
+        var tc = (net.kyori.adventure.text.TranslatableComponent) c;
+        assertEquals(1, tc.args().size());
+        assertTrue(tc.args().get(0).style().color() != null, "nested Message parsed with style");
     }
 }

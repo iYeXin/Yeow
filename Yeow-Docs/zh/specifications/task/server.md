@@ -6,7 +6,7 @@
 
 | 任务 | 请求 | 返回 |
 |------|------|------|
-| `server.broadcast` | `{ "message": "<text>" }` | `true` |
+| `server.broadcast` | `{ "message": <Message> }` | `true` | `message` 为 [Message 对象](../task/player.md#message-对象可翻译组件) 或纯文本 |
 | `server.getMotd` | `{}` | `string` |
 | `server.setMotd` | `{ "motd": "<text>" }` | `true` |
 | `server.getVersion` | `{}` | `string` |

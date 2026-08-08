@@ -40,7 +40,12 @@ export interface PlayerCommandEvent {
 }
 export interface PlayerDeathEvent {
   player: Player;
+  /** 死亡消息纯文本（legacy 格式）。 */
   deathMessage: string;
+  /** 死亡消息的可翻译组件（如有）：翻译键（如 `death.attack.player`）。 */
+  deathKey?: string;
+  /** 死亡消息的可翻译组件参数（纯文本）。 */
+  deathArgs?: string[];
   deathType: string;
   cancelled?: boolean;
 }
