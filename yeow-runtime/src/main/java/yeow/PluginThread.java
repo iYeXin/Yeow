@@ -250,7 +250,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
-                        ioExecutor.submit(() -> { var result = handleFs(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, result)); });
+                        ioExecutor.submit(() -> { var result = handleFs(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(result))); });
                         return null;
                     }
                     return handleFs(pld);
@@ -271,7 +271,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
-                        ioExecutor.submit(() -> { var result = handleAssets(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, result)); });
+                        ioExecutor.submit(() -> { var result = handleAssets(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(result))); });
                         return null;
                     }
                     return handleAssets(pld);
@@ -346,8 +346,18 @@ public class PluginThread implements Runnable, PluginEntity {
         }
     }
 
-    private String handleFs(String pld) {
-        try {
+    /**
+     * 通道处理返回的 JSON 字符串 → 对象，用于异步回调投递（`r` 字段）：
+     * 同步调用经 `$send` 的 JSON.parse 得到对象；异步回调必须同样得到对象，
+     * 否则 JS 侧收到字符串（如 `{"data":...}`），`r.data` 为 undefined。
+     * "null"（缺失文件等）→ null；解析失败原样返回。
+     */
+    private static Object toJsonValue(String json) {
+        if (json == null) return null;
+        try { return gson.fromJson(json, Object.class); } catch (Exception e) { return json; }
+    }
+
+    private String handleFs(String pld) {        try {
             var obj = gson.fromJson(pld, JsonObject.class); var task = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
             var dot = task.indexOf('.');
             var level = dot > 0 ? task.substring(0, dot) : "plugin";
@@ -489,7 +499,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     var headers = p.has("headers") ? p.getAsJsonObject("headers") : new JsonObject();
                     var responseType = p.has("responseType") ? p.get("responseType").getAsString() : "text";
                     var cb = p.get("cb").getAsString();
-                    ioExecutor.submit(() -> { var result = handleHttpRequest(url, method, body, headers, responseType); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cb, result)); });
+                    ioExecutor.submit(() -> { var result = handleHttpRequest(url, method, body, headers, responseType); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cb, toJsonValue(result))); });
                     yield null;
                 }
                 default -> gson.toJson(Map.of("err", "Unknown http op: " + t));

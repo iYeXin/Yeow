@@ -186,7 +186,10 @@ export function createServer(port?: number): Server {
       try {
         data = await read(filePath);
       } catch {
-        return next(); // 文件不存在 → 继续后续层（最终 404）
+        return next(); // 读取失败（文件不存在等）→ 继续后续层（最终 404）
+      }
+      if (data == null || data === '') {
+        return next(); // 空结果（缺失文件/读取异常）同样继续后续层，避免静态层吞掉未知路径
       }
       const dot = rel.lastIndexOf('.');
       const ext = dot >= 0 ? rel.slice(dot).toLowerCase() : '';
