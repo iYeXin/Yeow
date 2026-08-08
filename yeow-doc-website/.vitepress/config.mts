@@ -59,6 +59,7 @@ export default defineConfig({
                         items: [
                             { text: 'Player', link: '/api/player' },
                             { text: 'Server', link: '/api/server' },
+                            { text: 'Env', link: '/api/env' },
                         ],
                     },
                     {
@@ -115,6 +116,13 @@ export default defineConfig({
                             { text: 'Service', link: '/api/service' },
                             { text: 'HTTP', link: '/api/http' },
                             { text: 'HTTP Server', link: '/api/http-server' },
+                        ],
+                    },
+                    {
+                        text: '多线程',
+                        collapsed: true,
+                        items: [
+                            { text: 'Worker', link: '/api/worker' },
                         ],
                     },
                     {
