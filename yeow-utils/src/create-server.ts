@@ -1,4 +1,13 @@
 import { listen, respond, close } from 'yeow-api';
+import type { RespondOptions } from 'yeow-api';
+
+/** 响应体：字符串（文本）或完整响应选项（含 bodyBase64 二进制）。 */
+export type ResponseBody = RespondOptions;
+
+/** 路由 handler：返回字符串（文本响应）、响应选项对象（如 { bodyBase64, headers }），或不返回（自行 respond）。 */
+export type RouteHandler = (
+  req: RouteRequest,
+) => string | ResponseBody | undefined | Promise<string | ResponseBody | undefined>;
 
 export interface RouteRequest {
   path: string;
@@ -14,17 +23,17 @@ export interface RouteRequest {
 
 export interface Server {
   port: number | undefined;
-  get(path: string, handler: (req: RouteRequest) => any): Server;
-  post(path: string, handler: (req: RouteRequest) => any): Server;
-  put(path: string, handler: (req: RouteRequest) => any): Server;
-  del(path: string, handler: (req: RouteRequest) => any): Server;
+  get(path: string, handler: RouteHandler): Server;
+  post(path: string, handler: RouteHandler): Server;
+  put(path: string, handler: RouteHandler): Server;
+  del(path: string, handler: RouteHandler): Server;
   close(): void;
 }
 
 interface CompiledRoute {
   regex: RegExp;
   paramNames: string[];
-  handler: (req: RouteRequest) => any;
+  handler: RouteHandler;
 }
 
 function compile(path: string): { regex: RegExp; paramNames: string[] } {

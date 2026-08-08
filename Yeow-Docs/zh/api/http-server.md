@@ -115,27 +115,34 @@ close(serverId);
 
 ### 二进制响应（base64）
 
-`respond` 支持 `bodyBase64`——base64 编码的**二进制**响应体（与 `body` 互斥，优先）。典型场景：从 `assets` 读取资源包等二进制文件并暴露下载 URL：
+`respond` 支持 `bodyBase64`——base64 编码的**二进制**响应体（与 `body` 互斥，优先）。典型场景：从 `assets` 读取资源包等二进制文件并暴露下载 URL。
+
+**推荐使用 `yeow-utils` 的 `createServer`**（路由 + 自动响应）：
 
 ```js
-import { listen, respond } from 'yeow-api';
+import { createServer } from 'yeow-utils';
 import { assetsReadBase64 } from 'yeow-api';
 
-const { serverId, port } = listen(async (req) => {
-    if (req.path === '/resourcepack') {
-        const data = await assetsReadBase64('pack/resourcepack.zip');   // assets 二进制 → base64
-        respond(req.serverId, req.connId, {
-            status: 200,
-            bodyBase64: data,
-            headers: {
-                'content-type': 'application/zip',
-                'content-disposition': 'attachment; filename="resourcepack.zip"',
-            },
-        });
-    } else {
-        respond(req.serverId, req.connId, { status: 404, body: 'Not Found' });
-    }
-}, 8080);
+let cachedPack = null;   // 缓存：每次请求都从 .zip 内解压读取较耗时
 
-// 玩家/客户端可直接下载: http://<服务器地址>:8080/resourcepack
+const app = createServer(8080);
+
+app.get('/resourcepack', async (req) => {
+    if (!cachedPack) {
+        cachedPack = await assetsReadBase64('pack/resourcepack.zip');   // 首次读取并缓存
+    }
+    return {
+        bodyBase64: cachedPack,
+        headers: {
+            'content-type': 'application/zip',
+            'content-disposition': 'attachment; filename="resourcepack.zip"',
+        },
+    };
+});
+
+// 客户端/玩家下载: http://<服务器>:8080/resourcepack
 ```
+
+> **缓存提示**：`assetsReadBase64` 每次调用都会从插件包（.zip）中解压读取目标文件——对资源包等大文件，请**缓存**读取结果（如上面的 `cachedPack`），避免每个请求都重复解压。
+
+> **端口告知**：HTTP 监听端口需**插件作者自行保证可用**（未被占用、服务器防火墙放行）——请在插件文档/说明中**告知服主监听的端口号**，由服主配置防火墙与转发。
