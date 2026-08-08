@@ -45,6 +45,12 @@
 | ⭐ [Event](event.md) | 事件订阅：`eventOn` / `eventOff` |
 | ⭐ [Command](command.md) | 命令注册 + Tab 补全（含 `yeow-utils` 重载式命令） |
 
+## 物品
+
+| 文档 | 说明 |
+|------|------|
+| ⭐ [ItemStack](item.md) | 物品数据：类型、数量、meta（显示名/附魔/自定义模型等） |
+
 ## 服务与网络
 
 | 文档 | 说明 |
