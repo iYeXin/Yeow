@@ -9,6 +9,7 @@ export default defineConfig({
     lang: 'zh-CN',
     title: 'Yeow',
     description: '用 TypeScript 写 Minecraft Paper 插件 · QuickJS 引擎',
+    site: 'https://yeow.yeside.top',
     base,
     srcDir: 'docs',
     appearance: 'dark',
@@ -47,6 +48,7 @@ export default defineConfig({
                     { text: '构建与分发', link: '/distribution' },
                     { text: '运行时警告', link: '/runtime-warning' },
                     { text: '路线图', link: '/todo' },
+                    { text: '站点地图', link: '/sitemap' },
                 ],
             },
             {
