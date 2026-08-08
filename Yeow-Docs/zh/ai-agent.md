@@ -17,7 +17,7 @@ npm run dev                          # 启动 Paper 开发服务器（WebSocket 
 
 - `--ts`：**TypeScript**（强烈建议——完整类型推断，AI/编辑器获得类型支持，杜绝静态错误与模型幻觉）
 - `--name=xxx`：指定项目名；不带 `-y` 时交互式选择语言
-- `npm run dev -- -y --stop=2m`：2 分钟后自动停止
+- `npm run dev -- -y --stop=2m`：非交互式 EULA 同意；2 分钟后自动停止
 
 ## 下一步
 
