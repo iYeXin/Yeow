@@ -51,7 +51,7 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 死亡的玩家 |
-| `deathMessage` | [Message 对象](../task/player.md#message-对象可翻译组件) | 死亡消息：`{ "key": "<翻译键>", "args": [...] }`（原始消息为可翻译组件时，如 `death.attack.player`）或 `{ "text": "<纯文本>" }` |
+| `deathMessage` | [Message 对象](../task/player.md#message-对象可翻译组件) | 死亡消息：`{ "key": "<翻译键>", "args": [...], "text": "<纯文本>" }`——`key`/`args` 可翻译组件（原始消息为可翻译组件时）与 `text` 纯文本兜底**同时传递** |
 | `deathType` | string | 伤害类型 key |
 
 > 插件可直接把 `deathMessage` 转发给发送消息 API（`broadcast`、`player.sendMessage` 等）——Message 对象天然兼容。
@@ -137,6 +137,8 @@
 |------|------|------|
 | `player` | string (UUID) | 玩家 |
 | `advancement` | string | 进度命名空间 key（如 `minecraft:story/root`） |
+| `title` | [Message 对象](../task/player.md#message-对象可翻译组件) (可选) | 进度标题（`{ "text": "<纯文本>" }`；隐藏进度时缺失） |
+| `description` | [Message 对象](../task/player.md#message-对象可翻译组件) (可选) | 进度描述（同上） |
 
 ## `playerToggleSneak`
 

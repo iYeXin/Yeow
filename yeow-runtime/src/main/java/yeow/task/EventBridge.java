@@ -310,14 +310,15 @@ public class EventBridge implements Listener {
                 if(e.getClickedBlock()!=null){var b=e.getClickedBlock();m.put("block",Map.of("x",b.getX(),"y",b.getY(),"z",b.getZ(),"type",b.getType().getKey().toString()));} break; }
             case "playerCommand":{ var e=(PlayerCommandPreprocessEvent)ev; putP(m,e.getPlayer()); m.put("message",e.getMessage()); break; }
             case "playerDeath":{ var e=(PlayerDeathEvent)ev; putP(m,e.getPlayer());
-                // 死亡消息直接传 Message 对象：{key,args} 可翻译组件 或 {text} 纯文本
+                // 死亡消息：Message 对象——key/args 可翻译组件（如有）+ text 纯文本兜底，两者同时传递
                 var dm = e.getDeathMessage();
+                var text = dm != null ? TextUtil.toLegacy(dm) : "";
                 if (dm instanceof net.kyori.adventure.text.TranslatableComponent tc) {
                     var args = new java.util.ArrayList<String>();
                     for (var a : tc.args()) args.add(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(a));
-                    m.put("deathMessage", Map.of("key", tc.key(), "args", args));
+                    m.put("deathMessage", Map.of("key", tc.key(), "args", args, "text", text));
                 } else {
-                    m.put("deathMessage", dm != null ? Map.of("text", TextUtil.toLegacy(dm)) : null);
+                    m.put("deathMessage", text.isEmpty() ? null : Map.of("text", text));
                 }
                 m.put("deathType",e.getDamageSource()!=null?e.getDamageSource().getDamageType().getKey().getKey():"UNKNOWN"); break; }
             case "playerRespawn":{ var e=(PlayerRespawnEvent)ev; putP(m,e.getPlayer()); m.put("respawnLocation",pos(e.getRespawnLocation())); break; }
@@ -330,7 +331,14 @@ public class EventBridge implements Listener {
             case "playerExpChange":{ var e=(PlayerExpChangeEvent)ev; putP(m,e.getPlayer()); m.put("amount",e.getAmount()); break; }
             case "playerLevelChange":{ var e=(PlayerLevelChangeEvent)ev; putP(m,e.getPlayer()); m.put("oldLevel",e.getOldLevel()); m.put("newLevel",e.getNewLevel()); break; }
             case "playerGameModeChange":{ var e=(PlayerGameModeChangeEvent)ev; putP(m,e.getPlayer()); m.put("newGameMode",e.getNewGameMode().name()); break; }
-            case "playerAdvancementDone":{ var e=(PlayerAdvancementDoneEvent)ev; putP(m,e.getPlayer()); m.put("advancement",e.getAdvancement().getKey().toString()); break; }
+            case "playerAdvancementDone":{ var e=(PlayerAdvancementDoneEvent)ev; putP(m,e.getPlayer()); m.put("advancement",e.getAdvancement().getKey().toString());
+                // 进度标题/描述：Message 对象（Bukkit 仅提供 legacy 文本，传 {text}）
+                var disp = e.getAdvancement().getDisplay();
+                if (disp != null) {
+                    m.put("title", Map.of("text", (Object) disp.getTitle()));
+                    m.put("description", Map.of("text", (Object) disp.getDescription()));
+                }
+                break; }
             case "playerToggleSneak":{ var e=(PlayerToggleSneakEvent)ev; putP(m,e.getPlayer()); m.put("sneaking",e.isSneaking()); break; }
             case "playerToggleFlight":{ var e=(PlayerToggleFlightEvent)ev; putP(m,e.getPlayer()); m.put("flying",e.isFlying()); break; }
             case "foodLevelChange":{ var e=(FoodLevelChangeEvent)ev; putP(m,(org.bukkit.entity.Player)e.getEntity()); m.put("oldFoodLevel",e.getEntity().getFoodLevel()); m.put("newFoodLevel",e.getFoodLevel()); break; }

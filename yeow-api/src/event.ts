@@ -41,7 +41,7 @@ export interface PlayerCommandEvent {
 }
 export interface PlayerDeathEvent {
   player: Player;
-  /** 死亡消息（Message 对象）：`{key, args}` 可翻译组件（客户端本地化）或 `{text}` 纯文本。 */
+  /** 死亡消息（Message 对象）：`{key, args}` 可翻译组件（客户端本地化）+ `{text}` 纯文本兜底，同时传递。 */
   deathMessage: Message;
   deathType: string;
   cancelled?: boolean;
@@ -181,6 +181,10 @@ export interface PlayerItemConsumeEvent {
 export interface PlayerAdvancementDoneEvent {
   player: Player;
   advancement: string;
+  /** 进度标题（Message 对象，`{text}` 纯文本；隐藏进度时缺失）。 */
+  title?: Message;
+  /** 进度描述（Message 对象，`{text}` 纯文本；隐藏进度时缺失）。 */
+  description?: Message;
 }
 export interface PlayerToggleSneakEvent {
   player: Player;

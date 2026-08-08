@@ -51,27 +51,32 @@ const motd = userText.replace(/\\n/g, '\n');   // 字面 \n → 真实换行
 涉及文本的载荷支持 **Message 对象**——可翻译组件（客户端按语言本地化）或纯文本：
 
 ```js
-// 可翻译组件：Minecraft 翻译键 + 参数
-{ key: 'death.attack.player', args: ['Steve', 'Zombie'] }
+// 可翻译组件：Minecraft 翻译键 + 参数 + 纯文本兜底（key 与 text 可同时存在）
+{ key: 'death.attack.player', args: ['Steve', 'Zombie'], text: '§cSteve 被 Zombie 杀死了' }
 
 // 纯文本（MiniMessage/legacy 解析）
 { text: '<red>你死了</red>' }
 ```
 
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `key` | string | Minecraft 翻译键（如 `death.attack.player`）；存在时构造可翻译组件 |
-| `args` | (string \| number \| Message)[] | 翻译参数（可选，可嵌套 Message） |
-| `text` | string | 纯文本（`key` 缺失时使用） |
+| 字段   | 类型                            | 说明                                                               |
+| ------ | ------------------------------- | ------------------------------------------------------------------ |
+| `key`  | string                          | Minecraft 翻译键（如 `death.attack.player`）；存在时构造可翻译组件 |
+| `args` | (string \| number \| Message)[] | 翻译参数（可选，可嵌套 Message）                                   |
+| `text` | string                          | 纯文本兜底（MiniMessage/legacy 解析）                              |
 
-- `key` 与 `text` 同时存在时 **`key` 优先**
+- `key` 与 `text` **同时存在**：`key` 用于客户端本地化，`text` 为纯文本兜底（如跨实现转发时）
 - 纯字符串等价于 `{ text: "<string>" }`
 - 发送消息 API（`player.sendMessage`、`player.sendActionBar`、`broadcast`）均接受
-- 事件侧：`playerDeath` 的 `deathMessage` 直接就是 Message 对象（`{key, args}` 或 `{text}`）
+- 事件侧：`playerDeath` 的 `deathMessage` 为 Message 对象（`{key, args, text}` 或 `{text}`）；`playerAdvancementDone` 的 `title`/`description` 为 Message 对象（`{text}`）
 
 ```js
-// 死亡消息本地化转发——Message 对象直接透传
+// 死亡消息本地化转发——Message 对象直接透传（key 本地化 + text 兜底）
 eventOn('playerDeath', (e) => {
-    broadcast(e.deathMessage);   // 客户端按语言本地化（可翻译组件）或直接显示（纯文本）
+    broadcast(e.deathMessage);
+});
+
+// 进度达成提示
+eventOn('playerAdvancementDone', (e) => {
+    if (e.title) player.sendTitle(e.title.text, e.description?.text);
 });
 ```

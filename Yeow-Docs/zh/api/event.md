@@ -89,7 +89,7 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 | `playerExpChange` | player, amount | |
 | `playerLevelChange` | player, oldLevel, newLevel | |
 | `playerGameModeChange` | player, newGameMode | ✔ |
-| `playerAdvancementDone` | player, advancement | |
+| `playerAdvancementDone` | player, advancement, title(Message)?, description(Message)? | |
 | `playerToggleSneak` | player, sneaking | |
 | `playerToggleFlight` | player, flying | |
 | `foodLevelChange` | player, oldFoodLevel, newFoodLevel | ✔ |

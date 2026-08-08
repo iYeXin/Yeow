@@ -100,8 +100,8 @@
 涉及文本的载荷（如 `message` 字段）接受 **Message 对象** 或纯字符串：
 
 ```json
-// 可翻译组件（客户端按语言本地化）
-{ "key": "death.attack.player", "args": ["Steve", "Zombie"] }
+// 可翻译组件 + 纯文本兜底（key 与 text 可同时存在）
+{ "key": "death.attack.player", "args": ["Steve", "Zombie"], "text": "§cSteve 被 Zombie 杀死了" }
 // 纯文本（MiniMessage/legacy 解析）
 { "text": "<red>你死了</red>" }
 // 纯字符串等价于 { "text": "<string>" }
@@ -111,9 +111,9 @@
 |------|------|------|
 | `key` | string | Minecraft 翻译键（如 `death.attack.player`）；存在时构造可翻译组件 |
 | `args` | array | 翻译参数：string / number / 嵌套 Message（可选） |
-| `text` | string | 纯文本（`key` 缺失时使用） |
+| `text` | string | 纯文本兜底（`key` 缺失时使用；与 `key` 同时存在时二者都传递） |
 
-`key` 与 `text` 同时存在时 `key` 优先。**实现建议**：所有实现至少应支持 `text` 字段（纯文本）；`key`/`args` 为可翻译组件支持。
+**实现建议**：所有实现至少应支持 `text` 字段（纯文本）；`key`/`args` 为可翻译组件支持。`key` 与 `text` 同时存在时**两者都传递**（`key` 用于本地化，`text` 为跨实现转发兜底）。
 
 ### 资源包
 
