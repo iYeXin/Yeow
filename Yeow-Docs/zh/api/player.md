@@ -117,7 +117,7 @@ player.getItemInOffHandSync()       // ItemStack | null
 ```js
 player.sendActionBar(message)       // Promise —— message 为纯文本或 Message 对象
 player.sendActionBarSync(message)
-player.sendResourcePack(url, hash?, prompt?, force?)  // Promise
+player.sendResourcePack(url, hash?, prompt?, force?)  // Promise —— prompt 为纯文本或 Message 对象
 ```
 
 ### 异步属性访问

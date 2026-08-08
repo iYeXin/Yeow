@@ -61,7 +61,7 @@ public class PlayerTasks {
         var url = p.get("url").getAsString();
         var hash = p.has("hash") && !p.get("hash").isJsonNull() ? p.get("hash").getAsString() : "";
         var prompt = p.has("prompt") && !p.get("prompt").isJsonNull()
-            ? TextUtil.parse(p.get("prompt").getAsString()) : net.kyori.adventure.text.Component.empty();
+            ? TextUtil.parseMessage(p.get("prompt")) : net.kyori.adventure.text.Component.empty();
         var force = p.has("force") && p.get("force").getAsBoolean();
         try {
             var method = Player.class.getMethod("setResourcePack", String.class, String.class, net.kyori.adventure.text.Component.class, boolean.class);

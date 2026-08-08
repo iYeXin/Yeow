@@ -119,7 +119,7 @@
 
 | 任务 | 请求 | 返回 | 说明 |
 |------|------|------|------|
-| `player.sendResourcePack` | `{ "uuid": "<uuid>", "url": "<url>", "hash": "<sha1>", "prompt": "<text>", "force": <boolean> }` | `true` | 提示下载资源包。`hash` 为 SHA-1 十六进制字符串 |
+| `player.sendResourcePack` | `{ "uuid": "<uuid>", "url": "<url>", "hash": "<sha1>", "prompt": <Message>, "force": <boolean> }` | `true` | 提示下载资源包。`hash` 为 SHA-1 十六进制字符串；`prompt` 为 [Message 对象](#message-对象可翻译组件) 或纯文本 |
 
 ### 手持物品
 

@@ -145,8 +145,11 @@ export class Player {
   teleportSync(loc: Location, options?: TaskOptions): void { call('player.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
   sendActionBar(message: string | Message, options?: TaskOptions): Promise<void> { return post('player.sendActionBar', { uuid: this.uuid, message }, options); }
   sendActionBarSync(message: string | Message, options?: TaskOptions): void { call('player.sendActionBar', { uuid: this.uuid, message }, options); }
-  sendResourcePack(url: string, hash?: string, prompt?: string, force?: boolean, options?: TaskOptions): Promise<void> {
+  sendResourcePack(url: string, hash?: string, prompt?: string | Message, force?: boolean, options?: TaskOptions): Promise<void> {
     return post('player.sendResourcePack', { uuid: this.uuid, url, hash, prompt, force }, options);
+  }
+  sendResourcePackSync(url: string, hash?: string, prompt?: string | Message, force?: boolean, options?: TaskOptions): void {
+    call('player.sendResourcePack', { uuid: this.uuid, url, hash, prompt, force }, options);
   }
   getItemInMainHand(options?: TaskOptions): Promise<ItemStack | null> { return post<ItemStack | null>('player.getItemInMainHand', { uuid: this.uuid }, options); }
   getItemInMainHandSync(options?: TaskOptions): ItemStack | null { return call<ItemStack | null>('player.getItemInMainHand', { uuid: this.uuid }, options); }

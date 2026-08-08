@@ -125,7 +125,7 @@ import { assetsReadBase64 } from 'yeow-api';
 
 let cachedPack = null;   // 缓存：每次请求都从 .zip 内解压读取较耗时
 
-const app = createServer(8080);
+const app = createServer(17835);
 
 app.get('/resourcepack', async (req) => {
     if (!cachedPack) {
@@ -140,9 +140,43 @@ app.get('/resourcepack', async (req) => {
     };
 });
 
-// 客户端/玩家下载: http://<服务器>:8080/resourcepack
+// 客户端/玩家下载: http://<服务器>:17835/resourcepack
 ```
 
 > **缓存提示**：`assetsReadBase64` 每次调用都会从插件包（.zip）中解压读取目标文件——对资源包等大文件，请**缓存**读取结果（如上面的 `cachedPack`），避免每个请求都重复解压。
 
 > **端口告知**：HTTP 监听端口需**插件作者自行保证可用**（未被占用、服务器防火墙放行）——请在插件文档/说明中**告知服主监听的端口号**，由服主配置防火墙与转发。
+
+### 完整闭环：资源包下载并发送给玩家
+
+```js
+import { createServer } from 'yeow-utils';
+import { assetsReadBase64, Player, fs, eventOn } from 'yeow-api';
+
+// ① 暴露资源包下载 URL（见上例，缓存 base64）
+const app = createServer(17835);
+app.get('/resourcepack', async (req) => {
+    if (!cachedPack) cachedPack = await assetsReadBase64('pack/resourcepack.zip');
+    return { bodyBase64: cachedPack, headers: { 'content-type': 'application/zip' } };
+});
+
+// ② 公网地址由服主在插件数据目录配置（plugins/<插件名>/config.json）
+//    { "publicUrl": "https://mc.example.com:17835" }   ← 服主填写公网可达的 IP/域名 + 端口
+const cfg = JSON.parse(fs.readFileSync('config.json'));
+
+// ③ 玩家加入时发送资源包（url 指向上面暴露的下载地址）
+eventOn('playerJoin', async (e) => {
+    await e.player.sendResourcePack(
+        cfg.publicUrl + '/resourcepack',              // url —— 从配置读取的公网地址
+        hash,                                          // hash —— SHA-1（可选，建议提供以校验完整性）
+        { text: '<yellow>请下载服务器资源包</yellow>' },  // prompt —— Message 对象（也支持纯字符串）
+        true,                                          // force —— 是否强制
+    );
+});
+```
+
+`sendResourcePack` 的 `hash` 为 **SHA-1 十六进制**（可选但建议提供，客户端据此校验完整性）；`hash`/`prompt`/`force` 均可省略。`hash` 需插件自行提供（如构建时对资源包文件计算后写入配置）。
+
+> **公网地址配置**：`url` 必须由**玩家客户端**可访问——插件作者应让**服主在配置中填写公网可达的 IP 或域名**（含端口），并在插件文档中说明：端口需放行防火墙、如在内网/家宽需做端口转发。
+
+> **⚠ 生产环境建议**：资源包**理论上应当通过 CDN 分发**（如对象存储 + CDN、GitHub Releases 等）。**本示例（插件自带 HTTP 服务器直出）仅用于临时场景**，或用户自定义资源包的场景，生产请改用 CDN 地址作为 `sendResourcePack` 的 `url`。
