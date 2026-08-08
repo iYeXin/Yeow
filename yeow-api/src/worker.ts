@@ -37,17 +37,19 @@ function _sendWorkerAsync(t: string, p: Record<string, unknown>): Promise<void> 
  * - 事件/命令/服务以独立实体注册；调度器任务独立统计
  * - 共享主插件的**数据目录**与**权限**
  * - 不能创建新的 Worker（嵌套被拒绝）
+ * - **创建后无法销毁，只能卸载**（卸载物理销毁 JS 上下文，句柄保留——可重新 load）
  * - 主插件卸载时连带卸载；/yeow 管理命令不覆盖 Worker；profiler 会统计（标记 created by 主插件）
  * - Worker 的 JS 错误与主插件同样回传（dev 模式经 source-map 定位）
  */
 export class Worker {
-  private readonly id: string;
   private readonly name: string;
   private readonly entry?: string;
   private readonly code?: string;
   private readonly key: string;
   private _loaded = false;
   private _onMessage: ((msg: any) => void) | null = null;
+  /** 内部 workerId（主插件 JS 侧分配；跨主插件可重复）。 */
+  readonly id: string;
 
   constructor(name: string, entry: string | undefined, code: string | undefined) {
     this.name = name;
@@ -67,29 +69,25 @@ export class Worker {
     this._onMessage = cb;
   }
 
-  /** 加载/启动 Worker（首次调用后重复调用为 no-op）。 */
+  /** 启动 Worker：执行 init.js → worker-inject.js → Worker 代码 → INIT → LOAD（已加载为 no-op）。 */
   load(): Promise<void> {
     if (this._loaded) return Promise.resolve();
     this._loaded = true;
-    const p: Record<string, unknown> = { name: this.name, msgCb: _msgCbs[this.id] };
-    if (this.entry) p.entry = this.entry;
-    else p.code = this.code;
-    return _sendWorkerAsync('create', p);
+    return _sendWorkerAsync('load', { name: this.name });
   }
 
-  /** 卸载 Worker（停止线程并清理其事件/命令/服务/任务；之后可重新 load 同名 Worker）。 */
+  /** 卸载 Worker（物理销毁 JS 上下文并清理其事件/命令/服务/任务；句柄保留，可重新 load）。 */
   unload(): Promise<void> {
     this._loaded = false;
-    delete _created[this.key];
     return _sendWorkerAsync('unload', { name: this.name });
   }
 
-  /** 向 Worker 发送消息（其 onMessage 回调接收）。 */
+  /** 向 Worker 发送消息（其 onMessage 回调接收；未 load 时抛错）。 */
   postMessage(msg: Record<string, unknown>): Promise<void> {
     return _sendWorkerAsync('post', { name: this.name, msg });
   }
 
-  /** 重载 Worker 代码（保持 workerId；旧上下文销毁、新代码重新加载）。 */
+  /** 重载 Worker 代码（需已 load；旧上下文销毁、新代码重新加载）。 */
   reload(): Promise<void> {
     const p: Record<string, unknown> = { name: this.name };
     if (this.entry) p.entry = this.entry;
@@ -99,8 +97,11 @@ export class Worker {
 }
 
 /**
- * 创建 Worker（虚拟插件）。`entry`（资源路径，经 getAssetsPath）与 `code` 二选一，
- * 同时传递抛错；`name` 必填、非 'main'、同主插件内不重复。返回后调用 `worker.load()` 启动。
+ * 创建 Worker（虚拟插件）：**仅注册到注册表并返回句柄**——`worker.load()` 才真正启动
+ * （执行 init.js → worker-inject.js → Worker 代码 → INIT → LOAD）。
+ *
+ * `entry`（资源路径，经 getAssetsPath）与 `code` 二选一，同时传递抛错；
+ * `name` 必填、非 'main'、同主插件内不重复。
  */
 export function createWorker(options: WorkerOptions): Worker {
   const name = options?.name;
@@ -121,7 +122,13 @@ export function createWorker(options: WorkerOptions): Worker {
     throw new Error('createWorker: duplicate worker name "' + name + '" in plugin ' + (__plugin?.name || 'unknown'));
   }
   _created[key] = true;
-  return new Worker(name, options.entry, options.code);
+  const w = new Worker(name, options.entry, options.code);
+  // 注册到运行时注册表（同步；重复/非法名抛错）
+  const p: Record<string, unknown> = { name, msgCb: _msgCbs[w.id] };
+  if (options.entry) p.entry = options.entry;
+  else p.code = options.code;
+  _sendWorker({ t: 'create', p });
+  return w;
 }
 
 // ── Worker 侧 API（仅 Worker 环境可用）──────────────────────────────

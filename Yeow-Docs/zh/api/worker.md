@@ -14,14 +14,16 @@ const worker = createWorker({
     entry: getAssetsPath('worker/web-worker.js'),  // 资源路径（经 getAssetsPath）；与 code 互斥
     // code: '...',                             // 代码字符串；与 entry 互斥
 });
+// createWorker 仅注册到注册表并返回句柄——worker.load() 才真正启动
 
-await worker.load();            // 启动（可重复调用，已加载为 no-op）
+await worker.load();            // 启动：init.js → worker-inject.js → Worker 代码 → INIT → LOAD（已加载为 no-op）
 worker.onMessage((msg) => {     // 接收 Worker 发来的消息
     console.log('from worker:', msg);
 });
 await worker.postMessage({ task: 'compute', data: [...] });   // 发送给 Worker
-await worker.reload();          // 重载代码（旧上下文销毁、重新加载）
-await worker.unload();          // 卸载（停止线程并清理其事件/命令/服务/任务；可重新 load 同名）
+await worker.reload();          // 重载代码（需已 load；旧上下文销毁、重新加载）
+await worker.unload();          // 卸载（物理销毁 JS 上下文并清理其事件/命令/服务/任务）
+await worker.load();            // 卸载后句柄保留——可重新加载
 ```
 
 校验：`entry` 与 `code` 不可同时传递（抛错）；`name` 必填、非 `'main'`、同主插件内重复创建抛错。
@@ -52,7 +54,7 @@ Worker 与普通插件开发类似：可调用全部 yeow-api（task/fs/http/ass
 | 资源     | **共享主插件资源**（assets 通道同一命名空间）                                                   |
 | 权限     | **共享主插件权限**（无独立声明）                                                                |
 | 嵌套     | **不能创建新的 Worker**（worker 通道被拒绝）                                                    |
-| 生命周期 | 主插件卸载/热重载时**连带卸载**全部 Worker                                                      |
+| 生命周期 | 主插件卸载/热重载时**连带卸载**全部 Worker；**Worker 创建后无法销毁，只能卸载**（`unload` 物理销毁 JS 上下文，句柄保留，可重新 `load`） |
 | 管理命令 | `/yeow` 管理命令**不覆盖** Worker                                                               |
 | 性能监控 | profiler 统计 Worker（标记 `(worker of <主插件>)`），告警同样检测                               |
 | 错误回传 | Worker 的 JS 错误与主插件同样回传（dev 模式 source-map 定位，显示 `JS Error in Worker <name>`） |

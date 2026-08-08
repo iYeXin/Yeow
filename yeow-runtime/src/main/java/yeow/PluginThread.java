@@ -368,6 +368,7 @@ public class PluginThread implements Runnable, PluginEntity {
             };
             return switch (t) {
                 case "create" -> {
+                    // 仅注册（构造句柄，不启动）：worker.load() 才执行 init/inject/代码/INIT/LOAD
                     var wname = p.get("name").getAsString();
                     if (wname.isEmpty() || "main".equals(wname) || workers.containsKey(wname)) {
                         respond.accept("{\"err\":\"invalid or duplicate worker name: " + wname + "\"}");
@@ -378,31 +379,45 @@ public class PluginThread implements Runnable, PluginEntity {
                     var w = new WorkerThread(wname, wname, PluginThread.this, initCode, code);
                     if (p.has("msgCb") && !p.get("msgCb").isJsonNull()) w.setMainMessageCb(p.get("msgCb").getAsString());
                     workers.put(wname, w);
-                    w.start();
-                    long deadline = System.currentTimeMillis() + 5000;
-                    while (System.currentTimeMillis() < deadline && (w.messageCbId() == null || !w.isRunning())) {
-                        try { Thread.sleep(10); } catch (InterruptedException e) { break; }
+                    respond.accept("true");
+                    yield null;
+                }
+                case "load" -> {
+                    // 启动已注册的 Worker（注册实体 → 执行 init.js → worker-inject.js → 代码 → INIT → LOAD）
+                    var w = workers.get(p.get("name").getAsString());
+                    if (w == null) { respond.accept("{\"err\":\"worker not registered\"}"); yield null; }
+                    if (!w.isRunning()) {
+                        var rt = YeowRuntime.inst();
+                        if (rt != null && rt.getPlugin(w.name()) == null) rt.registerPluginEntity(w, false);
+                        else w.start();
+                        long deadline = System.currentTimeMillis() + 5000;
+                        while (System.currentTimeMillis() < deadline && (w.messageCbId() == null || !w.isRunning())) {
+                            try { Thread.sleep(10); } catch (InterruptedException e) { break; }
+                        }
                     }
                     respond.accept("true");
                     yield null;
                 }
                 case "unload" -> {
-                    var w = workers.remove(p.get("name").getAsString());
+                    // 卸载：停止线程并清理（物理销毁 JS 上下文），句柄保留在注册表——可重新 load
+                    var w = workers.get(p.get("name").getAsString());
                     if (w != null && YeowRuntime.inst() != null) YeowRuntime.inst().unloadPlugin(w.name());
                     respond.accept("true");
                     yield null;
                 }
                 case "post" -> {
                     var w = workers.get(p.get("name").getAsString());
-                    if (w == null) { respond.accept("{\"err\":\"worker not found\"}"); yield null; }
+                    if (w == null || !w.isRunning() || w.messageCbId() == null) { respond.accept("{\"err\":\"worker not loaded\"}"); yield null; }
                     var msg = p.has("msg") ? p.get("msg") : JsonNull.INSTANCE;
                     w.postMessage(gson.toJson(Map.of("t","cb","p",w.messageCbId(),"r", gson.fromJson(msg.toString(), Object.class))));
                     respond.accept("true");
                     yield null;
                 }
                 case "reload" -> {
+                    // 重载运行中的 Worker；未加载（未 load）时报错
                     var w = workers.get(p.get("name").getAsString());
-                    if (w == null) { respond.accept("{\"err\":\"worker not found\"}"); yield null; }
+                    if (w == null) { respond.accept("{\"err\":\"worker not registered\"}"); yield null; }
+                    if (!w.isRunning()) { respond.accept("{\"err\":\"worker not loaded\"}"); yield null; }
                     var code = workerCode(p);
                     if (code == null) { respond.accept("{\"err\":\"worker entry not found\"}"); yield null; }
                     w.reload(code);

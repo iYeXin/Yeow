@@ -180,9 +180,7 @@ public class WorkerThread implements PluginEntity, Runnable {
             var hmFunc = hmObj instanceof JSFunction ? (JSFunction) hmObj : null;
             if (hmFunc != null) hmFunc.call(gson.toJson(Map.of("t","INIT")));
             if (hmFunc != null) hmFunc.call(gson.toJson(Map.of("t","LOAD")));
-
-            var prof = YeowRuntime.inst().getProfiler();
-            if (prof != null) prof.registerPlugin(this);
+            // 实体注册（plugins map + profiler）由 load 通道的 registerPluginEntity 完成
 
             while (running) {
                 var raw = queue.takeJs();

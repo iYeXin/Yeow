@@ -7,13 +7,15 @@ Worker（虚拟插件）通道——主插件 JS 侧经 `$_send('worker', ...)` 
 ## 消息格式
 
 ```json
-// 创建 Worker
+// 注册 Worker（仅注册到注册表并返回句柄——不启动；worker.load() 才执行启动）
 { "t": "create", "p": { "name": "<worker名>", "code": "<代码>" | "entry": "<资源路径>", "msgCb": "<主插件侧回调id>", "cb": "<回调id>" } }
-// 卸载
+// 启动（注册实体 → init.js → worker-inject.js → Worker 代码 → INIT → LOAD → 就绪）
+{ "t": "load", "p": { "name": "<worker名>", "cb": "<回调id>" } }
+// 卸载（物理销毁 JS 上下文并清理事件/命令/服务/任务；句柄保留，可重新 load）
 { "t": "unload", "p": { "name": "<worker名>", "cb": "<回调id>" } }
-// 发送消息给 Worker
+// 发送消息给 Worker（未 load 时报错）
 { "t": "post", "p": { "name": "<worker名>", "msg": <任意 JSON>, "cb": "<回调id>" } }
-// 重载
+// 重载（需已 load）
 { "t": "reload", "p": { "name": "<worker名>", "code" | "entry", "cb": "<回调id>" } }
 ```
 
@@ -31,10 +33,11 @@ Worker（虚拟插件）通道——主插件 JS 侧经 `$_send('worker', ...)` 
 
 | 事件 | 行为 |
 |------|------|
-| `create` | 构造 Worker 执行单元（独立 QuickJS 上下文 + 线程）→ `INIT` → `LOAD` → 就绪后回调 |
-| `unload` | 发送 `DISABLE` → 等待退出（5s 强制）→ 清理事件/命令/服务/任务 → 注销 profiler |
-| `reload` | 发送 `RELOAD` → 旧上下文销毁 → 新代码重新加载（`INIT` + `LOAD`） |
-| 主插件卸载/热重载 | **连带卸载**全部依附 Worker |
+| `create` | 仅注册（构造句柄，不启动）；重复/非法名报错 |
+| `load` | 注册实体（plugins map + profiler）→ 构造执行单元（独立 QuickJS 上下文 + 线程）→ `INIT` → `LOAD` → 就绪后回调；已加载为 no-op |
+| `unload` | 发送 `DISABLE` → 等待退出（5s 强制）→ 清理事件/命令/服务/任务 → 注销 profiler——**句柄保留，可重新 `load`** |
+| `reload` | 发送 `RELOAD` → 旧上下文销毁 → 新代码重新加载（`INIT` + `LOAD`）；需已 load |
+| 主插件卸载/热重载 | **连带卸载**全部依附 Worker（彻底清理，句柄随之销毁） |
 
 ## 错误
 
