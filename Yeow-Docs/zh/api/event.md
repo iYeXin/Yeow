@@ -134,6 +134,23 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 | `serverCommand` | command, sender | ✔ |
 | `playerResourcePackStatus` | player, status, hash | |
 
+### 权限检查（Yeow 生态）
+
+| 类型 | 字段 | 可取消 |
+|------|------|:------:|
+| `permissionCheck` | target, node | |
+
+`permissionCheck` 用于 **Yeow 生态**权限拦截（仅 `player.hasPermission` 任务与 Yeow 命令执行检查触发；其他 Java 插件的权限检查不经过）。handler 返回 `{ allowed }` 决定结果（覆盖 Bukkit）；不返回视为未处理；多 handler 返回冲突以最后返回的为准：
+
+```js
+eventOn('permissionCheck', (e) => {
+    if (e.node === 'myplugin.home' && isVip(e.target)) {
+        return { allowed: true };   // 覆盖 Bukkit 结果
+    }
+    // 不返回 → 回退 Bukkit hasPermission
+});
+```
+
 > `player` 字段在 JS 侧自动转为 `Player.get(uuid)`。`block` 为命名空间 ID（如 `minecraft:stone`）。
 
 ## 取消事件

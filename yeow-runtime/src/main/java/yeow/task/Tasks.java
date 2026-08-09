@@ -148,8 +148,12 @@ public class Tasks {
             case "inventory.removeItem"-> InventoryTasks.removeItem(p);
             case "inventory.clear"     -> InventoryTasks.clear(p);
             // Event
-            case "event.subscribe"   -> { var rt = YeowRuntime.inst(); rt.getEventBridge().subscribe(p.get("pluginName").getAsString(), p.get("eventType").getAsString(), p.get("callbackId").getAsString()); yield true; }
-            case "event.unsubscribe" -> { var rt = YeowRuntime.inst(); rt.getEventBridge().unsubscribe(p.get("pluginName").getAsString(), p.get("eventType").getAsString()); yield true; }
+            case "event.subscribe"   -> { var rt = YeowRuntime.inst(); var et = p.get("eventType").getAsString();
+                if ("permissionCheck".equals(et)) rt.getEventBridge().subscribePermissionCheck(p.get("pluginName").getAsString(), p.get("callbackId").getAsString());
+                else rt.getEventBridge().subscribe(p.get("pluginName").getAsString(), et, p.get("callbackId").getAsString()); yield true; }
+            case "event.unsubscribe" -> { var rt = YeowRuntime.inst(); var et = p.get("eventType").getAsString();
+                if ("permissionCheck".equals(et)) rt.getEventBridge().unsubscribePermissionCheck(p.get("pluginName").getAsString());
+                else rt.getEventBridge().unsubscribe(p.get("pluginName").getAsString(), et); yield true; }
             case "event.complete"    -> { var key = p.get("eventId").getAsString();
                 // key = eventId（每次 dispatch 唯一）：同一 cbId 并发/连续触发多次事件时，
                 // register(cbId) 会互相覆盖；eventId 保证精确匹配本次等待。

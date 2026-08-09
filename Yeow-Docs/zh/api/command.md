@@ -10,7 +10,7 @@ import { registerCommand } from 'yeow-api';
 | ------------- | ------------------------------------------------ | ---------- |
 | `executor`    | `(p: CommandPayload) => void`                    | 执行器     |
 | `description` | `string`                                         | 描述       |
-| `permission`  | `string`                                         | 权限节点（Bukkit 命令权限：无权限玩家不执行，含补全过滤） |
+| `permission`  | `string`                                         | 权限节点（注册进 Bukkit 权限系统供管理；**执行时检查**——`permissionCheck` 事件优先，无处理时回退 `hasPermission`） |
 | `permissionDefault` | `'true' \| 'false' \| 'op' \| 'not-op'`     | 权限节点默认值（默认 `'false'`）；`'true'` = **普通玩家默认拥有**，服主可经权限插件撤销/管理 |
 | `aliases`     | `string[]`                                       | 别名       |
 | `completer`   | `(sender, args) => string[]` / `ManualCompleter` | Tab 补全器 |

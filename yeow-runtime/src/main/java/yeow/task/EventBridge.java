@@ -32,6 +32,10 @@ public class EventBridge implements Listener {
     private final YeowRuntime runtime;
     /** 事件类型 → 插件 → 该插件的全部回调（同一插件可对同一事件注册多个 handler）。 */
     private final Map<String, Map<String, Set<String>>> subs = new ConcurrentHashMap<>();
+    /** permissionCheck 订阅：插件 → 回调集合（Yeow 生态权限检查拦截，非 Bukkit 事件）。 */
+    private final Map<String, Set<String>> permSubs = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicLong permSeq = new java.util.concurrent.atomic.AtomicLong();
+    private static final long PERM_CHECK_TIMEOUT_NS = 1_000_000_000L; // 1s
     /** 事件类型 → 是否已注册 Bukkit 监听器（生命周期 = EventBridge，一经注册永久保留）。 */
     private final Map<String, Boolean> reg = new ConcurrentHashMap<>();
     /** 每次 dispatch 的唯一 id 生成器：pend key 用 eventId 而非 cbId——
@@ -129,6 +133,67 @@ public class EventBridge implements Listener {
 
     public void unsubscribeAll(String plugin) {
         subs.forEach((et, s) -> s.remove(plugin));
+        permSubs.remove(plugin);
+    }
+
+    public void subscribePermissionCheck(String plugin, String cbId) {
+        permSubs.computeIfAbsent(plugin, k -> ConcurrentHashMap.newKeySet()).add(cbId);
+    }
+
+    public void unsubscribePermissionCheck(String plugin) {
+        permSubs.remove(plugin);
+    }
+
+    /**
+     * Yeow 生态权限检查：触发 `permissionCheck` 事件——**仅 Yeow 生态内**（
+     * `player.hasPermission` 任务与 Yeow 插件注册命令的执行检查）触发；
+     * 其他 Java 插件的 hasPermission / 命令执行不会经过此检查。
+     *
+     * handler 返回 `{ "allowed": <bool> }` 决定结果；不返回视为未处理。
+     * 多个 handler 返回结果冲突时**以最后一个返回的为准**（不保证执行顺序）。
+     *
+     * @return null = 无 Yeow 插件处理（调用方回退 Bukkit hasPermission）；否则为最终结果
+     */
+    public Boolean checkPermission(String target, String node) {
+        if (permSubs.isEmpty()) return null;
+        var active = new java.util.HashMap<String, Set<String>>();
+        for (var e : permSubs.entrySet()) {
+            if (e.getValue() != null && !e.getValue().isEmpty()) active.put(e.getKey(), e.getValue());
+        }
+        if (active.isEmpty()) return null;
+        int total = 0;
+        for (var s : active.values()) total += s.size();
+        var latch = new CountDownLatch(total);
+        var data = Map.of("target", target, "node", node);
+        var cbToEvent = new HashMap<String, String>();
+        boolean primary = Bukkit.isPrimaryThread();
+        for (var entry : active.entrySet()) {
+            var pt = runtime.getPlugin(entry.getKey());
+            if (pt == null) { for (var cb : entry.getValue()) latch.countDown(); continue; }
+            for (var cb : entry.getValue()) {
+                var eventId = "perm#" + permSeq.incrementAndGet();
+                cbToEvent.put(entry.getKey() + "\u0000" + cb, eventId);
+                SyncCallbackHelper.register(eventId, latch::countDown);
+                pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data,"eventId",eventId)));
+            }
+        }
+        var deadline = System.nanoTime() + PERM_CHECK_TIMEOUT_NS;
+        while (System.nanoTime() < deadline && latch.getCount() > 0) {
+            if (primary) runtime.getScheduler().tick();
+            Thread.onSpinWait();
+        }
+        Boolean result = null;
+        for (var entry : active.entrySet()) {
+            for (var cb : entry.getValue()) {
+                var eventId = cbToEvent.get(entry.getKey() + "\u0000" + cb);
+                var r = SyncCallbackHelper.waitFor(eventId, 0);
+                if (r instanceof Map<?,?> m && m.get("allowed") instanceof Boolean b) {
+                    result = b; // 最后返回的为准
+                }
+                SyncCallbackHelper.remove(eventId);
+            }
+        }
+        return result;
     }
 
     void dispatch(Event ev, String et) {

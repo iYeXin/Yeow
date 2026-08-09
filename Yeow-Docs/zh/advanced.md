@@ -1022,5 +1022,6 @@ Paper/Bukkit 的 yeow-runtime 是官方实现的运行时示例。更多插件�
 - **路径隔离**：`fs.*`（`plugin` 段节点）限制在 `plugins/<插件名>/`，`fs.server.*` 限制在服务器根目录，均拦截 `../` 穿越；`fs.outer.*` 无范围限制（需声明权限）
 - **上下文隔离**：每个插件独立 QuickJSContext，全局对象互不干扰
 - **权限声明**：敏感消息节点（`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract`）默认拒绝，必须在 `yeow.config.json` 声明（构建时计算进 `computedPermissions`）；未声明调用返回 `Permission denied: <node>`。权限只按**节点**匹配（节点名中的段是业务/访问范围命名，非层级）：节点级（`fs:server.readFile`）、整组通配（`fs:server.*`）与通道通配（`fs:*`），其余节点默认允许
-- **权限委托**：命令权限由 Bukkit 处理，未授权玩家不执行 executor
+- **Yeow 生态权限检查（permissionCheck）**：`player.hasPermission` 任务与 Yeow 插件注册命令的**执行时检查**会先触发 `permissionCheck` 事件（[详见事件规范](specifications/event/index.md#permissioncheckyeow-生态权限检查)）——handler 返回 `{ allowed }` 决定结果（**覆盖 Bukkit hasPermission**），不返回则回退 Bukkit；多 handler 返回冲突以最后返回的为准。**仅限 Yeow 生态**：其他 Java 插件的 hasPermission / 命令执行不经过此检查
+- **命令权限**：Yeow 命令的权限节点同时注册进 Bukkit 权限系统（传统插件/权限插件可管理），但命令**不设 setPermission 拦截**——执行时按上述顺序检查（permissionCheck > Bukkit）；补全不做权限过滤
 - **同名唯一**：同一插件名只允许一个实例，重复加载（自动扫描 / `/yeow load` / 模板 JAR）均被拒绝并警告

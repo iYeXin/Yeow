@@ -32,7 +32,7 @@
 | `completerCbId` | 否 | Tab 补全回调 ID（`persistent: true`） |
 | `description` | 否 | 命令描述 |
 | `usage` | 否 | 用法提示（如 `"/cmd <arg1> <arg2>"`） |
-| `permission` | 否 | 权限节点（Bukkit 命令权限）：无权限玩家不执行命令（含补全过滤）；控制台默认拥有 |
+| `permission` | 否 | 权限节点（仅声明 + 注册进 Bukkit 权限系统，传统 Java 插件/权限插件可管理）。**命令不设 Bukkit setPermission**——权限在**执行时**检查：`permissionCheck` 事件结果优先，无处理时回退 `hasPermission` |
 | `permissionDefault` | 否 | 权限节点默认值（`PermissionDefault`，默认 `"false"`）：`"true"` = 普通玩家**默认拥有**（服主可经权限插件撤销/管理）；`"op"` / `"not-op"` 按是否 op |
 | `aliases` | 否 | 别名列表 |
 

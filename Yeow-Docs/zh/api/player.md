@@ -95,7 +95,7 @@ player.giveExpSync(amount)
 ### 权限、命令与传送
 
 ```js
-player.hasPermission(node)          // Promise<boolean>
+player.hasPermission(node)          // Promise<boolean> —— 经 Yeow 权限检查（permissionCheck 事件优先，无处理时回退 Bukkit）
 player.hasPermissionSync(node)      // boolean
 player.performCommand(cmd)          // Promise<boolean> —— 以玩家身份执行命令（不含 / 前缀，如 'say hi'）
 player.performCommandSync(cmd)      // boolean

@@ -254,6 +254,22 @@ export interface ServerCommandEvent {
   sender: string;
   cancelled?: boolean;
 }
+
+/**
+ * Yeow 生态权限检查（仅 `player.hasPermission` 任务与 Yeow 插件注册命令的执行检查触发；
+ * 其他 Java 插件的 hasPermission / 命令不会触发）。
+ *
+ * handler 返回 `{ allowed: <boolean> }` 决定结果；**不返回视为未处理**（回退 Bukkit hasPermission）。
+ * 多个 handler 都返回且结果冲突时，以**最后一个返回的为准**（不保证执行顺序）。
+ */
+export interface PermissionCheckEvent {
+  /** 检查对象：玩家 UUID 或 "CONSOLE"。 */
+  target: string;
+  /** 权限节点（如 "myplugin.home"）。 */
+  node: string;
+  /** handler 返回 `{ allowed }` 决定结果。 */
+  allowed?: boolean;
+}
 export interface InventoryClickEvent {
   player: Player;
   slot: number;
@@ -316,6 +332,7 @@ type EventMap = {
   inventoryClose: InventoryCloseEvent;
   serverPing: ServerPingEvent;
   serverCommand: ServerCommandEvent;
+  permissionCheck: PermissionCheckEvent;
   playerTeleport: PlayerTeleportEvent;
   playerItemConsume: PlayerItemConsumeEvent;
   inventoryClick: InventoryClickEvent;

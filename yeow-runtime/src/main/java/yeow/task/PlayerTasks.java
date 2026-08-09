@@ -3,6 +3,7 @@ package yeow.task;
 import com.google.gson.JsonObject;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
+import yeow.YeowRuntime;
 import java.util.*;
 
 public class PlayerTasks {
@@ -54,7 +55,13 @@ public class PlayerTasks {
     }
     public static Object giveExp(JsonObject p) { player(p).giveExp(p.get("amount").getAsInt()); return true; }
     public static Object performCommand(JsonObject p) { return player(p).performCommand(p.get("command").getAsString()); }
-    public static Object hasPermission(JsonObject p) { return player(p).hasPermission(p.get("permission").getAsString()); }
+    public static Object hasPermission(JsonObject p) {
+        var pl = player(p);
+        var node = p.get("permission").getAsString();
+        // Yeow 生态权限检查：permissionCheck 事件结果优先，无处理时回退 Bukkit
+        var r = YeowRuntime.inst().getEventBridge().checkPermission(pl.getUniqueId().toString(), node);
+        return r != null ? r : pl.hasPermission(node);
+    }
     public static Object teleport(JsonObject p) { player(p).teleport(new Location(Bukkit.getWorld(p.get("world").getAsString()),p.get("x").getAsDouble(),p.get("y").getAsDouble(),p.get("z").getAsDouble(),(float)p.get("yaw").getAsDouble(),(float)p.get("pitch").getAsDouble())); return true; }
     public static Object sendActionBar(JsonObject p) { player(p).sendActionBar(TextUtil.parseMessage(p.get("message"))); return true; }
     public static Object sendResourcePack(JsonObject p) {

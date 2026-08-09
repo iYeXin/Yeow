@@ -67,6 +67,30 @@ Yeow 事件系统是运行时向插件投递游戏事件的机制。插件通过
 | `serverPing`               | 服务器 | 否     | 服务器被 ping    |
 | `serverCommand`            | 服务器 | 是     | 控制台命令       |
 | `playerResourcePackStatus` | 资源包 | 否     | 资源包状态变化   |
+| `permissionCheck`          | 权限   | 否     | Yeow 生态权限检查（非 Bukkit 事件，见下） |
+
+## `permissionCheck`（Yeow 生态权限检查）
+
+**Yeow 插件**通过 handler 返回 `{ "allowed": <bool> }` 拦截权限检查；**不返回视为未处理**。多个 handler 返回冲突时以**最后一个返回的为准**（不保证执行顺序）。
+
+- **触发范围（仅限 Yeow 生态）**：
+  - `player.hasPermission` 任务
+  - Yeow 插件注册命令的**执行时检查**
+  - **其他 Java 插件的 `hasPermission` / 命令执行不会触发**——本检查不捆绑其他生态
+- **优先级**：`permissionCheck` 有结果时**覆盖 Bukkit `hasPermission`**；无处理时回退 Bukkit
+- **节点融合**：权限节点仍同时注册进 Bukkit 权限系统（传统 Java 插件 / 权限插件可管理），只是 Yeow 检查优先级更高
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `target` | string | 检查对象：玩家 UUID 或 `"CONSOLE"` |
+| `node` | string | 权限节点（如 `myplugin.home`） |
+
+示例：
+
+```json
+{ "t": "cb", "p": "<cbId>", "r": { "target": "<uuid>", "node": "myplugin.home" } }
+// handler 返回：{ "allowed": true } 或 { "allowed": false }；或不返回（未处理）
+```
 
 ---
 

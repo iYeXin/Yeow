@@ -38,8 +38,14 @@ public class CommandTasks {
 
         var cmd = new BukkitCommand(cmdName) {
             public boolean execute(CommandSender s, String l, String[] a) {
-                // 权限检查由 Bukkit 命令权限完成（setPermission + PermissionDefault）；
-                // 无权限玩家不会执行到这里（默认消息 "No permission."）
+                // Yeow 生态权限检查：permissionCheck 事件结果优先，无处理时回退 Bukkit hasPermission。
+                // 命令不设 Bukkit setPermission（不拦截）——执行时检查，保证 permissionCheck 可拦截。
+                if (perm != null && !perm.isEmpty()) {
+                    String target = s instanceof Player pl ? pl.getUniqueId().toString() : "CONSOLE";
+                    var r = YeowRuntime.inst().getEventBridge().checkPermission(target, perm);
+                    boolean ok = r != null ? r : s.hasPermission(perm);
+                    if (!ok) { s.sendMessage("No permission."); return true; }
+                }
                 var payload = Map.of("sender",Map.of("name",s.getName(),"uuid",s instanceof Player pl?pl.getUniqueId().toString():"CONSOLE","isPlayer",s instanceof Player),"args",List.of(a),"label",l);
                 if (cbId != null && !cbId.isEmpty()) {
                     var pt = YeowRef.getPlugin(pluginName);
@@ -78,8 +84,8 @@ public class CommandTasks {
         cmd.setDescription(p.has("description") ? p.get("description").getAsString() : "");
         cmd.setUsage("/" + cmdName);
         if (p.has("aliases")) { var as = new ArrayList<String>(); for(var e:p.getAsJsonArray("aliases")) as.add(e.getAsString()); cmd.setAliases(as); }
-        // 声明权限节点（Bukkit 命令权限）：无权限玩家不执行命令（含补全过滤）。
-        // 节点默认值由 permissionDefault 控制：'true' 时普通玩家默认拥有（服主可经权限插件撤销/管理）。
+        // 权限节点加入 Bukkit 权限系统（传统 Java 插件/权限插件可管理）；
+        // 命令本身不设 setPermission——执行时的权限检查在 executor 内（permissionCheck 优先）。
         if (perm != null && !perm.isEmpty()) {
             try {
                 if (Bukkit.getPluginManager().getPermission(perm) == null) {
@@ -87,8 +93,6 @@ public class CommandTasks {
                     Bukkit.getPluginManager().addPermission(new org.bukkit.permissions.Permission(perm, pd));
                 }
             } catch (Exception ignored) {}
-            cmd.setPermission(perm);
-            cmd.setPermissionMessage("No permission.");
         }
         map.register(pluginName.toLowerCase(), cmd);
         pluginCommands.computeIfAbsent(pluginName, k -> new ArrayList<>()).add(cmdName);

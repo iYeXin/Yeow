@@ -27,6 +27,7 @@ export type {
     BlockBreakEvent, BlockPlaceEvent, BlockFadeEvent, BlockGrowEvent, BlockSpreadEvent, BlockExplodeEvent,
     InventoryOpenEvent, InventoryCloseEvent, InventoryClickEvent,
     ServerPingEvent, ServerCommandEvent,
+    PermissionCheckEvent,
     PlayerResourcePackStatusEvent,
 } from './event.js';
 export { onInit, onLoad, onUnload } from './lifecycle.js';
