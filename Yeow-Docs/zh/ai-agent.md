@@ -9,7 +9,7 @@
 ## 如何启动项目
 
 ```bash
-npm create yeow@latest -- -y --ts --name=my-yeow-plugin    # 创建项目（-y 非交互；--ts 使用 TypeScript——强烈建议）
+npm create yeow@latest -- -y --ts    # 创建项目（-y 非交互；--ts 使用 TypeScript——强烈建议）
 cd my-plugin
 npm install                          # 安装依赖
 npm run dev                          # 启动 Paper 开发服务器（WebSocket 热重载 + source-map 错误定位）
@@ -17,8 +17,19 @@ npm run dev                          # 启动 Paper 开发服务器（WebSocket 
 
 - `--ts`：**TypeScript**（强烈建议——完整类型推断，AI/编辑器获得类型支持，杜绝静态错误与模型幻觉）
 - `--name=xxx`：指定项目名；不带 `-y` 时交互式选择语言
-- `npm run dev -- -y --stop=2m`：非交互式 EULA 同意；2 分钟后自动停止
-- 在任何情况下，使用 Yeow 官方脚手架工具创建项目，绝对不要自己构造项目结构
+- `npm run dev -- --stop=2m`：2 分钟后自动停止
+
+## 调试工作流（AI 代理）
+
+headless 模式适合 AI 代理/CI：自动接受 EULA → 下载服务端 → 启动 → 检测加载完成 → 等待后命令自动结束，日志落盘、服务器进程可控：
+
+```bash
+npm run dev -- --eula --keep --timeout=2m --wait=30s --outfile=log.txt
+```
+
+- `--eula`：自动接受 EULA；`--timeout=2m`：加载超时（默认 2m，超时提示检查网络或加大）；`--wait=30s`：加载成功后等待（默认 30s，时间到命令自动结束）；`--outfile=log.txt`：日志输出文件；`--keep`：命令结束后**保留服务器进程**
+- 流程：输出 `Server PID` → 下载/启动 → 检测到 `Done (...)! For help` 视为加载完成 → 等待后命令结束
+- **加载成功后看日志**（`--outfile` 或控制台输出）；不需要服务器时按输出的 `Server PID` 杀死进程（`kill <pid>`）
 
 ## 下一步
 

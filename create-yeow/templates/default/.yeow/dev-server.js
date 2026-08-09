@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, copyFileSync, writeFileSync, readFileSync, creat
 import { resolve, dirname, basename } from 'path';
 import { spawn, execSync } from 'child_process';
 import { fileURLToPath } from 'url';
+import { createInterface } from 'readline';
 import https from 'https';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
@@ -15,8 +16,23 @@ const SERVER = resolve(DEVDIR, 'server');
 const WS_PORT = 17368;
 
 const YES = process.argv.includes('-y') || process.env.CI === 'true';
+const EULA = process.argv.includes('--eula') || YES;
 const PROXY = process.argv.find(a => a.startsWith('--proxy='))?.split('=').slice(1).join('=');
 const STOP = (() => { const a = process.argv.find(a => a.startsWith('--stop=')); if (!a) return null; const m = a.split('=')[1].match(/^(\d+)(s|m|h)?$/); return m ? parseInt(m[1]) * (m[2] === 'm' ? 60 : m[2] === 'h' ? 3600 : 1) : null; })();
+
+// ── AI 工作流参数（headless 模式）─────────────────────────────
+function parseDur(flag, def) {
+  const a = process.argv.find(a => a.startsWith(flag));
+  if (!a) return def;
+  const m = a.split('=')[1].match(/^(\d+)(s|m|h)?$/);
+  return m ? parseInt(m[1]) * (m[2] === 'm' ? 60 : m[2] === 'h' ? 3600 : 1) : def;
+}
+const TIMEOUT = parseDur('--timeout=', 120);   // 服务器加载超时（秒，默认 2m）
+const WAIT = parseDur('--wait=', 30);          // 加载成功后等待（秒，默认 30s）
+const OUTFILE = process.argv.find(a => a.startsWith('--outfile='))?.split('=').slice(1).join('=') || null;
+const KEEP = process.argv.includes('--keep');
+const HEADLESS = process.argv.includes('--eula') || process.argv.includes('--timeout')
+  || process.argv.includes('--wait') || process.argv.includes('--outfile') || KEEP;
 
 const cfg = JSON.parse(readFileSync(resolve(ROOT, 'yeow.config.json'), 'utf-8'));
 const RUNTIME = resolve(ROOT, '.yeow', 'assets', 'yeow-runtime-0.1.0.jar');
@@ -425,6 +441,8 @@ async function main() {
     console.log(`\n${c.b}${c.B}  Yeow Dev Server${c.r}\n`);
     if (!existsSync(RUNTIME)) { fail(`Runtime JAR not found: ${RUNTIME}`); process.exit(1); }
 
+    if (HEADLESS) { await runHeadless(); return; }
+
     startWebSocket();
     await ensurePaper();
     mkdirSync(SERVER, { recursive: true });
@@ -437,6 +455,73 @@ async function main() {
 
     startHotReload();
     startServer();
+}
+
+// ── AI 工作流（headless）─────────────────────────────────────────
+// 适合 AI 代理/CI：--eula 自动接受 → 下载 → 启动 → 检测加载完成 →
+// 等待 --wait 秒后命令自动结束（--keep 保留服务器子进程，日志见 --outfile）。
+async function runHeadless() {
+    if (!EULA) {
+        fail('AI 模式需要 --eula（自动接受 EULA）');
+        process.exit(1);
+    }
+    const log = OUTFILE ? createWriteStream(OUTFILE, { flags: 'a' }) : null;
+    const out = (line) => { if (log) log.write(line + '\n'); else console.log(line); };
+
+    info('正在下载/准备服务端…');
+    await ensurePaper();
+    mkdirSync(SERVER, { recursive: true });
+    await initServer();
+    serverProps(cfg.dev?.port || 17367);
+    buildPlugin();
+    removeStaleDevJar();
+    copyToYeowDir(resolve(ROOT, 'dist', 'plugins', `${cfg.name}-${cfg.version}.yeow.zip`), 'Plugin (.yeow.zip → plugins/Yeow/)');
+    copyToPlugins(RUNTIME, 'Runtime');
+
+    const jvmArgs = ['-Xmx4G', '-Xms4G', '-Dyeow.dev=true', '-Dyeow.ws.port=' + WS_PORT];
+    info(`正在启动 Paper ${PAPER_VERSION}...`);
+    proc = spawn('java', [...jvmArgs, '-jar', resolve(SERVER, PAPER_JAR), '--nogui'], { cwd: SERVER, stdio: ['ignore', 'pipe', 'pipe'] });
+    info(`Server PID: ${proc.pid}`);
+
+    let started = false, done = false, waitTimer = null;
+    const failTimer = setTimeout(() => {
+        if (done) return;
+        fail(`服务器在 ${TIMEOUT}s 内未完成加载——请检查网络/依赖下载，或加大超时（--timeout=3m）`);
+        killProc();
+        process.exit(1);
+    }, TIMEOUT * 1000);
+
+    const onLine = (line) => {
+        out(line);
+        if (!started && line.includes('Starting org.bukkit.craftbukkit.Main')) {
+            started = true;
+            info('开始加载（Starting org.bukkit.craftbukkit.Main）');
+        }
+        if (!done && line.includes('Done (') && line.includes('For help')) {
+            done = true;
+            clearTimeout(failTimer);
+            info(`加载完成——等待 ${WAIT}s 后命令结束${KEEP ? '（--keep 保留服务器进程）' : '（关闭服务器进程）'}…`);
+            waitTimer = setTimeout(() => {
+                info(`等待结束。日志${OUTFILE ? '：' + OUTFILE : '输出于上方'}；PID=${proc.pid}${KEEP ? '（服务器仍在运行，按需 kill）' : ''}`);
+                if (log) log.end();
+                if (KEEP) process.exit(0);
+                killProc();
+                process.exit(0);
+            }, WAIT * 1000);
+        }
+    };
+    readline.createInterface({ input: proc.stdout }).on('line', onLine);
+    if (proc.stderr) readline.createInterface({ input: proc.stderr }).on('line', (l) => out('[err] ' + l));
+
+    proc.on('exit', (code) => {
+        if (!done) fail(`服务器提前退出（code ${code}）——见${OUTFILE ? '日志 ' + OUTFILE : '上方输出'}`);
+        if (log) log.end();
+        process.exit(1);
+    });
+}
+
+function killProc() {
+    if (proc && !proc.killed) { try { proc.kill('SIGKILL'); } catch {} }
 }
 
 main().catch(e => { fail(e.message); process.exit(1); });

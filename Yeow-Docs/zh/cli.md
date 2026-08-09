@@ -56,6 +56,33 @@ npm run dev [-- options]
 | `--stop=<N><s\|m\|h>` | 自动停止，如 `60s`、`5m`、`2h` |
 | `--proxy=<url>`       | Paper 下载代理                 |
 
+### AI 调试工作流（headless 模式）
+
+面向 AI 代理 / CI：自动接受 EULA → 下载服务端 → 启动 → 检测加载完成 → 等待后命令自动结束。**任一 AI 参数出现即进入 headless 模式**（不启动 WebSocket/热重载）：
+
+```bash
+npm run dev -- --eula --keep --timeout=2m --wait=30s --outfile=log.txt
+```
+
+| 参数 | 说明 |
+|------|------|
+| `--eula` | 自动接受 EULA（headless 必需） |
+| `--timeout=<N><s\|m\|h>` | **加载超时**（默认 `2m`）：启动到加载完成（`Done (...)!`）的时限；超时直接退出并提示检查网络或加大超时 |
+| `--wait=<N><s\|m\|h>` | **加载成功后等待**（默认 `30s`）：时间到后命令自动结束（控制权交回 AI） |
+| `--outfile=<path>` | 服务器日志输出文件（缺省输出到控制台） |
+| `--keep` | 命令结束后**保留服务器子进程**（否则关闭） |
+
+流程与输出：
+
+1. 输出 `Server PID: <pid>`（服务器 java 进程）
+2. `正在下载/准备服务端…`——下载 Paper（缓存命中则跳过）
+3. 检测到 `Starting org.bukkit.craftbukkit.Main` → 输出「开始加载」
+4. 检测到 `Done (x)! For help, type "help"` → 输出「加载完成——等待 N s 后命令结束」并开始计时
+5. `--wait` 时间到 → 输出日志位置与 PID，命令自动结束（`--keep` 时服务器仍在运行，按 PID 关闭）
+
+> **工作流**：运行上述命令 → 加载成功后查看 `--outfile` 日志（或等待命令结束后手动查看）→ 不需要服务器时按 `Server PID` 杀掉进程（`kill <pid>` / 任务管理器）。
+> **超时排查**：`--timeout` 超时提示检查网络问题（Paper 下载）或加大超时时间。
+
 ### 工作流程
 
 1. 检查本地 Paper 开发版本缓存（默认 `1.21.4`，可在 `yeow.config.json` 的 `paperVersion` / `paperJar` 配置），没有则下载
