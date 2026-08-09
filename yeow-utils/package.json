@@ -1,6 +1,6 @@
 {
     "name": "yeow-utils",
-    "version": "0.1.19",
+    "version": "0.1.20",
     "description": "Yeow high-level utilities: HTTP server, command builder, etc.",
     "type": "module",
     "main": "./src/index.ts",
