@@ -36,6 +36,20 @@ interface ManualCompleter {
 }
 ```
 
+**`sender`（CommandSender）**：玩家执行时为**真正的 `Player` 对象**（异步 `sendMessage` 等全部方法）；控制台为字符串 `'CONSOLE'`：
+
+```js
+import { isPlayer } from 'yeow-api';
+
+registerCommand('hello', {
+    executor: async (p) => {
+        if (p.sender === 'CONSOLE') { console.log('hi from console'); return; }
+        await p.sender.sendMessage('Hi!');       // 异步（Player 方法）
+    },
+    completer: (sender, args) => ['opt1', 'opt2'],
+});
+```
+
 ```js
 // 自动模式（默认）
 registerCommand('hello', {

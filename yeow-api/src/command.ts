@@ -1,14 +1,16 @@
 import { call } from './task.js';
 import type { TaskOptions } from './task.js';
+import { Player } from './player.js';
 import type { Permission } from './permission.js';
 import type { PermissionOptions } from './permission.js';
 import { permissionPayload } from './permission.js';
 
-export interface CommandSender {
-  readonly name: string;
-  readonly uuid: string;
-  readonly isPlayer: boolean;
-  sendMessage(msg: string): void;
+/** 命令发送者：玩家为真正的 `Player` 对象（异步 `sendMessage` 等全部方法）；控制台为字符串 `'CONSOLE'`。 */
+export type CommandSender = Player | 'CONSOLE';
+
+/** 判断发送者是否为玩家（非 'CONSOLE' 即玩家）。 */
+export function isPlayer(sender: CommandSender): sender is Player {
+  return sender !== 'CONSOLE';
 }
 
 export interface CommandPayload {
@@ -42,21 +44,17 @@ export function registerCommand(name: string, options: CommandOptions, taskOptio
   const completer = options.completer;
   const pluginName = __plugin?.name || 'unknown';
 
-  function decorateSender(sender: CommandSender): CommandSender {
-    if (sender?.uuid && sender.isPlayer) {
-      (sender as any).sendMessage = (msg: string) => {
-        call('player.sendMessage', { uuid: sender.uuid, message: msg }, taskOptions);
-      };
-    } else {
-      (sender as any).sendMessage = (msg: string) => {
-        $send('log', { level: 'INFO', message: msg });
-      };
+  /** 原始 sender（{name, uuid, isPlayer}）→ 真正的 Player 或 'CONSOLE'。 */
+  function adaptSender(raw: any): CommandSender {
+    if (raw?.isPlayer) {
+      const p = Player.getSync(raw.uuid);
+      if (p) return p;
     }
-    return sender;
+    return 'CONSOLE';
   }
 
   const cbId = _registerCallback((payload: CommandPayload) => {
-    (payload as any).sender = decorateSender(payload.sender);
+    (payload as any).sender = adaptSender(payload.sender);
     executor(payload);
   }, { persistent: true });
 
@@ -73,7 +71,7 @@ export function registerCommand(name: string, options: CommandOptions, taskOptio
 
     compCbId = _registerCallback((data: any) => {
       try {
-        const sender = decorateSender(data.sender);
+        const sender = adaptSender(data.sender);
         if (manualRelease) {
           const complete = (result: string[]) => {
             $send('task', {

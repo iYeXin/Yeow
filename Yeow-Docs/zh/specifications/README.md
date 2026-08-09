@@ -354,7 +354,7 @@ JS 处理器执行完毕（或手动调用 complete）后，通过 `task` 通道
 } }
 ```
 
-> 注意：`sender` 是普通对象。JS 侧 yeow-api 会为其附加 `sendMessage` 方法（玩家 → 消息通道；控制台 → 日志）。其他运行时实现需保证此行为兼容（或不依赖 sendMessage 的实现细节）。
+> 注意：协议层 `sender` 为普通对象（`{name, uuid, isPlayer}`）。**JS 侧 yeow-api 将其转换为真正的 `Player` 对象（`isPlayer: true`）或字符串 `'CONSOLE'`**（执行器用 `p.sender === 'CONSOLE'` 判断）。其他运行时实现需在 JS 侧保证此转换兼容。
 
 ### 补全
 

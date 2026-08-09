@@ -257,7 +257,10 @@ export class CommandBuilder {
           return;
         }
         if (options.default) { options.default(p); }
-        else if (usageMsg) { p.sender.sendMessage(usageMsg); }
+        else if (usageMsg) {
+          if (p.sender === 'CONSOLE') console.log(usageMsg);
+          else p.sender.sendMessage(usageMsg);
+        }
       },
       completer: (sender: CommandSender, args: string[]): string[] | Promise<string[]> => {
         const idx = args.length - 1;
@@ -309,15 +312,13 @@ function resolvePos(values: string[], sender?: CommandSender): number[] {
     return { relative: false, offset: 0, value: parseFloat(v) || 0 };
   });
   if (nums.some((n) => n.relative)) {
-    if (sender?.isPlayer && sender.uuid) {
+    if (sender !== 'CONSOLE') {
       try {
-        const player = Player.getSync(sender.uuid);
-        if (player) {
-          const loc = player.location;
-          if (loc) {
-            const base: number[] = [loc.x, loc.y, loc.z];
-            return nums.map((n, i) => (n.relative ? base[i] + n.offset : n.value));
-          }
+        const player = sender as import('yeow-api').Player;
+        const loc = player.location;
+        if (loc) {
+          const base: number[] = [loc.x, loc.y, loc.z];
+          return nums.map((n, i) => (n.relative ? base[i] + n.offset : n.value));
         }
       } catch { /* ignore */ }
     }

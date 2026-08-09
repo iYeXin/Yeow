@@ -50,6 +50,8 @@
 - `label`：实际使用的命令名（可能是别名）
 - `isPlayer`：`false` 时表示控制台执行，此时 `uuid` 为空
 
+**JS 侧 sender 转换**（yeow-api）：`isPlayer: true` → 真正的 `Player` 对象（异步 `sendMessage` 等全部方法）；否则 → 字符串 `'CONSOLE'`。执行器判断：`p.sender === 'CONSOLE'`。
+
 执行器可以使用 async 函数，内部可用 `await` 调用异步 API。
 
 ## `command.dispatch`
