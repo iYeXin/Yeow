@@ -221,7 +221,7 @@ async function initServer() {
     const eula = resolve(SERVER, 'eula.txt');
     if (existsSync(eula) && readFileSync(eula, 'utf-8').includes('eula=true')) return;
 
-    if (YES) {
+    if (EULA) {
         if (!existsSync(resolve(SERVER, 'server.properties'))) {
             info('Initializing...');
             await new Promise(r => { const p = spawn('java', ['-Xmx4G', '-Xms4G', '-jar', jar, '--nogui'], { cwd: SERVER, stdio: ['pipe', 'inherit', 'inherit'] }); setTimeout(() => { p.kill(); r(); }, 120000); p.on('exit', r); p.on('error', r); });
@@ -429,7 +429,7 @@ async function printFormattedError(err) {
 }
 
 function startServer() {
-    const jvmArgs = ['-Xmx4G', '-Xms4G', '-Dyeow.dev=true', '-Dyeow.ws.port=' + WS_PORT];
+    const jvmArgs = ['-Xmx4G', '-Xms4G', '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dyeow.dev=true', '-Dyeow.ws.port=' + WS_PORT];
     info(`\nStarting Paper ${PAPER_VERSION} server...`);
     proc = spawn('java', [...jvmArgs, '-jar', resolve(SERVER, PAPER_JAR), '--nogui'], { cwd: SERVER, stdio: ['pipe', 'inherit', 'inherit'] });
     proc.on('exit', code => { warn(`Server exited (${code})`); if (wss) wss.close(); process.exit(0); });
@@ -478,17 +478,24 @@ async function runHeadless() {
     copyToYeowDir(resolve(ROOT, 'dist', 'plugins', `${cfg.name}-${cfg.version}.yeow.zip`), 'Plugin (.yeow.zip → plugins/Yeow/)');
     copyToPlugins(RUNTIME, 'Runtime');
 
-    const jvmArgs = ['-Xmx4G', '-Xms4G', '-Dyeow.dev=true', '-Dyeow.ws.port=' + WS_PORT];
+    // 编码：确保子进程 stdout 按 UTF-8 输出（Windows 下避免中文字符乱码）
+    const jvmArgs = ['-Xmx4G', '-Xms4G', '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8',
+        '-Dyeow.dev=true', '-Dyeow.ws.port=' + WS_PORT];
     info(`正在启动 Paper ${PAPER_VERSION}...`);
     proc = spawn('java', [...jvmArgs, '-jar', resolve(SERVER, PAPER_JAR), '--nogui'], { cwd: SERVER, stdio: ['ignore', 'pipe', 'pipe'] });
     info(`Server PID: ${proc.pid}`);
 
     let started = false, done = false, waitTimer = null;
+    const finish = (code) => {
+        if (waitTimer) clearTimeout(waitTimer);
+        try { if (log) log.end(); } catch {}
+        process.exit(code);
+    };
     const failTimer = setTimeout(() => {
         if (done) return;
         fail(`服务器在 ${TIMEOUT}s 内未完成加载——请检查网络/依赖下载，或加大超时（--timeout=3m）`);
         killProc();
-        process.exit(1);
+        finish(1);
     }, TIMEOUT * 1000);
 
     const onLine = (line) => {
@@ -503,20 +510,17 @@ async function runHeadless() {
             info(`加载完成——等待 ${WAIT}s 后命令结束${KEEP ? '（--keep 保留服务器进程）' : '（关闭服务器进程）'}…`);
             waitTimer = setTimeout(() => {
                 info(`等待结束。日志${OUTFILE ? '：' + OUTFILE : '输出于上方'}；PID=${proc.pid}${KEEP ? '（服务器仍在运行，按需 kill）' : ''}`);
-                if (log) log.end();
-                if (KEEP) process.exit(0);
-                killProc();
-                process.exit(0);
+                if (!KEEP) killProc();
+                finish(0);
             }, WAIT * 1000);
         }
     };
-    readline.createInterface({ input: proc.stdout }).on('line', onLine);
-    if (proc.stderr) readline.createInterface({ input: proc.stderr }).on('line', (l) => out('[err] ' + l));
+    createInterface({ input: proc.stdout }).on('line', onLine);
+    if (proc.stderr) createInterface({ input: proc.stderr }).on('line', (l) => out('[err] ' + l));
 
     proc.on('exit', (code) => {
         if (!done) fail(`服务器提前退出（code ${code}）——见${OUTFILE ? '日志 ' + OUTFILE : '上方输出'}`);
-        if (log) log.end();
-        process.exit(1);
+        finish(1);
     });
 }
 
