@@ -1,6 +1,6 @@
 import {
   onInit, onLoad, onUnload, registerCommand, eventOn,
-  Player, Location, pdcSet, pdcGet, log,
+  Location, pdcSet, pdcGet, log,
 } from 'yeow-api';
 
 onInit(() => { log.info('Init'); });
@@ -20,23 +20,26 @@ onLoad(() => {
 
   registerCommand('back', {
     description: 'Teleport to your death location',
+    permission: { node: 'back.use', default: 'all' },   // 声明权限节点：普通玩家默认可用，服主可经权限插件管理
     executor: async (p) => {
-      const raw = await pdcGet(p.sender.uuid, 'back.deathLocation');
-      if (!raw) return p.sender.sendMessage('<red>No death location recorded</red>');
+      if (p.sender === 'CONSOLE') return;
+      const player = p.sender;                           // 已确认非 CONSOLE → Player
+      const raw = await pdcGet(player.uuid, 'back.deathLocation');
+      if (!raw) return player.sendMessage('<red>No death location recorded</red>');
 
       const loc = JSON.parse(raw);
-      const player = await Player.get(p.sender.uuid);
-      if (!player) return;
       await player.teleport(new Location(loc.x, loc.y, loc.z, 0, 0, loc.world));
-      p.sender.sendMessage('<green>Teleported to death location</green>');
+      await player.sendMessage('<green>Teleported to death location</green>');
     },
   });
 
   // ── /ping ──
   registerCommand('ping', {
+    permission: { node: 'ping.use', default: 'all' },
     executor: async (p) => {
-      const player = await Player.get(p.sender.uuid);
-      if (player) p.sender.sendMessage(`Ping: ${player.ping}ms`);
+      if (p.sender === 'CONSOLE') { log.info('Ping: console'); return; }
+      const player = p.sender;                           // Player
+      await player.sendMessage(`Ping: ${player.ping}ms`);
     },
   });
 
