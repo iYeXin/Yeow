@@ -436,11 +436,27 @@ public class ServiceManager {
     // ── Response (called by plugin service owner via $_send service.response) ──
 
     public void respond(String requestId, String consumerPlugin, Object result) {
+        // Java 插件调用方（consumerPlugin = null）：直接回调（不走插件消息投递）
+        if (consumerPlugin == null) {
+            var pr = requestConsumers.remove(requestId);
+            if (pr != null && pr.javaCallback() != null) pr.javaCallback().accept(result);
+            return;
+        }
         var rt = YeowRuntime.inst();
         var pt = rt.getPlugin(consumerPlugin);
         if (pt != null) {
             pt.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(requestId, result));
         }
+    }
+
+    /**
+     * Java 插件调用 JS 侧（或原生）服务：请求-响应，结果经回调返回（gson 解析对象）。
+     * 服务不存在/异常时回调收到 {@code {"err": ...}}。
+     */
+    public void requestJava(String serviceId, String path, JsonObject body, java.util.function.Consumer<Object> callback) {
+        var requestId = "java_" + java.util.UUID.randomUUID();
+        trackRequestConsumer(requestId, null, serviceId, callback);
+        request(serviceId, path, body, requestId, null);
     }
 
     private void respondError(String requestId, String consumerPlugin, String msg) {
@@ -451,7 +467,20 @@ public class ServiceManager {
 
     public void subscribe(String serviceId, String eventPath, String cbId, String pluginName) {
         subscriptions.computeIfAbsent(serviceId, k -> ConcurrentHashMap.newKeySet())
-            .add(new Subscription(pluginName, eventPath, cbId));
+            .add(new Subscription(pluginName, eventPath, cbId, null));
+    }
+
+    /**
+     * Java 插件订阅服务事件（回调直接接收事件载荷 {@code {serviceId, eventPath, body}}）。
+     * 返回 {@link AutoCloseable}——{@code close()} 取消订阅。
+     */
+    public AutoCloseable subscribeJava(String serviceId, String eventPath, java.util.function.Consumer<Object> callback) {
+        subscriptions.computeIfAbsent(serviceId, k -> ConcurrentHashMap.newKeySet())
+            .add(new Subscription(null, eventPath, null, callback));
+        return () -> {
+            var set = subscriptions.get(serviceId);
+            if (set != null) set.removeIf(s -> s.javaCallback() == callback);
+        };
     }
 
     public void unsubscribe(String serviceId, String eventPath, String pluginName) {
@@ -477,12 +506,17 @@ public class ServiceManager {
         var set = subscriptions.get(serviceId);
         if (set == null) return;
         var rt = YeowRuntime.inst();
+        var payload = Map.of("serviceId", serviceId, "eventPath", eventPath,
+            "body", (Object)(body != null ? gson.fromJson(body.toString(), Object.class) : null));
         for (var sub : set) {
             if (!eventPath.equals(sub.eventPath)) continue;
+            // Java 订阅：直接回调
+            if (sub.javaCallback() != null) {
+                try { sub.javaCallback().accept(payload); } catch (Exception ignored) {}
+                continue;
+            }
             var pt = rt.getPlugin(sub.subscriberPlugin);
             if (pt != null) {
-                var payload = Map.of("serviceId", serviceId, "eventPath", eventPath,
-                    "body", (Object)(body != null ? gson.fromJson(body.toString(), Object.class) : null));
                 pt.postMessage(gson.toJson(Map.of("t", "cb", "p", sub.subscriberCb, "r", payload)));
             }
         }
@@ -568,7 +602,12 @@ public class ServiceManager {
     private final ConcurrentHashMap<String, PendingRequest> requestConsumers = new ConcurrentHashMap<>();
 
     public void trackRequestConsumer(String requestId, String consumerPlugin, String serviceId) {
-        requestConsumers.put(requestId, new PendingRequest(consumerPlugin, serviceId));
+        requestConsumers.put(requestId, new PendingRequest(consumerPlugin, serviceId, null));
+    }
+
+    /** Java 插件发起请求时记录回调（consumerPlugin = null 表示 Java 调用方）。 */
+    public void trackRequestConsumer(String requestId, String consumerPlugin, String serviceId, java.util.function.Consumer<Object> javaCallback) {
+        requestConsumers.put(requestId, new PendingRequest(consumerPlugin, serviceId, javaCallback));
     }
 
     private PendingRequest findConsumerForRequest(String requestId) {
@@ -646,7 +685,7 @@ public class ServiceManager {
         }
     }
 
-    record Subscription(String subscriberPlugin, String eventPath, String subscriberCb) {}
+    record Subscription(String subscriberPlugin, String eventPath, String subscriberCb, java.util.function.Consumer<Object> javaCallback) {}
     record PendingReady(String cbId, String pluginName) {}
-    record PendingRequest(String consumerPlugin, String serviceId) {}
+    record PendingRequest(String consumerPlugin, String serviceId, java.util.function.Consumer<Object> javaCallback) {}
 }

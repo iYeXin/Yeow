@@ -48,6 +48,24 @@ public class YeowRuntime extends JavaPlugin {
     public yeow.service.ServiceManager getServiceManager() { return serviceManager; }
     public YeowConfig getYeowConfig() { return config; }
     public yeow.profile.Profiler getProfiler() { return profiler; }
+
+    // ── Java 插件集成：调用 JS 侧服务 / 订阅服务事件 ────────────────
+
+    /**
+     * Java 插件调用 Yeow 插件注册的服务（请求-响应）。结果经回调返回（gson 解析对象；
+     * 失败时收到 {@code {"err": ...}}）。
+     */
+    public void requestService(String serviceId, String path, com.google.gson.JsonObject body, java.util.function.Consumer<Object> callback) {
+        serviceManager.requestJava(serviceId, path, body, callback);
+    }
+
+    /**
+     * Java 插件订阅 Yeow 服务事件。回调接收 {@code {serviceId, eventPath, body}}；
+     * 返回 {@link AutoCloseable}，{@code close()} 取消订阅。
+     */
+    public AutoCloseable subscribeService(String serviceId, String eventPath, java.util.function.Consumer<Object> callback) {
+        return serviceManager.subscribeJava(serviceId, eventPath, callback);
+    }
     public PermissionRegistry getPermissionRegistry() { return permissionRegistry; }
 
     /** 原生服务是否需要批准（config.yml，内存唯一信任源）。 */

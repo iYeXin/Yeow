@@ -306,6 +306,27 @@ unsubscribe();
 
 返回 `() => void` 取消函数。插件 unload / hot-reload 时 Runtime 自动清理订阅。
 
+## Java 插件调用（Java 集成接口）
+
+其他 **Java 插件**也可调用 Yeow 插件注册的服务、或订阅其事件（经运行时 API，回调为 Java `Consumer`）：
+
+```java
+var rt = (YeowRuntime) Bukkit.getPluginManager().getPlugin("Yeow");
+
+// 请求-响应（JS 侧 registerService 的 onRequest 处理）
+rt.requestService("my-plugin.svc.v1", "/status", new JsonObject(), result -> {
+    System.out.println(result);   // gson 解析对象；失败为 {"err": ...}
+});
+
+// 订阅服务事件（publish 触发；close() 取消）
+AutoCloseable sub = rt.subscribeService("my-plugin.svc.v1", "status", payload -> {
+    System.out.println(payload);  // {serviceId, eventPath, body}
+});
+sub.close();
+```
+
+> 详细协议见 [Java 插件集成规范](../specifications/java-api.md)。
+
 ## 示例
 
 ```js

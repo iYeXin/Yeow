@@ -28,7 +28,8 @@ export default defineConfig({
     themeConfig: {
         logo: '/favicon.svg',
         nav: [
-            { text: '指南', link: '/overview', activeMatch: '/overview|/getting-started|/cli|/runtime-warning' },
+            { text: '关于', link: '/about', activeMatch: '/about' },
+            { text: '指南', link: '/overview', activeMatch: '/overview|/getting-started|/ai-agent|/cli|/runtime-warning' },
             { text: 'API', link: '/api/', activeMatch: '/api/' },
             { text: '进阶', link: '/advanced', activeMatch: '/advanced' },
             { text: '分发', link: '/distribution', activeMatch: '/distribution' },
@@ -42,6 +43,7 @@ export default defineConfig({
             {
                 text: '开始',
                 items: [
+                    { text: '关于 Yeow', link: '/about' },
                     { text: '概览', link: '/overview' },
                     { text: '快速开始', link: '/getting-started' },
                     { text: 'AI 启动指南', link: '/ai-agent' },
@@ -150,8 +152,16 @@ export default defineConfig({
             },
             {
                 text: '进阶',
+                collapsed: false,
                 items: [
-                    { text: '进阶知识（架构）', link: '/advanced' },
+                    { text: '进阶索引', link: '/advanced' },
+                    { text: '架构与线程模型', link: '/advanced/architecture' },
+                    { text: '调度器与任务', link: '/advanced/scheduler' },
+                    { text: '事件与回调', link: '/advanced/events' },
+                    { text: '生命周期与热重载', link: '/advanced/lifecycle' },
+                    { text: '环境能力与通道', link: '/advanced/channels' },
+                    { text: '服务机制', link: '/advanced/service' },
+                    { text: '运行时运维与安全', link: '/advanced/operations' },
                 ],
             },
             {
@@ -164,6 +174,7 @@ export default defineConfig({
                 text: '平台规范',
                 items: [
                     { text: '规范总览', link: '/specifications/' },
+                    { text: 'Java 插件集成', link: '/specifications/java-api' },
                     {
                         text: '消息通道',
                         collapsed: true,
@@ -178,6 +189,7 @@ export default defineConfig({
                             { text: 'Log', link: '/specifications/message/log' },
                             { text: 'Lifecycle', link: '/specifications/message/lifecycle' },
                             { text: 'Debug', link: '/specifications/message/debug' },
+                            { text: 'Worker', link: '/specifications/message/worker' },
                         ],
                     },
                     {

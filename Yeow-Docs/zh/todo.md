@@ -22,5 +22,5 @@ Yeow 运行时尝试适配 [Folia](https://github.com/PaperMC/Folia)
 重构任务调度器和事件分发机制：
 
 - 部分解耦 `task` 通道与主线程的绑定
-- 对部分事件类型（如 `permissionCheck`）引入**异步结果回传**
+- 对部分不需要在当前 tick 决策的事件（如 `permissionCheck`）引入**异步结果回传**
 - 降低主线程的负担
