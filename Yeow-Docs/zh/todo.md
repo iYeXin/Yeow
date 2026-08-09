@@ -17,12 +17,10 @@
 
 Yeow 运行时尝试适配 [Folia](https://github.com/PaperMC/Folia)
 
-## Worker API（多线程）——已实现
+## 优化：任务调度器与事件分发机制
 
-基于插件实体抽象（[`PluginEntity`](specifications/adapter/index.md)，`isVirtual()` 标记）的 Worker API 已落地：
+重构任务调度器和事件分发机制：
 
-- 注册**虚拟插件**实体：独立线程 + 消息循环，接入事件 / 命令 / 调度器 / Profile 全链路
-- Worker 场景：CPU 密集计算、并行批量任务、与 JS 插件线程隔离的长任务
-- 详见 [Worker API](api/worker.md) 与 [worker 通道规范](specifications/message/worker.md)
-
-> 规划中：完整的 Worker 开发体验（独立工具链、更细的打包配置）
+- 部分解耦 `task` 通道与主线程的绑定
+- 对部分事件类型（如 `permissionCheck`）引入**异步结果回传**
+- 降低主线程的负担
