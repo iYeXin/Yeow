@@ -23,7 +23,18 @@ export interface ManualCompleter {
 export interface CommandOptions {
   description?: string;
   usage?: string;
+  /**
+   * 声明权限节点（Bukkit 命令权限）：无权限玩家不执行命令（含补全过滤），控制台默认拥有。
+   * 未声明则所有人可执行。
+   */
   permission?: string;
+  /**
+   * 权限节点默认值（Bukkit PermissionDefault）：
+   * - `'false'`（默认）：需经权限插件授予（op 自动拥有）
+   * - `'true'`：**普通玩家默认拥有**，服主可经权限插件撤销/管理
+   * - `'op'` / `'not-op'`：按是否 op 决定默认
+   */
+  permissionDefault?: 'true' | 'false' | 'op' | 'not-op';
   aliases?: string[];
   executor: (payload: CommandPayload) => void;
   completer?: CompleterFn | ManualCompleter;
@@ -109,6 +120,7 @@ export function registerCommand(name: string, options: CommandOptions, taskOptio
     description: options.description,
     usage: options.usage,
     permission: options.permission,
+    permissionDefault: options.permissionDefault,
     aliases: options.aliases,
   }, taskOptions);
 }

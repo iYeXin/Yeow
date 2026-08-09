@@ -19,6 +19,7 @@
   "description": "<text>",
   "usage": "<text>",
   "permission": "<node>",
+  "permissionDefault": "true | false | op | not-op",
   "aliases": ["<alias1>", "<alias2>"]
 }
 ```
@@ -31,7 +32,8 @@
 | `completerCbId` | 否 | Tab 补全回调 ID（`persistent: true`） |
 | `description` | 否 | 命令描述 |
 | `usage` | 否 | 用法提示（如 `"/cmd <arg1> <arg2>"`） |
-| `permission` | 否 | 权限节点。玩家需具备此权限才能执行命令 |
+| `permission` | 否 | 权限节点（Bukkit 命令权限）：无权限玩家不执行命令（含补全过滤）；控制台默认拥有 |
+| `permissionDefault` | 否 | 权限节点默认值（`PermissionDefault`，默认 `"false"`）：`"true"` = 普通玩家**默认拥有**（服主可经权限插件撤销/管理）；`"op"` / `"not-op"` 按是否 op |
 | `aliases` | 否 | 别名列表 |
 
 - **返回**：`boolean`

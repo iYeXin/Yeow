@@ -10,9 +10,19 @@ import { registerCommand } from 'yeow-api';
 | ------------- | ------------------------------------------------ | ---------- |
 | `executor`    | `(p: CommandPayload) => void`                    | 执行器     |
 | `description` | `string`                                         | 描述       |
-| `permission`  | `string`                                         | 权限节点   |
+| `permission`  | `string`                                         | 权限节点（Bukkit 命令权限：无权限玩家不执行，含补全过滤） |
+| `permissionDefault` | `'true' \| 'false' \| 'op' \| 'not-op'`     | 权限节点默认值（默认 `'false'`）；`'true'` = **普通玩家默认拥有**，服主可经权限插件撤销/管理 |
 | `aliases`     | `string[]`                                       | 别名       |
 | `completer`   | `(sender, args) => string[]` / `ManualCompleter` | Tab 补全器 |
+
+```js
+// 声明权限节点 + 普通玩家默认可执行（服主可用权限插件撤销）
+registerCommand('home', {
+    permission: 'myplugin.home',
+    permissionDefault: 'true',   // 默认所有人拥有；权限插件可管理
+    executor: (p) => { /* ... */ },
+});
+```
 
 ## ManualCompleter
 

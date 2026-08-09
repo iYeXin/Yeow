@@ -30,13 +30,16 @@ public class CommandTasks {
         var cbId = p.has("callbackId") ? p.get("callbackId").getAsString() : null;
         var compCbId = p.has("completerCbId") ? p.get("completerCbId").getAsString() : null;
         var perm = p.has("permission") ? p.get("permission").getAsString() : null;
+        // 权限节点默认值（Bukkit PermissionDefault）：true = 普通玩家默认拥有（服主可经权限插件管理）
+        var permDefault = p.has("permissionDefault") ? p.get("permissionDefault").getAsString() : "false";
 
         var map = getMap();
         if (map == null) return false;
 
         var cmd = new BukkitCommand(cmdName) {
             public boolean execute(CommandSender s, String l, String[] a) {
-                if (perm != null && !s.hasPermission(perm)) { s.sendMessage("No permission."); return true; }
+                // 权限检查由 Bukkit 命令权限完成（setPermission + PermissionDefault）；
+                // 无权限玩家不会执行到这里（默认消息 "No permission."）
                 var payload = Map.of("sender",Map.of("name",s.getName(),"uuid",s instanceof Player pl?pl.getUniqueId().toString():"CONSOLE","isPlayer",s instanceof Player),"args",List.of(a),"label",l);
                 if (cbId != null && !cbId.isEmpty()) {
                     var pt = YeowRef.getPlugin(pluginName);
@@ -75,6 +78,18 @@ public class CommandTasks {
         cmd.setDescription(p.has("description") ? p.get("description").getAsString() : "");
         cmd.setUsage("/" + cmdName);
         if (p.has("aliases")) { var as = new ArrayList<String>(); for(var e:p.getAsJsonArray("aliases")) as.add(e.getAsString()); cmd.setAliases(as); }
+        // 声明权限节点（Bukkit 命令权限）：无权限玩家不执行命令（含补全过滤）。
+        // 节点默认值由 permissionDefault 控制：'true' 时普通玩家默认拥有（服主可经权限插件撤销/管理）。
+        if (perm != null && !perm.isEmpty()) {
+            try {
+                if (Bukkit.getPluginManager().getPermission(perm) == null) {
+                    var pd = org.bukkit.permissions.PermissionDefault.valueOf(permDefault.toUpperCase());
+                    Bukkit.getPluginManager().addPermission(new org.bukkit.permissions.Permission(perm, pd));
+                }
+            } catch (Exception ignored) {}
+            cmd.setPermission(perm);
+            cmd.setPermissionMessage("No permission.");
+        }
         map.register(pluginName.toLowerCase(), cmd);
         pluginCommands.computeIfAbsent(pluginName, k -> new ArrayList<>()).add(cmdName);
         return true;
