@@ -164,7 +164,13 @@ public class EventBridge implements Listener {
         int total = 0;
         for (var s : active.values()) total += s.size();
         var latch = new CountDownLatch(total);
-        var data = Map.of("target", target, "node", node);
+        // permission 对象（含节点默认值）随事件投递
+        var permObj = new java.util.LinkedHashMap<String, Object>();
+        permObj.put("node", node);
+        var rt = YeowRuntime.inst();
+        var def = rt != null ? rt.getPermissionRegistry().defaultOf(node) : null;
+        if (def != null) permObj.put("default", def);
+        var data = Map.of("target", target, "node", node, "permission", permObj);
         var cbToEvent = new HashMap<String, String>();
         boolean primary = Bukkit.isPrimaryThread();
         for (var entry : active.entrySet()) {

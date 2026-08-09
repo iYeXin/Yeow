@@ -18,8 +18,7 @@
   "completerCbId": "<cbId>",
   "description": "<text>",
   "usage": "<text>",
-  "permission": "<node>",
-  "permissionDefault": "true | false | op | not-op",
+  "permission": { "node": "<节点>", "default": "all | op | none" },
   "aliases": ["<alias1>", "<alias2>"]
 }
 ```
@@ -32,8 +31,7 @@
 | `completerCbId` | 否 | Tab 补全回调 ID（`persistent: true`） |
 | `description` | 否 | 命令描述 |
 | `usage` | 否 | 用法提示（如 `"/cmd <arg1> <arg2>"`） |
-| `permission` | 否 | 权限节点（仅声明 + 注册进 Bukkit 权限系统，传统 Java 插件/权限插件可管理）。**命令不设 Bukkit setPermission**——权限在**执行时**检查：`permissionCheck` 事件结果优先，无处理时回退 `hasPermission` |
-| `permissionDefault` | 否 | 权限节点默认值（`PermissionDefault`，默认 `"false"`）：`"true"` = 普通玩家**默认拥有**（服主可经权限插件撤销/管理）；`"op"` / `"not-op"` 按是否 op |
+| `permission` | 否 | 权限节点：字符串（兼容，default 按 `"none"`）或对象 `{ "node", "default" }`（default：`"all"` 所有人默认拥有 / `"op"` / `"none"`）。节点注册进 Bukkit 权限系统（权限插件可管理）；**执行时检查**：`permissionCheck` 事件优先，无处理时回退 `hasPermission` |
 | `aliases` | 否 | 别名列表 |
 
 - **返回**：`boolean`

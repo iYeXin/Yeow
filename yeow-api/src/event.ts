@@ -261,12 +261,17 @@ export interface ServerCommandEvent {
  *
  * handler 返回 `{ allowed: <boolean> }` 决定结果；**不返回视为未处理**（回退 Bukkit hasPermission）。
  * 多个 handler 都返回且结果冲突时，以**最后一个返回的为准**（不保证执行顺序）。
+ *
+ * ⚠ 普通插件不建议监听（每次权限检查都触发，影响性能）——专为 Yeow 生态权限管理插件设计。
+ * ⚠ handler 中调用 `hasPermission` 会再次触发本检查——**可能导致无限循环**，请避免。
  */
 export interface PermissionCheckEvent {
   /** 检查对象：玩家 UUID 或 "CONSOLE"。 */
   target: string;
   /** 权限节点（如 "myplugin.home"）。 */
   node: string;
+  /** 权限对象（含节点默认值，`registerPermission` 或命令声明的权限）。 */
+  permission: { node: string; default?: string };
   /** handler 返回 `{ allowed }` 决定结果。 */
   allowed?: boolean;
 }

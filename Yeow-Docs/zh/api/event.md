@@ -140,11 +140,12 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 |------|------|:------:|
 | `permissionCheck` | target, node | |
 
-`permissionCheck` 用于 **Yeow 生态**权限拦截（仅 `player.hasPermission` 任务与 Yeow 命令执行检查触发；其他 Java 插件的权限检查不经过）。handler 返回 `{ allowed }` 决定结果（覆盖 Bukkit）；不返回视为未处理；多 handler 返回冲突以最后返回的为准：
+`permissionCheck` 用于 **Yeow 生态**权限拦截（仅 `player.hasPermission` 任务与 Yeow 命令执行检查触发；其他 Java 插件的权限检查不经过）。handler 返回 `{ allowed }` 决定结果（覆盖 Bukkit）；不返回视为未处理；多 handler 返回冲突以最后返回的为准。事件含 `permission` 对象（`{ node, default }`）。**⚠ 普通插件不建议监听（性能）；handler 中调用 `hasPermission` 会无限循环**。详见 [Permission](permission.md)：
 
 ```js
 eventOn('permissionCheck', (e) => {
-    if (e.node === 'myplugin.home' && isVip(e.target)) {
+    const { target, node, permission } = e;
+    if (node === 'myplugin.home' && isVip(target)) {
         return { allowed: true };   // 覆盖 Bukkit 结果
     }
     // 不返回 → 回退 Bukkit hasPermission

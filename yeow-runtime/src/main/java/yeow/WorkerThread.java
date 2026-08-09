@@ -100,7 +100,7 @@ public class WorkerThread implements PluginEntity, Runnable {
     }
 
     @Override public void start() { running = true; thread = new Thread(this, "yeow-worker-" + entityName); thread.start(); }
-    @Override public void stop() { if (ctx != null) queue.sendJs(gson.toJson(Map.of("t","DISABLE"))); }
+    public void stop() { if (ctx != null) queue.sendJs(gson.toJson(Map.of("t","DISABLE"))); }
 
     @Override
     public void stopAndWait() {

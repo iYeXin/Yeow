@@ -3,6 +3,7 @@ import type { TaskOptions } from './task.js';
 import { Location, LocationData } from './location.js';
 import type { ItemStack } from './item.js';
 import type { Message } from './message.js';
+import type { Permission } from './permission.js';
 
 interface PlayerData {
   uuid: string;
@@ -135,11 +136,12 @@ export class Player {
   }
   giveExp(amount: number, options?: TaskOptions): Promise<void> { return post('player.giveExp', { uuid: this.uuid, amount }, options); }
   giveExpSync(amount: number, options?: TaskOptions): void { call('player.giveExp', { uuid: this.uuid, amount }, options); }
-  hasPermission(node: string, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('player.hasPermission', { uuid: this.uuid, permission: node }, options);
+  /** 检查权限（经 Yeow 权限检查：`permissionCheck` 事件优先，无处理时回退 Bukkit）。node 可为权限节点对象。 */
+  hasPermission(node: string | Permission, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('player.hasPermission', { uuid: this.uuid, permission: typeof node === 'string' ? node : { node: node.node } }, options);
   }
-  hasPermissionSync(node: string, options?: TaskOptions): boolean {
-    return call<boolean>('player.hasPermission', { uuid: this.uuid, permission: node }, options);
+  hasPermissionSync(node: string | Permission, options?: TaskOptions): boolean {
+    return call<boolean>('player.hasPermission', { uuid: this.uuid, permission: typeof node === 'string' ? node : { node: node.node } }, options);
   }
   /** 以玩家身份执行命令（**不含 `/` 前缀**，如 `say hi`；前缀会自动剥离；与服务器 `dispatchCommand`（控制台）相对）。 */
   performCommand(cmd: string, options?: TaskOptions): Promise<boolean> {

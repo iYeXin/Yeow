@@ -63,6 +63,7 @@ export default defineConfig({
                             { text: 'Player', link: '/api/player' },
                             { text: 'Server', link: '/api/server' },
                             { text: 'Env', link: '/api/env' },
+                            { text: 'Permission', link: '/api/permission' },
                         ],
                     },
                     {

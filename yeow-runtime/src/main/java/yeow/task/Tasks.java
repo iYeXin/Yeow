@@ -59,6 +59,8 @@ public class Tasks {
             case "command.register"     -> CommandTasks.register(p);
             case "command.dispatch"     -> CommandTasks.dispatch(p);
             case "command.unregisterAll" -> CommandTasks.unregisterAll(p.get("pluginName").getAsString());
+            // Permission
+            case "permission.register"  -> { var rt = YeowRuntime.inst(); rt.getPermissionRegistry().register(p.get("node").getAsString(), p.has("default") ? p.get("default").getAsString() : "none"); yield true; }
             // Entity
             case "entity.get"          -> EntityTasks.get(p);
             case "entity.getType"      -> EntityTasks.getType(p);

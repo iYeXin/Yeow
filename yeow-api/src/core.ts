@@ -95,5 +95,7 @@ export { log, Logger } from './log.js';
 export type { Message } from './message.js';
 export { getEnv } from './env.js';
 export type { EnvInfo } from './env.js';
+export { registerPermission } from './permission.js';
+export type { Permission, PermissionOptions, PermissionDefault } from './permission.js';
 export { createWorker, Worker, onMessage, postMessage } from './worker.js';
 export type { WorkerOptions } from './worker.js';

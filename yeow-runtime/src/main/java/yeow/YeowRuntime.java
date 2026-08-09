@@ -38,6 +38,7 @@ public class YeowRuntime extends JavaPlugin {
     private yeow.service.ServiceManager serviceManager;
     private yeow.profile.Profiler profiler;
     private ApprovalStore approvals;
+    private final PermissionRegistry permissionRegistry = new PermissionRegistry();
     /** 因原生服务未批准而被拒加载的插件（pluginName → 包路径）；批准后自动加载。 */
     private final Map<String, String> pendingLoads = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -47,6 +48,7 @@ public class YeowRuntime extends JavaPlugin {
     public yeow.service.ServiceManager getServiceManager() { return serviceManager; }
     public YeowConfig getYeowConfig() { return config; }
     public yeow.profile.Profiler getProfiler() { return profiler; }
+    public PermissionRegistry getPermissionRegistry() { return permissionRegistry; }
 
     /** 原生服务是否需要批准（config.yml，内存唯一信任源）。 */
     public boolean requireNativeApproval() { return config.requireNativeApproval(); }

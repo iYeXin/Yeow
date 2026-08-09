@@ -29,9 +29,16 @@ public class CommandTasks {
         var cmdName = p.get("commandName").getAsString();
         var cbId = p.has("callbackId") ? p.get("callbackId").getAsString() : null;
         var compCbId = p.has("completerCbId") ? p.get("completerCbId").getAsString() : null;
-        var perm = p.has("permission") ? p.get("permission").getAsString() : null;
-        // 权限节点默认值（Bukkit PermissionDefault）：true = 普通玩家默认拥有（服主可经权限插件管理）
-        var permDefault = p.has("permissionDefault") ? p.get("permissionDefault").getAsString() : "false";
+        // permission：字符串（兼容）或对象 { node, default: all|op|none }
+        String perm = null;
+        if (p.has("permission") && !p.get("permission").isJsonNull()) {
+            if (p.get("permission").isJsonPrimitive()) {
+                perm = p.get("permission").getAsString();
+            } else {
+                var po = p.getAsJsonObject("permission");
+                perm = po.get("node").getAsString();
+            }
+        }
 
         var map = getMap();
         if (map == null) return false;
@@ -84,14 +91,13 @@ public class CommandTasks {
         cmd.setDescription(p.has("description") ? p.get("description").getAsString() : "");
         cmd.setUsage("/" + cmdName);
         if (p.has("aliases")) { var as = new ArrayList<String>(); for(var e:p.getAsJsonArray("aliases")) as.add(e.getAsString()); cmd.setAliases(as); }
-        // 权限节点加入 Bukkit 权限系统（传统 Java 插件/权限插件可管理）；
+        // 权限节点注册进 Bukkit 权限系统（传统 Java 插件/权限插件可管理）；
         // 命令本身不设 setPermission——执行时的权限检查在 executor 内（permissionCheck 优先）。
         if (perm != null && !perm.isEmpty()) {
             try {
-                if (Bukkit.getPluginManager().getPermission(perm) == null) {
-                    var pd = org.bukkit.permissions.PermissionDefault.valueOf(permDefault.toUpperCase());
-                    Bukkit.getPluginManager().addPermission(new org.bukkit.permissions.Permission(perm, pd));
-                }
+                YeowRuntime.inst().getPermissionRegistry().register(perm,
+                    p.has("permission") && p.get("permission").isJsonObject() && p.getAsJsonObject("permission").has("default")
+                        ? p.getAsJsonObject("permission").get("default").getAsString() : "none");
             } catch (Exception ignored) {}
         }
         map.register(pluginName.toLowerCase(), cmd);

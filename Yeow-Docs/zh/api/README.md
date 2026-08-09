@@ -9,6 +9,7 @@
 | ⭐ [Player](player.md) | 玩家：属性、位置、消息、传送、权限 |
 | [Server](server.md) | 服务器级：广播、MOTD、图标、版本 |
 | [Env](env.md) | 运行时环境信息 + 微秒时间戳 |
+| ⭐ [Permission](permission.md) | 权限节点：`registerPermission`、命令权限、`permissionCheck` 生态钩子 |
 
 ## 世界与方块
 

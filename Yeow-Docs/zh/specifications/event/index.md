@@ -84,11 +84,12 @@ Yeow 事件系统是运行时向插件投递游戏事件的机制。插件通过
 |------|------|------|
 | `target` | string | 检查对象：玩家 UUID 或 `"CONSOLE"` |
 | `node` | string | 权限节点（如 `myplugin.home`） |
+| `permission` | object | 权限对象：`{ "node": "<节点>", "default": "all" \| "op" \| "none" }`（`default` 为该节点注册的默认值，未注册时省略） |
 
 示例：
 
 ```json
-{ "t": "cb", "p": "<cbId>", "r": { "target": "<uuid>", "node": "myplugin.home" } }
+{ "t": "cb", "p": "<cbId>", "r": { "target": "<uuid>", "node": "myplugin.home", "permission": { "node": "myplugin.home", "default": "all" } } }
 // handler 返回：{ "allowed": true } 或 { "allowed": false }；或不返回（未处理）
 ```
 

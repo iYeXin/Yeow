@@ -1,5 +1,8 @@
 import { call } from './task.js';
 import type { TaskOptions } from './task.js';
+import type { Permission } from './permission.js';
+import type { PermissionOptions } from './permission.js';
+import { permissionPayload } from './permission.js';
 
 export interface CommandSender {
   readonly name: string;
@@ -24,17 +27,11 @@ export interface CommandOptions {
   description?: string;
   usage?: string;
   /**
-   * 声明权限节点（Bukkit 命令权限）：无权限玩家不执行命令（含补全过滤），控制台默认拥有。
-   * 未声明则所有人可执行。
+   * 权限节点：字符串（兼容）或权限节点对象 `{ node, default }`（或 `registerPermission` 返回值）。
+   * 节点注册进 Bukkit 权限系统（权限插件/ permissions.yml 可管理）；**执行时检查**——
+   * `permissionCheck` 事件结果优先，无处理时回退 Bukkit `hasPermission`。未声明则所有人可执行。
    */
-  permission?: string;
-  /**
-   * 权限节点默认值（Bukkit PermissionDefault）：
-   * - `'false'`（默认）：需经权限插件授予（op 自动拥有）
-   * - `'true'`：**普通玩家默认拥有**，服主可经权限插件撤销/管理
-   * - `'op'` / `'not-op'`：按是否 op 决定默认
-   */
-  permissionDefault?: 'true' | 'false' | 'op' | 'not-op';
+  permission?: string | Permission | PermissionOptions;
   aliases?: string[];
   executor: (payload: CommandPayload) => void;
   completer?: CompleterFn | ManualCompleter;
@@ -119,8 +116,7 @@ export function registerCommand(name: string, options: CommandOptions, taskOptio
     completerCbId: compCbId,
     description: options.description,
     usage: options.usage,
-    permission: options.permission,
-    permissionDefault: options.permissionDefault,
+    permission: options.permission ? permissionPayload(options.permission) : undefined,
     aliases: options.aliases,
   }, taskOptions);
 }
