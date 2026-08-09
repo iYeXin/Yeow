@@ -148,9 +148,9 @@ function download(url, dest, agent) {
             if (res.statusCode !== 200) { f.close(); reject(new Error(`HTTP ${res.statusCode}`)); return; }
             const total = parseInt(res.headers['content-length'], 10);
             let dl = 0;
-            res.on('data', chunk => { dl += chunk.length; if (total) process.stdout.write(`\r   ${c.B}Downloading...${c.r} ${(dl / 1024 / 1024).toFixed(1)}MB / ${(total / 1024 / 1024).toFixed(1)}MB`); });
+            res.on('data', chunk => { dl += chunk.length; if (total && !HEADLESS) process.stdout.write(`\r   ${c.B}Downloading...${c.r} ${(dl / 1024 / 1024).toFixed(1)}MB / ${(total / 1024 / 1024).toFixed(1)}MB`); });
             res.pipe(f);
-            f.on('finish', () => { f.close(); process.stdout.write('\n'); resolve(); });
+            f.on('finish', () => { f.close(); if (!HEADLESS) process.stdout.write('\n'); resolve(); });
         }).on('error', e => { f.close(); reject(e); });
     });
 }
@@ -159,19 +159,19 @@ async function ensurePaper() {
     if (PAPER_URL) {
         // User-specified URL or file path
         if (PAPER_URL.startsWith('http://') || PAPER_URL.startsWith('https://')) {
-            if (existsSync(PAPER_PATH) && statSync(PAPER_PATH).size > 1_000_000) { ok('Paper found in cache'); return; }
+            if (existsSync(PAPER_PATH) && statSync(PAPER_PATH).size > 1_000_000) { if (!HEADLESS) ok('Paper found in cache'); return; }
             mkdirSync(CACHE, { recursive: true });
             let agent = null;
             if (PROXY) { info(`Proxy: ${PROXY}`); try { const { HttpsProxyAgent } = await import('https-proxy-agent'); agent = new HttpsProxyAgent(PROXY); } catch {} }
-            info('Downloading Paper...');
-            try { await download(PAPER_URL, PAPER_PATH, agent); ok('Paper downloaded'); }
+            if (!HEADLESS) info('Downloading Paper...');
+            try { await download(PAPER_URL, PAPER_PATH, agent); if (!HEADLESS) ok('Paper downloaded'); }
             catch (e) { fail('Download failed: ' + e.message); console.log('  Manually: ' + PAPER_PATH); process.exit(1); }
         } else {
             if (!existsSync(PAPER_PATH)) { fail(`Paper JAR not found: ${PAPER_PATH}`); process.exit(1); }
-            ok('Paper found at specified path');
+            if (!HEADLESS) ok('Paper found at specified path');
         }
     } else {
-        if (existsSync(PAPER_PATH) && statSync(PAPER_PATH).size > 1_000_000) { ok('Paper found in cache'); return; }
+        if (existsSync(PAPER_PATH) && statSync(PAPER_PATH).size > 1_000_000) { if (!HEADLESS) ok('Paper found in cache'); return; }
         mkdirSync(CACHE, { recursive: true });
         info('Downloading Paper...');
         try {
@@ -180,7 +180,7 @@ async function ensurePaper() {
             const latestBuild = versions.builds[versions.builds.length - 1];
             const dlUrl = `https://api.papermc.io/v2/projects/paper/versions/${PAPER_VERSION}/builds/${latestBuild}/downloads/paper-${PAPER_VERSION}-${latestBuild}.jar`;
             await download(dlUrl, PAPER_PATH, null);
-            ok('Paper downloaded');
+            if (!HEADLESS) ok('Paper downloaded');
         } catch (e) {
             fail('Download failed: ' + e.message);
             console.log('  Manually download to: ' + PAPER_PATH);

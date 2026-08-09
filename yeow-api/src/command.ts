@@ -8,11 +8,6 @@ import { permissionPayload } from './permission.js';
 /** 命令发送者：玩家为真正的 `Player` 对象（异步 `sendMessage` 等全部方法）；控制台为字符串 `'CONSOLE'`。 */
 export type CommandSender = Player | 'CONSOLE';
 
-/** 判断发送者是否为玩家（非 'CONSOLE' 即玩家）。 */
-export function isPlayer(sender: CommandSender): sender is Player {
-  return sender !== 'CONSOLE';
-}
-
 export interface CommandPayload {
   readonly sender: CommandSender;
   readonly args: string[];
