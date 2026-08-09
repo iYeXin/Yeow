@@ -15,20 +15,20 @@ const perm = registerPermission({ node: 'myplugin.home', default: 'all' });
 registerPermission({ node: string, default?: 'all' | 'op' | 'none' }): Permission
 ```
 
-注册权限节点（幂等），返回 `Permission` 对象（`{ node, default }`）。
+注册权限节点（幂等），返回 `Permission` 对象（`{ node, default }`）。`default` 默认 **`'op'`**。
 
 | `default` | 含义 |
 |-----------|------|
 | `'all'` | 所有人**默认拥有**（普通玩家可用；服主可经权限插件撤销） |
-| `'op'` | 仅 op 默认拥有 |
-| `'none'` | 默认无（需经权限插件/ permissions.yml 授权）——默认值 |
+| `'op'` | 仅 op 默认拥有——**默认值** |
+| `'none'` | 默认无（需经权限插件/ permissions.yml 授权） |
 
 - 节点**注册进 Bukkit 权限系统**（`PermissionDefault` 映射）——Paper 平台可通过 `permissions.yml` 静态声明，或 LuckPerms 等权限管理插件管理
 - 粒度较粗：只声明默认值；精细管理交给权限插件（Bukkit）或 `permissionCheck`（Yeow 生态）
 
 ## 命令权限
 
-`registerCommand` 的 `permission` 可传：字符串（兼容）、权限节点对象（`{ node, default }`）或 `registerPermission` 返回值：
+`registerCommand` 的 `permission` 可传：字符串（JS 侧包装为 `{ node, default: 'op' }`）、权限节点对象（`{ node, default }`）或 `registerPermission` 返回值：
 
 ```js
 import { registerPermission, registerCommand } from 'yeow-api';

@@ -57,10 +57,8 @@ public class PlayerTasks {
     public static Object performCommand(JsonObject p) { return player(p).performCommand(p.get("command").getAsString()); }
     public static Object hasPermission(JsonObject p) {
         var pl = player(p);
-        // permission 参数：字符串或对象 { node }
-        var node = p.get("permission").isJsonPrimitive()
-            ? p.get("permission").getAsString()
-            : p.getAsJsonObject("permission").get("node").getAsString();
+        // permission 参数为对象 { node }（字符串包装在 JS 侧完成，Java 不做兼容）
+        var node = p.getAsJsonObject("permission").get("node").getAsString();
         // Yeow 生态权限检查：permissionCheck 事件结果优先，无处理时回退 Bukkit
         var r = YeowRuntime.inst().getEventBridge().checkPermission(pl.getUniqueId().toString(), node);
         return r != null ? r : pl.hasPermission(node);

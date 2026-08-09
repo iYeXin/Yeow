@@ -29,15 +29,13 @@ public class CommandTasks {
         var cmdName = p.get("commandName").getAsString();
         var cbId = p.has("callbackId") ? p.get("callbackId").getAsString() : null;
         var compCbId = p.has("completerCbId") ? p.get("completerCbId").getAsString() : null;
-        // permission：字符串（兼容）或对象 { node, default: all|op|none }
+        // permission：对象 { node, default }（default 默认 op）——字符串包装在 JS 侧完成，Java 不做兼容
         String perm = null;
+        String permDefault = "op";
         if (p.has("permission") && !p.get("permission").isJsonNull()) {
-            if (p.get("permission").isJsonPrimitive()) {
-                perm = p.get("permission").getAsString();
-            } else {
-                var po = p.getAsJsonObject("permission");
-                perm = po.get("node").getAsString();
-            }
+            var po = p.getAsJsonObject("permission");
+            perm = po.get("node").getAsString();
+            if (po.has("default") && !po.get("default").isJsonNull()) permDefault = po.get("default").getAsString();
         }
 
         var map = getMap();
@@ -95,9 +93,7 @@ public class CommandTasks {
         // 命令本身不设 setPermission——执行时的权限检查在 executor 内（permissionCheck 优先）。
         if (perm != null && !perm.isEmpty()) {
             try {
-                YeowRuntime.inst().getPermissionRegistry().register(perm,
-                    p.has("permission") && p.get("permission").isJsonObject() && p.getAsJsonObject("permission").has("default")
-                        ? p.getAsJsonObject("permission").get("default").getAsString() : "none");
+                YeowRuntime.inst().getPermissionRegistry().register(perm, permDefault);
             } catch (Exception ignored) {}
         }
         map.register(pluginName.toLowerCase(), cmd);

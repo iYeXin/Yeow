@@ -1,13 +1,13 @@
 import { call } from './task.js';
 import type { TaskOptions } from './task.js';
 
-/** 权限节点默认值：'all' = 所有人默认拥有；'op' = 仅 op；'none' = 需授权（默认）。 */
+/** 权限节点默认值：'all' = 所有人默认拥有；'op' = 仅 op（默认）；'none' = 需授权。 */
 export type PermissionDefault = 'all' | 'op' | 'none';
 
 export interface PermissionOptions {
   /** 权限节点（如 `myplugin.home`）。 */
   node: string;
-  /** 默认值（默认 'none'）。 */
+  /** 默认值（默认 'op'）。 */
   default?: PermissionDefault;
 }
 
@@ -31,7 +31,7 @@ export function registerPermission(options: PermissionOptions, taskOptions?: Tas
   if (!node || typeof node !== 'string' || node.trim() === '') {
     throw new Error('registerPermission: node is required');
   }
-  const def: PermissionDefault = options.default || 'none';
+  const def: PermissionDefault = options.default || 'op';
   if (!_registered[node]) {
     call('permission.register', { node, default: def }, taskOptions);
     _registered[node] = { node, default: def };
@@ -39,8 +39,8 @@ export function registerPermission(options: PermissionOptions, taskOptions?: Tas
   return _registered[node];
 }
 
-/** 权限节点对象 → 请求载荷（{ node, default }）。 */
+/** 权限节点对象 → 请求载荷（{ node, default }）；字符串包装为对象（default 默认 'op'）——Java 侧不做兼容。 */
 export function permissionPayload(perm: string | Permission | PermissionOptions): { node: string; default: PermissionDefault } {
-  if (typeof perm === 'string') return { node: perm, default: 'none' };
-  return { node: perm.node, default: perm.default || 'none' };
+  if (typeof perm === 'string') return { node: perm, default: 'op' };
+  return { node: perm.node, default: perm.default || 'op' };
 }
