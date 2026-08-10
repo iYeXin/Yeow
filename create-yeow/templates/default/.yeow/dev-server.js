@@ -468,6 +468,20 @@ async function runHeadless() {
     const log = OUTFILE ? createWriteStream(OUTFILE, { flags: 'a' }) : null;
     const out = (line) => { if (log) log.write(line + '\n'); else console.log(line); };
 
+    // 流程级超时：覆盖下载/初始化/启动/加载全程（--timeout，默认 2m）
+    let done = false;
+    const finish = (code) => {
+        if (waitTimer) clearTimeout(waitTimer);
+        try { if (log) log.end(); } catch {}
+        process.exit(code);
+    };
+    const failTimer = setTimeout(() => {
+        if (done) return;
+        fail(`流程在 ${TIMEOUT}s 内未完成加载——请检查网络/依赖下载，或加大超时（--timeout=3m）`);
+        killProc();
+        finish(1);
+    }, TIMEOUT * 1000);
+
     info('正在下载/准备服务端…');
     await ensurePaper();
     mkdirSync(SERVER, { recursive: true });
@@ -485,18 +499,7 @@ async function runHeadless() {
     proc = spawn('java', [...jvmArgs, '-jar', resolve(SERVER, PAPER_JAR), '--nogui'], { cwd: SERVER, stdio: ['ignore', 'pipe', 'pipe'] });
     info(`Server PID: ${proc.pid}`);
 
-    let started = false, done = false, waitTimer = null;
-    const finish = (code) => {
-        if (waitTimer) clearTimeout(waitTimer);
-        try { if (log) log.end(); } catch {}
-        process.exit(code);
-    };
-    const failTimer = setTimeout(() => {
-        if (done) return;
-        fail(`服务器在 ${TIMEOUT}s 内未完成加载——请检查网络/依赖下载，或加大超时（--timeout=3m）`);
-        killProc();
-        finish(1);
-    }, TIMEOUT * 1000);
+    let started = false, waitTimer = null;
 
     const onLine = (line) => {
         out(line);

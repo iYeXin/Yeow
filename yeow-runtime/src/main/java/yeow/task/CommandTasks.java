@@ -30,12 +30,16 @@ public class CommandTasks {
         var cbId = p.has("callbackId") ? p.get("callbackId").getAsString() : null;
         var compCbId = p.has("completerCbId") ? p.get("completerCbId").getAsString() : null;
         // permission：对象 { node, default }（default 默认 op）——字符串包装在 JS 侧完成，Java 不做兼容
-        String perm = null;
-        String permDefault = "op";
+        // final 一次性赋值（匿名类捕获需 effectively final）
+        final String perm;
+        final String permDefault;
         if (p.has("permission") && !p.get("permission").isJsonNull()) {
             var po = p.getAsJsonObject("permission");
             perm = po.get("node").getAsString();
-            if (po.has("default") && !po.get("default").isJsonNull()) permDefault = po.get("default").getAsString();
+            permDefault = po.has("default") && !po.get("default").isJsonNull() ? po.get("default").getAsString() : "op";
+        } else {
+            perm = null;
+            permDefault = "op";
         }
 
         var map = getMap();
