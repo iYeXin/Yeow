@@ -130,13 +130,17 @@ public class Scheduler {
      * 无预算限制地排空全部队列（事件自旋期间使用）。
      * 事件自旋的主循环本应消费任务让 event.complete 执行——但 tick() 受时间片预算约束，
      * 繁忙时 HIGH 队列会占满预算，NORMAL 中的 event.complete 可能长期排不到 → 事件饿死直到 5s 超时。
-     * drainAll 忽略预算按 HIGH → NORMAL → LOW 依次排空，保证事件完成类任务必然被执行。
+     * drainAll 忽略预算：大循环每轮按 HIGH → NORMAL → LOW 顺序取**一个**任务执行——
+     * 执行期间新入队的高优任务下一轮即被优先取走，不会被低优队列的巨量积压撑死。
      */
     public void drainAll() {
-        PendingTask t;
-        while ((t = highPool.poll()) != null) executeOne(t);
-        while ((t = normalPool.poll()) != null) executeOne(t);
-        while ((t = lowPool.poll()) != null) executeOne(t);
+        while (true) {
+            var t = highPool.poll();
+            if (t == null) t = normalPool.poll();
+            if (t == null) t = lowPool.poll();
+            if (t == null) break;
+            executeOne(t);
+        }
     }
 
     private void idleSpin(long deadline) {
