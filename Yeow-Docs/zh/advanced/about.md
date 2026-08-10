@@ -22,7 +22,7 @@ Yeow **不会**提供从 JS 直接调用 Java 方法的 API。原因：
 1. **技术困难**：JS 运行在独立的 QuickJS 线程/上下文中，直接调用 Java 方法需要跨线程的同步桥、对象引用与生命周期管理、类型系统映射——复杂度高且难以保证安全（主线程阻塞、引用泄漏、线程安全）
 2. **破坏跨平台兼容性**：允许调用 Java 方法意味着插件代码依赖具体实现（Paper 的类、版本化的 CraftBukkit 包），同一插件无法在其他运行时（其他平台/未来实现）运行——直接违背平台无关的核心原则
 
-需要 Java 侧能力的场景通过**协议层**解决：游戏操作走任务/事件/命令桥；插件间通信走 Service；原生计算走 Native Service；其他 Java 插件可通过 [Java 集成接口](specifications/java-api.md) 调用 Yeow 插件注册的服务。
+需要 Java 侧能力的场景通过**协议层**解决：游戏操作走任务/事件/命令桥；插件间通信走 Service；原生计算走 Native Service；其他 Java 插件可通过 [Java 集成接口](../specifications/java-api.md) 调用 Yeow 插件注册的服务。
 
 ## 未来规划
 

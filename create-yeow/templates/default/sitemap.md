@@ -7,7 +7,6 @@
 
 | 页面           | URL                                          | 摘要                                                                                                                                                                                                      |
 | -------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 关于 Yeow      | `https://yeow.yeside.top/v1/about`           | 定位、设计目标、基本原则（避免平台绑定、不提供调用 Java 方法的 API）、愿景（Minecraft 的 Web 标准 / YEOW = Your Entry to an Open World）                                                                  |
 | 概览           | `https://yeow.yeside.top/v1/overview`        | 项目总览：用 TypeScript 写 Paper 插件（QuickJS 引擎，每插件独立线程）。按角色（初学者/开发者/服主/平台实现者）的文档入口导引 + 关键概念速览                                                               |
 | AI 辅助启动指南 | `https://yeow.yeside.top/v1/ai-agent`        | 面向 AI 代理 / Vibe Coding：Yeow 项目简介、启动命令（`--ts`）、下一步、文档查阅策略（站点地图/docs.zip/Harness 用法）                                                                                  |
 | 快速开始       | `https://yeow.yeside.top/v1/getting-started` | 从零开始：`npm create yeow` 建项目 → `npm run dev` 开发（热重载）→ `npm run build` 构建 → 三种部署方式。含第一个插件示例（/back 传送）、异步/同步约定、权限声明、原生服务批准、/yeow 管理命令、运行时配置 |
@@ -15,6 +14,7 @@
 | 构建与分发     | `https://yeow.yeside.top/v1/distribution`    | 两种产物：标准 Paper JAR（plugins/）与平台无关 .yeow.zip（plugins/Yeow/ 自动扫描或 /yeow install）；分发建议与 Modrinth 发布                                                                              |
 | 运行时警告     | `https://yeow.yeside.top/v1/runtime-warning` | 预警引擎：heartbeat.timeout / event.slow / plugin.hung / budget.congested 等告警的触发条件、含义与解决方案；配置阈值；动态扩容机制                                                                        |
 | 进阶知识       | `https://yeow.yeside.top/v1/advanced`        | 进阶索引（拆分后）：架构/调度器/事件/生命周期/通道/服务/运维与安全的入口                                                                                                                                    |
+| 关于 Yeow      | `https://yeow.yeside.top/v1/advanced/about`  | 定位、设计目标、基本原则（避免平台绑定、不提供调用 Java 方法的 API）、愿景（Minecraft 的 Web 标准 / YEOW = Your Entry to an Open World）                                                                  |
 | 进阶 · 架构与线程模型 | `https://yeow.yeside.top/v1/advanced/architecture` | 包结构、启动流程、线程模型、插件实体抽象、Worker（虚拟插件）、开发模式错误回显、资源路径机制（getAssetsPath）                                                                                        |
 | 进阶 · 调度器与任务 | `https://yeow.yeside.top/v1/advanced/scheduler` | 三级优先级调度器（时间片预算/自动降级/空闲自旋）、异步 vs 同步、手动分片、任务执行时机（onLoad/onInit）                                                                                             |
 | 进阶 · 事件与回调 | `https://yeow.yeside.top/v1/advanced/events` | 事件桥（EventBridge）：并发/串行、事件数据、处理器操作与模式选择                                                                                                                                    |
@@ -121,7 +121,7 @@
 
 ```
 开始：概览 · 快速开始 · CLI 参考 · 构建与分发 · 运行时警告 · 路线图 · 站点地图
-进阶：进阶知识（架构）
+进阶（默认折叠）：关于 Yeow · 进阶索引（架构/调度器/事件/生命周期/通道/服务/运维与安全）
 依赖包开发：编写依赖包
 API 参考：索引 → 玩家与服务器(Player/Server/Env) · 世界与方块(World/Chunk/Location/Block/Material) · 实体(Entity/Potion/Particle) · 交互界面(GUI/Inventory/BossBar/Scoreboard/Advancement/Recipe) · 事件与命令(Event/Command) · 物品(ItemStack) · 服务与网络(Service/HTTP/HTTP Server) · 多线程(Worker) · 文件与数据(FS/Assets/PDC) · 文本(Text) · 日志(Log)
 平台规范：规范总览 → 消息通道 · 任务类型 · 事件 · 运行时 · 原生服务 · 适配器

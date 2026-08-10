@@ -28,7 +28,6 @@ export default defineConfig({
     themeConfig: {
         logo: '/favicon.svg',
         nav: [
-            { text: '关于', link: '/about', activeMatch: '/about' },
             { text: '指南', link: '/overview', activeMatch: '/overview|/getting-started|/ai-agent|/cli|/runtime-warning' },
             { text: 'API', link: '/api/', activeMatch: '/api/' },
             { text: '进阶', link: '/advanced', activeMatch: '/advanced' },
@@ -43,7 +42,6 @@ export default defineConfig({
             {
                 text: '开始',
                 items: [
-                    { text: '关于 Yeow', link: '/about' },
                     { text: '概览', link: '/overview' },
                     { text: '快速开始', link: '/getting-started' },
                     { text: 'AI 启动指南', link: '/ai-agent' },
@@ -152,7 +150,7 @@ export default defineConfig({
             },
             {
                 text: '进阶',
-                collapsed: false,
+                collapsed: true,
                 items: [
                     { text: '进阶索引', link: '/advanced' },
                     { text: '架构与线程模型', link: '/advanced/architecture' },
@@ -162,6 +160,7 @@ export default defineConfig({
                     { text: '环境能力与通道', link: '/advanced/channels' },
                     { text: '服务机制', link: '/advanced/service' },
                     { text: '运行时运维与安全', link: '/advanced/operations' },
+                    { text: '关于 Yeow', link: '/advanced/about' },
                 ],
             },
             {
