@@ -59,10 +59,7 @@ declare global {
     | undefined;
 }
 
-// yeow-dev：构建期虚拟模块（由 Yeow 构建器按 importer 所属依赖项注入命名空间）。
-// 插件未安装 yeow-dev 时此声明生效；类型与实际构建行为一致。
-declare module 'yeow-dev' {
-  export function getAssetsPath(path: string): string;
-}
-
 export {};
+
+// yeow-dev 备选声明见同目录 yeow-dev.d.ts（ambient，非模块文件）——
+// 插件未安装 yeow-dev（构建期虚拟模块）时生效；已安装时以 yeow-dev 包内类型为准。

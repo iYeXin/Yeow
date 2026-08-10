@@ -1,4 +1,5 @@
 /// <reference path="global.d.ts" />
+/// <reference path="yeow-dev.d.ts" />
 
 export { call } from './task.js';
 export { Location } from './location.js';

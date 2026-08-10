@@ -27,7 +27,7 @@ headless 模式适合 AI 代理/CI：自动接受 EULA → 下载服务端 → �
 npm run dev -- --eula --keep --timeout=2m --wait=30s --outfile=log.txt
 ```
 
-- `--eula`：自动接受 EULA；`--timeout=2m`：加载超时（默认 2m，超时提示检查网络或加大）；`--wait=30s`：加载成功后等待（默认 30s，时间到命令自动结束）；`--outfile=log.txt`：日志输出文件；`--keep`：命令结束后**保留服务器进程**
+- `--eula`：自动接受 EULA；`--timeout=2m`：加载超时（默认 2m，超时可能代表网络问题，检查代理或加大超时时间）；`--wait=30s`：加载成功后等待（默认 30s，时间到命令自动结束）；`--outfile=log.txt`：日志输出文件；`--keep`：命令结束后**保留服务器进程**
 - 流程：输出 `Server PID` → 下载/启动 → 检测到 `Done (...)! For help` 视为加载完成 → 等待后命令结束
 - 调试方式：1. 引导用户进入测试服务器进行真实测试  2. 启动 http-server，通过外部请求调试   3. 编辑源代码，之后杀死进程并重启开发服务器（headless 无热重载）
 - **加载成功后看日志**（`--outfile` 或控制台输出）；不需要服务器时按输出的 `Server PID` 杀死进程（`kill <pid>`）
