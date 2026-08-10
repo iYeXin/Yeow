@@ -10,9 +10,10 @@ Bukkit 事件触发
   → eventData() 提取字段（基本类型，无 Bukkit 引用）
   → SyncCallbackHelper.register(cbId)
   → queue.sendJs({t:"cb", p:cbId, r:{事件数据}}) → JS 线程
-  → 主线程自旋等待:
-      while (!pend.isDone()) {
-          runtime.getScheduler().tick();
+  → 主线程自旋等待（无预算排空调度器队列——event.complete 不被 tick 时间片预算饿死）:
+      while (未完成 && 未超时) {
+          runtime.getScheduler().drainAll();
+          Thread.onSpinWait();
       }
   → JS $hm → _hm → _cbs[cbId].h(r)
   → yeow-api 回调内:

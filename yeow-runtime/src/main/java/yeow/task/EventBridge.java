@@ -285,10 +285,12 @@ public class EventBridge implements Listener {
                     var deadline = System.nanoTime() + timeout * 1_000_000;
                     boolean primary = Bukkit.isPrimaryThread();
                     while (System.nanoTime() < deadline && !pend.isDone()) {
-                        // 仅主线程 dispatch 时喂调度器 tick（事件完成依赖它）；
+                        // 仅主线程 dispatch 时消费调度器任务（无预算排空：event.complete 等
+                        // 事件完成任务不被 tick 预算饿死——繁忙时 tick 的 HIGH 配额会占满预算，
+                        // 导致事件完成任务排不到、事件 5s 超时）；
                         // 非主线程（如 serverPing 的 Netty 线程）纯自旋等待——
                         // 事件完成由主线程的正常 tick 执行，Netty 线程不能执行 Bukkit API。
-                        if (primary) runtime.getScheduler().tick();
+                        if (primary) runtime.getScheduler().drainAll();
                         Thread.onSpinWait();
                     }
                     long elapsedNs = System.nanoTime() - t0;
@@ -330,8 +332,9 @@ public class EventBridge implements Listener {
         var deadline = System.nanoTime() + timeout * 1_000_000;
         boolean primary = Bukkit.isPrimaryThread();
         while (System.nanoTime() < deadline && latch.getCount() > 0) {
-            // 仅主线程 dispatch 时喂调度器 tick；非主线程纯自旋（主线程正常 tick 处理 event.complete）。
-            if (primary) runtime.getScheduler().tick();
+            // 无预算排空（同 dispatchSerial）：event.complete 不被 tick 预算饿死；
+            // 非主线程纯自旋（主线程正常 tick 处理 event.complete）。
+            if (primary) runtime.getScheduler().drainAll();
             Thread.onSpinWait();
         }
         long now = System.nanoTime();

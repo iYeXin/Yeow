@@ -126,6 +126,19 @@ public class Scheduler {
         while (System.nanoTime() < deadline) { var t = pool.poll(); if (t == null) break; executeOne(t); }
     }
 
+    /**
+     * 无预算限制地排空全部队列（事件自旋期间使用）。
+     * 事件自旋的主循环本应消费任务让 event.complete 执行——但 tick() 受时间片预算约束，
+     * 繁忙时 HIGH 队列会占满预算，NORMAL 中的 event.complete 可能长期排不到 → 事件饿死直到 5s 超时。
+     * drainAll 忽略预算按 HIGH → NORMAL → LOW 依次排空，保证事件完成类任务必然被执行。
+     */
+    public void drainAll() {
+        PendingTask t;
+        while ((t = highPool.poll()) != null) executeOne(t);
+        while ((t = normalPool.poll()) != null) executeOne(t);
+        while ((t = lowPool.poll()) != null) executeOne(t);
+    }
+
     private void idleSpin(long deadline) {
         while (System.nanoTime() < deadline) {
             if (!highPool.isEmpty() || !normalPool.isEmpty() || !lowPool.isEmpty()) { greedyDrain(deadline); continue; }
