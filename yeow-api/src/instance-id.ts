@@ -1,4 +1,7 @@
 let _seq = 0;
+// 每个插件 QuickJS 上下文独立（模块级变量彼此隔离）；随机种子保证
+// 跨插件/跨 Worker 生成的 id 全局唯一——id 是不透明句柄，不携带任何业务信息。
+const _seed = Math.random().toString(36).slice(2, 12);
 const _gcQueue: string[] = [];
 const _gcReg = typeof FinalizationRegistry !== 'undefined'
   ? new FinalizationRegistry<string>((raw: string) => { _gcQueue.push(raw); })
@@ -9,8 +12,8 @@ export class InstanceId {
   readonly _raw: string;
   readonly _managed: boolean;
 
-  constructor(prefix: string) {
-    this._raw = prefix + '_' + (++_seq);
+  constructor() {
+    this._raw = _seed + '_' + (++_seq);
     this._managed = true;
     _gcReg?.register(this, this._raw);
   }
@@ -25,6 +28,6 @@ export class InstanceId {
   toString(): string { return this._raw; }
 }
 
-export class GUIHandle extends InstanceId { constructor() { super('gui'); } }
-export class BossBarHandle extends InstanceId { constructor() { super('boss'); } }
-export class InventoryHandle extends InstanceId { constructor() { super('inv'); } }
+export class GUIHandle extends InstanceId {}
+export class BossBarHandle extends InstanceId {}
+export class InventoryHandle extends InstanceId {}
