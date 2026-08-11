@@ -1,4 +1,4 @@
-﻿# Yeow v0
+# Yeow v0
 
 **用 JavaScript / TypeScript 编写 Minecraft Paper 插件。QuickJS 引擎。**
 
@@ -36,7 +36,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 - 插件包是标准 ZIP（`.yeow.zip`，内含打包 JS、资源、元信息与权限声明），**不依赖 Java 环境**
 - 放入 `plugins/Yeow/` 自动扫描加载，或 `/yeow load` 动态加载
 - 任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件
-- Paper/Bukkit 的 `yeow-runtime` 是官方实现示例
+- Paper 系（Paper/Purpur/Leaf 等）的 `yeow-runtime` 是官方实现示例
 
 ### 原生能力扩展
 
@@ -53,7 +53,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 | 热重载       | ✅ 秒级              | ❌ 需重启       | 部分        | 部分                          |
 | 线程隔离     | ✅ 每插件独立线程    | 主线程         | 主线程      | 主线程                        |
 | 性能         | QuickJS（接近原生） | 原生           | 解释执行    | 解释执行                      |
-| 平台可移植   | ✅ 插件包平台无关    | ❌ 仅 JVM       | ❌ 仅 Bukkit | ❌ 仅 JVM                      |
+| 平台可移植   | ✅ 插件包平台无关    | ❌ 仅 JVM       | ❌ 仅 Paper 系 | ❌ 仅 JVM                      |
 
 ---
 

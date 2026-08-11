@@ -88,7 +88,7 @@
 | `player.sendMessage` | `{ "uuid": "<uuid>", "message": <Message> }` | `true` | 发送消息（`message` 为 [Message 对象](#message-对象可翻译组件) 或纯文本） |
 | `player.sendActionBar` | `{ "uuid": "<uuid>", "message": <Message> }` | `true` | 发送操作栏消息（同上） |
 | `player.sendTitle` | `{ "uuid": "<uuid>", "title": "<text>", "subtitle": "<text>", "fadeIn": <int>, "stay": <int>, "fadeOut": <int> }` | `true` | 发送标题/副标题。`fadeIn`/`stay`/`fadeOut` 单位为 tick（默认 10/70/20） |
-| `player.playSound` | `{ "uuid": "<uuid>", "sound": "<key>", "volume": <float>, "pitch": <float> }` | `true` | 播放音效（sound 为 Bukkit Sound 枚举名，如 `block.note_block.pling`） |
+| `player.playSound` | `{ "uuid": "<uuid>", "sound": "<key>", "volume": <float>, "pitch": <float> }` | `true` | 播放音效（sound 为 Paper 系 Sound 枚举名，如 `block.note_block.pling`） |
 | `player.stopSound` | `{ "uuid": "<uuid>", "sound": "<key>" }` | `true` | 停止指定音效 |
 | `player.stopAllSounds` | `{ "uuid": "<uuid>" }` | `true` | 停止所有音效 |
 | `player.kick` | `{ "uuid": "<uuid>", "reason": "<text>" }` | `true` | 踢出玩家 |

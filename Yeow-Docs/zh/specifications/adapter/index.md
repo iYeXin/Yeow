@@ -4,7 +4,7 @@ Yeow 的**标准开发语言是 JavaScript**（官方 JS 适配器）。其他�
 
 Yeow v1 的多语言支持暂不完善，我们推荐使用 JavaScript/TypeScript。如果使用其他语言进行开发，开发者体验、用户体验、性能、资源占用以及插件安全模型的可靠性，高度依赖于语言本身的特性、适配器作者的设计以及适配器的实现质量。Yeow v1 不对其他开发方案的可用性做任何保证。
 
-下面是 Yeow 在 Paper/Bukkit 平台上的插件适配器规范。如果其他平台也实现了 Yeow 运行时，请适配器作者参考他们的规范进行开发。
+下面是 Yeow 在 Paper 系 平台上的插件适配器规范。如果其他平台也实现了 Yeow 运行时，请适配器作者参考他们的规范进行开发。
 
 典型适配器形态：
 
@@ -99,7 +99,7 @@ class PythonPluginEntity implements PluginEntity {
 
 ## 依赖与访问
 
-适配器插件在 `plugin.yml` 声明 `depend: [Yeow]`，通过 `YeowRuntime.inst()` 访问注册 API（运行时是 Bukkit 插件实例，也可经 `Bukkit.getPluginManager().getPlugin("Yeow")` 获取）。
+适配器插件在 `plugin.yml` 声明 `depend: [Yeow]`，通过 `YeowRuntime.inst()` 访问注册 API（运行时是 Paper 系插件实例，也可经 `Bukkit.getPluginManager().getPlugin("Yeow")` 获取）。
 
 ## 检查清单（合格适配器）
 

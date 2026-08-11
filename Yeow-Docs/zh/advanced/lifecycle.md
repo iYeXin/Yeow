@@ -61,7 +61,7 @@ onInit(() => {
 });
 
 onLoad(() => {
-    // Bukkit onEnable 后通过消息循环触发
+    // Paper 系 onEnable 后通过消息循环触发
     // 可以调所有游戏操作
 });
 
@@ -76,7 +76,7 @@ onUnload(() => {
 | 钩子       | 触发时机                  | 游戏 API 可用 |
 | ---------- | ------------------------- | :-----------: |
 | `onInit`   | JS 上下文创建、代码加载后 |       ❌       |
-| `onLoad`   | Bukkit `onEnable` 后      |       ✅       |
+| `onLoad`   | Paper 系 `onEnable` 后      |       ✅       |
 | `onUnload` | 插件禁用或热重载          |       ✅       |
 
 ### 热重载

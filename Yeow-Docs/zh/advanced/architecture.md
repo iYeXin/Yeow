@@ -11,7 +11,7 @@
     │  │ .yeow/main.js     (esbuild 打包的 JS)      │  │
     │  │ assets/<id>/      (资源，按命名空间分目录)  │  │
     │  │ yeow.json         (元信息 + 权限 + native) │  │
-    │  │ plugin.yml        (Bukkit 元信息，JAR 需)  │  │
+    │  │ plugin.yml        (Paper 系元信息，JAR 需)  │  │
     │  └───────────────────────────────────────────┘  │
     └──────────────────────┬──────────────────────────┘
                            │ YeowRuntime.registerPlugin()
@@ -35,11 +35,11 @@
     │                   │                             │
     │  ┌────────────────┴─────────────────────────┐  │
     │  │  EventBridge                              │  │
-    │  │  Bukkit 事件 → 插件 → applyMods()         │  │
+    │  │  Paper 系事件 → 插件 → applyMods()         │  │
     │  │  （未注册自动注册；无订阅自动跳过）        │  │
     │  └──────────────────────────────────────────┘  │
     └──────────────────────┬──────────────────────────┘
-                           ↓ Bukkit API
+                           ↓ Paper 系 API
     ┌─────────────────────────────────────────────────┐
     │                    PaperMC                      │
     └─────────────────────────────────────────────────┘
@@ -51,12 +51,12 @@
 | --------------- | ---------- | -------------------------------------------------------------- |
 | `yeow-api`      | TypeScript | 开发期 npm 依赖，提供 OOP 封装。esbuild 打包进 `.yeow/main.js` |
 | `create-yeow`   | Node.js    | CLI 脚手架，生成项目模板 + 构建脚本                            |
-| `yeow-runtime`  | Java       | Bukkit 插件，管理 QuickJS 引擎和 Bukkit API 桥接               |
+| `yeow-runtime`  | Java       | Paper 系插件，管理 QuickJS 引擎和 Paper 系 API 桥接               |
 | `yeow-template` | Java       | 空 JAR 骨架，构建时注入 JS 代码                                |
 
 ## 启动流程
 
-Bukkit 加载插件时：
+Paper 系加载插件时：
 
 ```
 Paper 启动
@@ -94,7 +94,7 @@ PluginThread.run()
 
 | 线程                     | 职责                                               |
 | ------------------------ | -------------------------------------------------- |
-| **Bukkit 主线程**        | 每 tick 50ms 调度 Scheduler.tick()，处理游戏任务   |
+| **Paper 系主线程**        | 每 tick 50ms 调度 Scheduler.tick()，处理游戏任务   |
 | **JS 线程**（每插件）    | 运行插件 JS，处理消息循环，直接处理 fs/http/assets |
 | **Timer 线程**（每插件） | 定时器到期后发消息到 JS 线程                       |
 | **Fetch 线程**           | HTTP 请求（每次请求一个线程）                      |

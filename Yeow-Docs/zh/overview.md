@@ -44,4 +44,4 @@ API 参考      api/README.md           按模块分组的完整索引（Player 
 
 > 要求：Node.js 18+（开发）· Java 21+（可选，开发服务器必需）。
 
-> **版本范围**：Yeow 插件目标运行在 **Minecraft 1.18+**（更低版本理论上可运行，但可能出现功能异常）。开发服务器默认使用 Paper **1.21.4**——这不是硬性要求，可在 `yeow.config.json` 的 `paperVersion` / `paperJar` 中配置为任意支持的 Paper 版本。
+> **版本范围**：Yeow 插件的目标运行环境是 **Minecraft 1.18+**（更低版本理论上可运行，但可能出现功能异常）。开发服务器默认使用 Paper **1.21.4**——这不是硬性要求，可在 `yeow.config.json` 的 `paperVersion` / `paperJar` 中配置为任意支持的 Paper 版本。

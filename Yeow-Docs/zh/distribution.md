@@ -17,7 +17,7 @@ npm run build
 
 ## 方式一：JAR（兼容）
 
-- 放入服务器 `plugins/` 目录即可运行，与其他 Java 插件行为一致（Bukkit 会在启动时先加载前置 Yeow 运行时）
+- 放入服务器 `plugins/` 目录即可运行，与其他 Java 插件行为一致（Paper 系会在启动时先加载前置 Yeow 运行时）
 - 可在 **Modrinth / CurseForge / Hangar** 等主流平台直接分发
 - 适合：
   - 使用其他 Java 插件管理器的用户
@@ -25,14 +25,14 @@ npm run build
 
 ## 方式二：.yeow.zip（推荐）
 
-- **平台无关**：纯 ZIP（JS 代码 + 资源 + 元信息），不依赖 Java / Bukkit——任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件，未来的跨平台兼容性更优
+- **平台无关**：纯 ZIP（JS 代码 + 资源 + 元信息），不依赖 Java / Paper 系——任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件，未来的跨平台兼容性更优
 - 部署方式：
   - 放入 `plugins/Yeow/`，服务器启动时**自动扫描加载**
   - 或管理员执行 `/yeow install <url>` 一键安装
   - 或 `/yeow load <url | path>` 临时/动态加载
 - 适合：
   - 面向 Yeow 生态的分发（用户已装 Yeow 运行时）
-  - 多平台目标（未来非 Bukkit 运行时）
+  - 多平台目标（未来非 Paper 系运行时）
 
 ## 建议：同时上传两种格式
 

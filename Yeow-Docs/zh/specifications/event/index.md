@@ -67,7 +67,7 @@ Yeow 事件系统是运行时向插件投递游戏事件的机制。插件通过
 | `serverPing`               | 服务器 | 否     | 服务器被 ping    |
 | `serverCommand`            | 服务器 | 是     | 控制台命令       |
 | `playerResourcePackStatus` | 资源包 | 否     | 资源包状态变化   |
-| `permissionCheck`          | 权限   | 否     | Yeow 生态权限检查（非 Bukkit 事件，见下） |
+| `permissionCheck`          | 权限   | 否     | Yeow 生态权限检查（非 Paper 系事件，见下） |
 
 ## `permissionCheck`（Yeow 生态权限检查）
 
@@ -77,8 +77,8 @@ Yeow 事件系统是运行时向插件投递游戏事件的机制。插件通过
   - `player.hasPermission` 任务
   - Yeow 插件注册命令的**执行时检查**
   - **其他 Java 插件的 `hasPermission` / 命令执行不会触发**——本检查不捆绑其他生态
-- **优先级**：`permissionCheck` 有结果时**覆盖 Bukkit `hasPermission`**；无处理时回退 Bukkit
-- **节点融合**：权限节点仍同时注册进 Bukkit 权限系统（传统 Java 插件 / 权限插件可管理），只是 Yeow 检查优先级更高
+- **优先级**：`permissionCheck` 有结果时**覆盖 Paper 系 `hasPermission`**；无处理时回退 Paper 系
+- **节点融合**：权限节点仍同时注册进 Paper 系权限系统（传统 Java 插件 / 权限插件可管理），只是 Yeow 检查优先级更高
 
 | 字段 | 类型 | 说明 |
 |------|------|------|

@@ -9,7 +9,7 @@
 | 工具 | 版本 | 用途 |
 |------|------|------|
 | Node.js | 18+ | `yeow-api` / `yeow-utils` / `create-yeow` / 文档站点 |
-| JDK | 21+ | `yeow-runtime` / `yeow-template` / `yeow-tools` / `quickjs-wrapper` |
+| JDK | 21+ | `yeow-runtime/jvm` / `yeow-template` / `yeow-tools` / `quickjs-wrapper` |
 | Maven | 3.9+ | 运行时与模板构建 |
 | Gradle | 8.x（仓库自带 wrapper） | quickjs-wrapper 构建 |
 | Git | 任意 | 版本控制（本仓库与 quickjs-wrapper 均使用） |
@@ -28,7 +28,9 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 | 目录 | 组件 | 构建方式 |
 |------|------|---------|
-| `yeow-runtime` | Bukkit 插件运行时 | `mvn install -DskipTests`（详见下文） |
+| `yeow-runtime/jvm` | Maven 父工程（多模块） | 根目录 `mvn install -DskipTests`（详见下文） |
+| `yeow-runtime/jvm/core` | 平台无关引擎（artifact `yeow-runtime-core`，零 Bukkit 依赖） | 随父工程构建；单独构建 `mvn -pl core install` |
+| `yeow-runtime/jvm/paper` | Paper/Bukkit 平台实现（artifact `yeow-runtime`，产出运行 jar） | 随父工程构建；单独构建 `mvn -pl paper install`（需先装 core） |
 | `yeow-template` | 空 JAR 骨架 | `mvn package`（依赖 yeow-runtime，需先安装到本地 Maven 仓库） |
 | `yeow-api` / `yeow-utils` | TS 库 | 无构建步骤（源码直接随插件 bundle）；类型检查 `tsc --noEmit` |
 | `create-yeow` | CLI 脚手架 | 无构建步骤；模板改动直接生效 |
@@ -44,23 +46,23 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 ### 1. quickjs-java-wrapper（关键依赖）
 
-`yeow-runtime` 依赖 `com.whl.quickjs:quickjs-java-wrapper`（本地 Maven 仓库）。该组件由主仓库 [iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper) 维护，本仓库仅镜像。两种获取方式：
+`yeow-runtime/jvm` 依赖 `com.whl.quickjs:quickjs-java-wrapper`（本地 Maven 仓库）。该组件由主仓库 [iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper) 维护，本仓库仅镜像。两种获取方式：
 
 **方式 A：使用 CI 发布产物（推荐）**
 
 1. 在 `quickjs-wrapper` 目录修改代码 → 更新 `CHANGELOG.md` → `git commit` → 打版本标签并推送（`git tag vX.Y.Z` + `git push origin main vX.Y.Z`）
 2. 标签推送触发 GitHub Actions 多平台构建，完成后从 [Releases](https://github.com/iYeXin/quickjs-wrapper/releases) 下载 `quickjs-java-wrapper.jar`
-3. 放入 `yeow-runtime/lib/`，执行：
+3. 放入 `yeow-runtime/jvm/paper/lib/`，执行：
 
 ```bash
-cd yeow-runtime
+cd yeow-runtime/jvm/paper
 mvn install:install-file \
   -Dfile=lib/quickjs-java-wrapper-<version>.jar \
   -DgroupId=com.whl.quickjs -DartifactId=quickjs-java-wrapper \
   -Dversion=<version> -Dpackaging=jar
 ```
 
-4. 确认 `yeow-runtime/pom.xml` 中的 `<version>` 与安装版本一致
+4. 确认 `yeow-runtime/jvm/paper/pom.xml` 中的 `<version>` 与安装版本一致
 
 **方式 B：本地构建（仅 Java 层改动，原生库不变）**
 
@@ -70,19 +72,19 @@ cd quickjs-wrapper
 ./gradlew :wrapper-java:publishToMavenLocal   # 或手动 install:install-file
 ```
 
-> 注意：C++ 层（`native/cpp/*`）改动必须走方式 A 的 CI 流程——本地原生库不会自动重建，发布标签后把产物下载到 `yeow-runtime/lib/` 再重装。
+> 注意：C++ 层（`native/cpp/*`）改动必须走方式 A 的 CI 流程——本地原生库不会自动重建，发布标签后把产物下载到 `yeow-runtime/jvm/paper/lib/` 再重装。
 
-### 2. yeow-runtime
+### 2. yeow-runtime（core + paper 多模块）
 
 ```bash
-cd yeow-runtime
-mvn clean install -DskipTests
+cd yeow-runtime/jvm
+mvn clean install -DskipTests    # 一次构建 core + paper 并安装到本地 Maven 仓库
 ```
 
-构建产物 `target/yeow-runtime-0.1.0.jar` 需要**复制到脚手架模板**，供 `create-yeow` 生成的插件项目使用：
+构建产物 `paper/target/yeow-runtime-0.1.0.jar`（shaded，含 core + 引擎 + 配置解析）需要**复制到脚手架模板**，供 `create-yeow` 生成的插件项目使用：
 
 ```bash
-cp target/yeow-runtime-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
+cp paper/target/yeow-runtime-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
 ```
 
 ### 3. yeow-template
@@ -92,7 +94,7 @@ cd yeow-template
 mvn clean package -DskipTests
 ```
 
-编译时解析 `yeow-runtime` 来自本地 Maven 仓库（第 2 步已安装）。产物同样复制到模板：
+编译时解析 `yeow-runtime/jvm` 来自本地 Maven 仓库（第 2 步已安装）。产物同样复制到模板：
 
 ```bash
 cp target/yeow-template-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
@@ -110,7 +112,7 @@ cp target/yeow-template-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
 2. `CHANGELOG.md` 顶部新增版本条目（`## X.Y.Z *(YYYY-MM-DD)*`）
 3. `git add` + `git commit`（提交信息使用 conventional 风格，如 `fix: ...` / `feat: ...`）
 4. `git tag vX.Y.Z && git push origin main vX.Y.Z` —— 标签触发多平台 CI 构建
-5. 从 Releases 下载 `quickjs-java-wrapper.jar` → 同步到本仓库 `yeow-runtime/lib/` → 执行上面方式 A 的安装
+5. 从 Releases 下载 `quickjs-java-wrapper.jar` → 同步到本仓库 `yeow-runtime/jvm/core/lib/` → 执行上面方式 A 的安装
 6. 重新构建并安装 yeow-runtime（第 2 步）
 
 > 镜像同步：主仓库的代码与 Release 更新后，将 `quickjs-wrapper/` 内容同步到本仓库（不含 `.git`）；`native/quickjs` 的 submodule commit 与主仓库保持一致（`git submodule update`）。提交镜像更新时需同时提交 `.gitmodules` 与 submodule gitlink。
@@ -153,7 +155,7 @@ cp target/yeow-template-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
 
 ### 测试
 
-- `yeow-runtime`：`mvn test`（JUnit 5）——直方图、窗口聚合、检测器阈值均有单测，改动 profile 相关代码需同步更新
+- `yeow-runtime/jvm`：`mvn test`（JUnit 5）——直方图、窗口聚合、检测器阈值均有单测，改动 profile 相关代码需同步更新
 - 实机验证：`npm run dev` 启动测试服务器（热重载）；生产行为用 `plugins/Yeow/*.yeow.zip` 自动扫描验证
 
 ---

@@ -171,6 +171,7 @@ export default defineConfig({
             },
             {
                 text: '平台规范',
+                collapsed: true,
                 items: [
                     { text: '规范总览', link: '/specifications/' },
                     { text: 'Java 插件集成', link: '/specifications/java-api' },

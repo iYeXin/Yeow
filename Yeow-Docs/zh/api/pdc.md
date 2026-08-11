@@ -43,7 +43,7 @@ await pdcRemoveBlock('world', 0, 64, 0, 'myplugin.key');
 
 支持 `namespace:key` 格式（如 `myplugin:config`），也支持纯字符串（默认命名空间 `yeow`）。
 
-> **注意：** 由于 Bukkit 平台上，key 中的大写字母将在运行时自动转为小写。例如 `myPlugin.deathLoc` 自动转为 `myplugin.deathloc`。允许字符：`a-z` `0-9` `/` `.` `_` `-`。
+> **注意：** 由于 Paper 系平台上，key 中的大写字母将在运行时自动转为小写。例如 `myPlugin.deathLoc` 自动转为 `myplugin.deathloc`。允许字符：`a-z` `0-9` `/` `.` `_` `-`。
 
 ## 示例
 

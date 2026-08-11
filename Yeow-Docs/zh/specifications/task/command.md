@@ -31,7 +31,7 @@
 | `completerCbId` | 否 | Tab 补全回调 ID（`persistent: true`） |
 | `description` | 否 | 命令描述 |
 | `usage` | 否 | 用法提示（如 `"/cmd <arg1> <arg2>"`） |
-| `permission` | 否 | 权限节点对象 `{ "node", "default" }`（default：`"all"` 所有人默认拥有 / `"op"` 默认 / `"none"`；字符串包装为对象由 JS 侧完成，Java 不做兼容）。节点注册进 Bukkit 权限系统（权限插件可管理）；**执行时检查**：`permissionCheck` 事件优先，无处理时回退 `hasPermission` |
+| `permission` | 否 | 权限节点对象 `{ "node", "default" }`（default：`"all"` 所有人默认拥有 / `"op"` 默认 / `"none"`；字符串包装为对象由 JS 侧完成，Java 不做兼容）。节点注册进 Paper 系权限系统（权限插件可管理）；**执行时检查**：`permissionCheck` 事件优先，无处理时回退 `hasPermission` |
 | `aliases` | 否 | 别名列表 |
 
 - **返回**：`boolean`

@@ -8,12 +8,12 @@ Yeow v1 是一个面向 **Minecraft** 的插件开发框架：用 **TypeScript /
 
 - **现代工程化**：TypeScript 优先、npm 生态、热重载、构建即产物——把 Web 前端的最佳实践带到 Minecraft 插件开发
 - **线程分离**：插件代码不阻塞服务器主线程；每插件独立线程，一个插件崩溃不影响其他插件
-- **平台无关**：插件包是纯 ZIP（JS + 资源 + 元信息），不绑定 Java / Bukkit——协议层开放，任何平台可实现运行时
+- **平台无关**：插件包是纯 ZIP（JS + 资源 + 元信息），不绑定 Java / Paper 系——协议层开放，任何平台可实现运行时
 - **原生能力扩展**：Native Service 让插件携带并调用原生程序（Go/Rust/C++），兼顾重计算场景
 
 ## 基本原则
 
-Yeow 的核心原则是**避免平台绑定**：插件只依赖协议层（消息通道、任务、事件、权限模型），不依赖任何宿主平台的专有 API。Paper/Bukkit 的 `Yeow` 运行时只是官方实现示例。
+Yeow 的核心原则是**避免平台绑定**：插件只依赖协议层（消息通道、任务、事件、权限模型），不依赖任何宿主平台的专有 API。Paper 系（Paper/Purpur/Leaf 等）的 `Yeow` 运行时只是官方实现示例。
 
 ### 不提供调用 Java 方法的 API
 
@@ -69,4 +69,4 @@ Yeow 的目标是成为 **Minecraft 的 Web 标准**：一个开放、跨实现�
 
 Yeow 的愿景是构造**面向未来的、开放的、属于所有人的创造入口**。
 
-**YEOW = Your Entry to an Open World。**
+**YEOW = <span style="color: var(--vp-c-brand-1);">Y</span>our <span style="color: var(--vp-c-brand-1);">E</span>ntry to an <span style="color: var(--vp-c-brand-1);">O</span>pen <span style="color: var(--vp-c-brand-1);">W</span>orld。**

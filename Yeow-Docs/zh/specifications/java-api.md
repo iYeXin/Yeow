@@ -54,5 +54,5 @@ String result = YeowRuntime.inst().submitTask(entity, json);   // 同步（无 c
 ## 约束
 
 - 需确保 Yeow 运行时实例存在时
-- 回调为运行时线程调用——**不要**在回调中直接调用 Bukkit 主线程 API（除线程安全的部分）；必要时转发主线程
+- 回调为运行时线程调用——**不要**在回调中直接调用 Paper 系主线程 API（除线程安全的部分）；必要时转发主线程
 - 请求/订阅生命周期不随插件卸载自动清理（Java 插件自行管理 `AutoCloseable`）

@@ -43,7 +43,7 @@ Yeow 平台规范只约定**契约层面**的行为，以下内容**不属于规
 
 ## Yeow 插件包结构
 
-Yeow 插件是一个 **ZIP 压缩包**（部署到 Bukkit 时为 `.jar`，部署到插件目录时为 `.yeow.zip`，本质都是 ZIP），运行时只需按 ZIP 读取，**不依赖 Java 环境**。
+Yeow 插件是一个 **ZIP 压缩包**（部署到 Paper 系 时为 `.jar`，部署到插件目录时为 `.yeow.zip`，本质都是 ZIP），运行时只需按 ZIP 读取，**不依赖 Java 环境**。
 
 ```
 my-plugin.jar / my-plugin.yeow.zip (ZIP)
@@ -52,10 +52,10 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 │   ├── main.js            ← esbuild 打包的插件代码（IIFE 格式，生产构建）
 │   └── dev.json           ← 开发模式信息（仅 dev 构建，见下）
 ├── assets/                ← 打包资源（按命名空间 id 分目录）
-└── plugin.yml             ← 宿主平台元信息（Bukkit 需要；`.yeow.zip` 与纯平台实现可忽略）
+└── plugin.yml             ← 宿主平台元信息（Paper 系需要；`.yeow.zip` 与纯平台实现可忽略）
 ```
 
-> **`.yeow.zip` 与 JAR 的行为完全一致**：运行时按同一套逻辑注册（读 `yeow.json` → 权限 → 代码 → 启动）。放入运行时数据目录（Bukkit 官方实现为 `plugins/Yeow/`）会被自动扫描加载，也可通过 `/yeow load <path>` 手动加载。同一插件名只允许一个实例，重复加载拒绝并警告。
+> **`.yeow.zip` 与 JAR 的行为完全一致**：运行时按同一套逻辑注册（读 `yeow.json` → 权限 → 代码 → 启动）。放入运行时数据目录（Paper 系官方实现为 `plugins/Yeow/`）会被自动扫描加载，也可通过 `/yeow load <path>` 手动加载。同一插件名只允许一个实例，重复加载拒绝并警告。
 
 ### `yeow.json` — 插件元信息
 
@@ -128,7 +128,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 **加载来源**（行为一致，均走上述流程）：
 
-- 模板 JAR 注册（宿主平台插件机制，如 Bukkit `depend`）
+- 模板 JAR 注册（宿主平台插件机制，如 Paper 系 `depend`）
 - 数据目录自动扫描（`plugins/Yeow/*.yeow.zip`，启动时）
 - 管理命令：`load <path|url>`（临时）、`install <url>`（下载并保存为标准格式到数据目录）、`update <url>`（替换同名旧包，旧包移入 `.backup/`）
 

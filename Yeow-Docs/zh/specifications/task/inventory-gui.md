@@ -109,5 +109,5 @@ GUI 由插件通过 `gui.create` 创建。插件负责其生命周期，通过 `
 | `meta.customModelData` | int | 否 | 自定义模型数据 |
 | `meta.unbreakable` | bool | 否 | 不可破坏 |
 | `meta.hideTooltip` | bool | 否 | 隐藏提示框 |
-| `meta.enchantments` | object | 否 | 附魔映射（key → 等级）。key 为 Bukkit 附魔命名空间 key（如 `sharpness`） |
-| `meta.itemFlags` | string[] | 否 | 物品标志（Bukkit ItemFlag 枚举名，如 `HIDE_ENCHANTS`） |
+| `meta.enchantments` | object | 否 | 附魔映射（key → 等级）。key 为 Paper 系附魔命名空间 key（如 `sharpness`） |
+| `meta.itemFlags` | string[] | 否 | 物品标志（Paper 系 ItemFlag 枚举名，如 `HIDE_ENCHANTS`） |

@@ -10,7 +10,7 @@ import { registerCommand } from 'yeow-api';
 | ------------- | ------------------------------------------------ | ---------- |
 | `executor`    | `(p: CommandPayload) => void`                    | 执行器     |
 | `description` | `string`                                         | 描述       |
-| `permission`  | `string \| Permission \| { node, default? }` | 权限节点（字符串兼容 / 权限节点对象 / `registerPermission` 返回值）；注册进 Bukkit 权限系统供管理；**执行时检查**——`permissionCheck` 事件优先，无处理时回退 `hasPermission` |
+| `permission`  | `string \| Permission \| { node, default? }` | 权限节点（字符串兼容 / 权限节点对象 / `registerPermission` 返回值）；注册进 Paper 系权限系统供管理；**执行时检查**——`permissionCheck` 事件优先，无处理时回退 `hasPermission` |
 | `aliases`     | `string[]`                                       | 别名       |
 | `completer`   | `(sender, args) => string[]` / `ManualCompleter` | Tab 补全器 |
 

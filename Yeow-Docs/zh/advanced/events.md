@@ -5,9 +5,9 @@
 ### EventBridge
 
 ```
-Bukkit 事件触发
+Paper 系事件触发
   → EventBridge: 检查 JS 订阅
-  → eventData() 提取字段（基本类型，无 Bukkit 引用）
+  → eventData() 提取字段（基本类型，无平台对象引用）
   → SyncCallbackHelper.register(cbId)
   → queue.sendJs({t:"cb", p:cbId, r:{事件数据}}) → JS 线程
   → 主线程自旋等待（无预算排空调度器队列——event.complete 不被 tick 时间片预算饿死）:

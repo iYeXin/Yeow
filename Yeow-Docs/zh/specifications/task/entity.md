@@ -96,7 +96,7 @@
 
 | 字段 | 类型 | 必填 | 默认 | 说明 |
 |------|------|------|------|------|
-| `type` | string | 是 | — | 药水效果类型名（Bukkit PotionEffectType 名称，小写，如 `speed`、`poison`） |
+| `type` | string | 是 | — | 药水效果类型名（Paper 系 PotionEffectType 名称，小写，如 `speed`、`poison`） |
 | `duration` | int | 否 | 200 | 持续时间（tick，20 = 1 秒） |
 | `amplifier` | int | 否 | 0 | 等级（0 = I 级，1 = II 级） |
 | `ambient` | bool | 否 | true | 是否为环境效果（粒子更少） |

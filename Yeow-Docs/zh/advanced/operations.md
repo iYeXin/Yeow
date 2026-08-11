@@ -48,7 +48,7 @@ Yeow 插件本身**平台无关**：
   4. 实现符合标准的 JS 运行时（`$_send` 桥、回调协议、生命周期消息）
   5. 实现通道（fs / http / assets / service / timer 等）
 
-Paper/Bukkit 的 yeow-runtime 是官方实现的运行时示例。更多插件包格式见 [平台规范](/specifications/README)。
+Paper 系（Paper/Purpur/Leaf 等）的 yeow-runtime 是官方实现的运行时示例。更多插件包格式见 [平台规范](/specifications/README)。
 
 ## 定时器资源管理
 

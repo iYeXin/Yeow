@@ -24,7 +24,7 @@ await spawnParticle({
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `particle` | string | 粒子类型名（大写 Bukkit Particle 枚举名，如 `FLAME`） |
+| `particle` | string | 粒子类型名（大写 Paper 系 Particle 枚举名，如 `FLAME`） |
 | `world` | string | 世界名 |
 | `x` / `y` / `z` | number | 坐标 |
 | `count` | number | 数量（默认 1） |

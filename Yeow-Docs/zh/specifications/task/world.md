@@ -115,9 +115,9 @@
 
 | 任务 | 请求 | 返回 |
 |------|------|------|
-| `material.isSolid` | `{ "type": "<key>" }` | `boolean`（Bukkit `Material.isSolid()`） |
-| `material.isLiquid` | `{ "type": "<key>" }` | `boolean`（Bukkit 无 `isLiquid`，实现为 `WATER`/`LAVA` 枚举判断——原版液体方块材质仅此两种） |
-| `material.isAir` | `{ "type": "<key>" }` | `boolean`（Bukkit `Material.isAir()`） |
+| `material.isSolid` | `{ "type": "<key>" }` | `boolean`（Paper 系 `Material.isSolid()`） |
+| `material.isLiquid` | `{ "type": "<key>" }` | `boolean`（Paper 系无 `isLiquid`，实现为 `WATER`/`LAVA` 枚举判断——原版液体方块材质仅此两种） |
+| `material.isAir` | `{ "type": "<key>" }` | `boolean`（Paper 系 `Material.isAir()`） |
 
 ---
 
@@ -140,7 +140,7 @@
 - **请求**：`{ "world": "<name>", "type": "<entityType>", "x": <double>, "y": <double>, "z": <double> }`
 - **返回**：`string` (实体 UUID)
 
-`type` 为 Bukkit EntityType 枚举名（如 `ZOMBIE`、`CREEPER`）。
+`type` 为 Paper 系 EntityType 枚举名（如 `ZOMBIE`、`CREEPER`）。
 
 ### `world.spawnItem`
 
@@ -159,7 +159,7 @@
 |------|------|------|
 | `world.playSound` | `{ "world": "<name>", "sound": "<sound>", "x": <double>, "y": <double>, "z": <double>, "volume": <float>, "pitch": <float> }` | `true` |
 
-`sound` 为 Bukkit Sound 枚举名（如 `entity.creeper.primed`）。
+`sound` 为 Paper 系 Sound 枚举名（如 `entity.creeper.primed`）。
 
 ### 粒子
 

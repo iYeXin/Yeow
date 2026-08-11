@@ -37,8 +37,8 @@ Material.isAirSync('minecraft:air');      // boolean
 
 说明：
 
-- `isSolid` / `isAir` 对应 Bukkit `Material.isSolid()` / `Material.isAir()`
-- `isLiquid`：Bukkit 1.13 起移除了 `Material.isLiquid()`，实现为水/熔岩枚举判断——**原版液体方块材质仅此两种**
+- `isSolid` / `isAir` 对应 Paper 系 `Material.isSolid()` / `Material.isAir()`
+- `isLiquid`：Paper 系 1.13 起移除了 `Material.isLiquid()`，实现为水/熔岩枚举判断——**原版液体方块材质仅此两种**
 - 判断与方块状态无关（如 `minecraft:chest[facing=...]` 任何状态都是固体）
 - `Block` 实例的 `isSolid()` 等即委托此处
 

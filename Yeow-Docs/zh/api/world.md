@@ -135,7 +135,7 @@ world.playSound(sound, x, y, z, volume?, pitch?)         // Promise
 world.playSoundSync(sound, x, y, z, volume?, pitch?)
 ```
 
-世界级音效。`sound` 为 Bukkit Sound 枚举名（如 `block.note_block.pling`）。
+世界级音效。`sound` 为 Paper 系 Sound 枚举名（如 `block.note_block.pling`）。
 
 粒子效果 API 参见 [Particle 文档](particle.md)。
 

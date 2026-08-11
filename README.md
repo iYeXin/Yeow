@@ -22,7 +22,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 
 | 目录                                    | 语言       | 作用                                                                                                              |
 | --------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
-| [`yeow-runtime`](yeow-runtime/)         | Java 21    | **核心运行时**（Bukkit 插件）：QuickJS 上下文管理、三级优先级调度器、事件/命令桥、Service、Profile 预警与全量分析 |
+| [`yeow-runtime`](yeow-runtime/)         | Java 21    | **核心运行时**（Paper 系插件）：QuickJS 上下文管理、三级优先级调度器、事件/命令桥、Service、Profile 预警与全量分析 |
 | [`yeow-api`](yeow-api/)                 | TypeScript | 插件开发期 npm 依赖：OOP 封装全部底层协议（Player/World/Event/Command/Service…），构建时随插件 bundle             |
 | [`yeow-utils`](yeow-utils/)             | TypeScript | 高层工具库（`createServer` HTTP 服务器、命令构造器），构建时随插件 bundle                                         |
 | [`create-yeow`](create-yeow/)           | Node.js    | `npm create yeow` 脚手架：交互式项目模板、dev-server（Paper + 热重载 + source-map 错误定位）、构建脚本            |
@@ -72,7 +72,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 - 插件包是标准 ZIP（`.yeow.zip`，含打包 JS、资源、元信息与权限声明），**不依赖 Java 环境**
 - 任何实现[平台规范](Yeow-Docs/zh/specifications/README.md)的运行时都能运行同一份插件
-- Paper/Bukkit 的 `yeow-runtime` 是官方实现示例
+- Paper 系（Paper/Purpur/Leaf 等）的 `yeow-runtime` 是官方实现示例
 
 ## 文档索引
 

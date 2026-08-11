@@ -16,7 +16,7 @@
 - `JSON.parse` / `JSON.stringify`
 - `Error`、`SyntaxError`、`TypeError`
 
-> **官方实现引擎版本**：Paper/Bukkit 的 `yeow-runtime` 使用 **QuickJS 2026-06-04**（[iyexin/quickjs](https://github.com/iyexin/quickjs) fork，上游 [bellard/quickjs](https://bellard.org/quickjs/)），额外提供：resizable `ArrayBuffer`、`ArrayBuffer.prototype.transfer`、`Iterator` 对象与 set 方法、`Math.sumPrecise()`、正则重复具名组，以及 `Uint8Array.prototype.toBase64()` / `Uint8Array.fromBase64()`（参见 [https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array)）。
+> **官方实现引擎版本**：Paper 系（Paper/Purpur/Leaf 等）的 `yeow-runtime` 使用 **QuickJS 2026-06-04**（[iyexin/quickjs](https://github.com/iyexin/quickjs) fork，上游 [bellard/quickjs](https://bellard.org/quickjs/)），额外提供：resizable `ArrayBuffer`、`ArrayBuffer.prototype.transfer`、`Iterator` 对象与 set 方法、`Math.sumPrecise()`、正则重复具名组，以及 `Uint8Array.prototype.toBase64()` / `Uint8Array.fromBase64()`（参见 [https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array](https://tc39.es/ecma262/multipage/indexed-collections.html#sec-uint8array)）。
 
 ---
 
