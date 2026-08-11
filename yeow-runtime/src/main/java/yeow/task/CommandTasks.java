@@ -75,8 +75,12 @@ public class CommandTasks {
                 long timeout = timeoutMs;
                 var deadline = System.nanoTime() + timeout * 1_000_000;
                 while (System.nanoTime() < deadline && !pend.isDone()) {
-                    var rt = YeowRuntime.inst();
-                    if (rt != null) rt.getScheduler().tick();
+                    // 与事件派发同款无预算排空：等待期间消费调度器队列，保证
+                    // command.tabComplete 完成任务能在补全超时前执行。
+                    if (Bukkit.isPrimaryThread()) {
+                        var rt = YeowRuntime.inst();
+                        if (rt != null) rt.getScheduler().drainAll();
+                    }
                     Thread.onSpinWait();
                 }
                 long elapsedNs = System.nanoTime() - t0;

@@ -35,7 +35,6 @@ public class EventBridge implements Listener {
     /** permissionCheck 订阅：插件 → 回调集合（Yeow 生态权限检查拦截，非 Bukkit 事件）。 */
     private final Map<String, Set<String>> permSubs = new ConcurrentHashMap<>();
     private final java.util.concurrent.atomic.AtomicLong permSeq = new java.util.concurrent.atomic.AtomicLong();
-    private static final long PERM_CHECK_TIMEOUT_NS = 1_000_000_000L; // 1s
     /** 事件类型 → 是否已注册 Bukkit 监听器（生命周期 = EventBridge，一经注册永久保留）。 */
     private final Map<String, Boolean> reg = new ConcurrentHashMap<>();
     /** 每次 dispatch 的唯一 id 生成器：pend key 用 eventId 而非 cbId——
@@ -183,9 +182,11 @@ public class EventBridge implements Listener {
                 pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data,"eventId",eventId)));
             }
         }
-        var deadline = System.nanoTime() + PERM_CHECK_TIMEOUT_NS;
+        var deadline = System.nanoTime() + timeoutMs * 1_000_000;
         while (System.nanoTime() < deadline && latch.getCount() > 0) {
-            if (primary) runtime.getScheduler().tick();
+            // 与事件派发同款无预算排空：等待期间消费调度器队列，保证 permissionCheck
+            // 的 event.complete 能在超时前执行。超时遵循普通事件配置（默认 5s）。
+            if (primary) runtime.getScheduler().drainAll();
             Thread.onSpinWait();
         }
         Boolean result = null;
