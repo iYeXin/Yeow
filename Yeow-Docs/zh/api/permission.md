@@ -79,7 +79,7 @@ eventOn('permissionCheck', (e) => {
 ```
 
 - **触发范围（仅限 Yeow 生态）**：`player.hasPermission` 任务 + Yeow 插件注册命令的执行检查——其他 Java 插件的权限检查不经过
-- **优先级**：有返回时覆盖 Bukkit；多 handler 返回冲突以**最后一个返回的为准**（不保证执行顺序）；超时 1s 视为未处理
+- **优先级**：有返回时覆盖 Bukkit；多 handler 返回冲突以**最后一个返回的为准**（不保证执行顺序）；超时（遵循普通事件超时配置 `profile.callback-timeout-event-ms`，默认 5s）视为未处理
 - 事件数据：`{ target, node, permission }`——`permission` 为权限对象（含节点默认值）
 - **⚠ 普通插件不建议监听**（每次权限检查都触发，影响性能）——为 Yeow 生态权限管理插件保留
 - **⚠ 无限循环**：`permissionCheck` handler 中调用 `hasPermission` 会再次触发本检查——**可能导致无限循环**，请避免（如需查询请直接读取自己的数据）
