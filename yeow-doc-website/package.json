@@ -10,6 +10,7 @@
         "docs:zip": "node scripts/build-docs-zip.mjs",
         "dev": "vitepress dev .",
         "build": "node scripts/build-docs-zip.mjs && vitepress build .",
+        "publish": "npm run build && node scripts/publish.mjs",
         "preview": "vitepress preview ."
     },
     "devDependencies": {
