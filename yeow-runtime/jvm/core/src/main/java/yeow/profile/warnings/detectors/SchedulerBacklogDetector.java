@@ -10,10 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 调度器积压告警（HIGH/NORMAL 专属——LOW 允许积压，不计入）：
- * - {@code budget.congested} — 滑动窗口内 HIGH/NORMAL 积压 tick 数达到 backlog-threshold（默认 35/40）。
+ * 调度器积压告警（HIGH/NORMAL 专属--LOW 允许积压，不计入）：
+ * - {@code budget.congested} - 滑动窗口内 HIGH/NORMAL 积压 tick 数达到 backlog-threshold（默认 35/40）。
  *   HIGH/NORMAL 承载实时性与交互响应，持续积压意味着任务提交速度超过处理能力，预算将被自动扩容。
- * - {@code budget.restored}  — 连续 40 tick 无积压后恢复（INFO）。
+ * - {@code budget.restored}  - 连续 40 tick 无积压后恢复（INFO）。
  */
 public final class SchedulerBacklogDetector implements WarningDetector {
     private final ProfileConfig cfg;
@@ -47,7 +47,7 @@ public final class SchedulerBacklogDetector implements WarningDetector {
                 List.of(
                     String.format(" HIGH/NORMAL 队列在最近 %d tick 中积压 %d 次（阈值 %d）。",
                         cfg.backlogWindowTicks(), backlogCount, cfg.backlogThreshold()),
-                    " 实时调度队列不应存在积压——任务提交速度超过了处理能力。",
+                    " 实时调度队列不应存在积压--任务提交速度超过了处理能力。",
                     " 运行时将自动扩容 tick 预算（不影响 LOW 批量队列）。",
                     " 建议：排查高频循环提交任务的插件（可用 /yeow track 定位）。")));
         } else if (congested) {

@@ -22,7 +22,7 @@ class TextUtilTest {
     }
 
     /** 字面 `\n`（两字符）按 MiniMessage 规范是**字面文本**（MiniMessage 只转义标签字符
-     *  `\\` / `\<` 等，`\n` 不转义）——不会被隐式变换行。 */
+     *  `\\` / `\<` 等，`\n` 不转义）--不会被隐式变换行。 */
     @Test void literalBackslashNStaysLiteral() {
         var out = TextUtil.toLegacy(TextUtil.parse("a\\nb"));
         assertEquals("a\\nb", out, "literal \\n stays literal");
@@ -47,7 +47,7 @@ class TextUtilTest {
         assertEquals("a\\b", out, "\\\\ -> literal backslash");
     }
 
-    /** `\\n`（双反斜杠 + n）按 MiniMessage 规范：字面 `\` + `n`——不被误还原为换行。 */
+    /** `\\n`（双反斜杠 + n）按 MiniMessage 规范：字面 `\` + `n`--不被误还原为换行。 */
     @Test void doubleBackslashNStaysLiteral() {
         var out = TextUtil.toLegacy(TextUtil.parse("a\\\\nb"));
         assertEquals("a\\nb", out, "\\\\n stays literal");

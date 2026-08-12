@@ -9,7 +9,7 @@ import yeow.profile.warnings.WarningLevel;
 import java.util.ArrayList;
 import java.util.List;
 
-/** 心跳超时：某插件单次心跳往返超过阈值（默认 200ms）——JS 线程响应缓慢。 */
+/** 心跳超时：某插件单次心跳往返超过阈值（默认 200ms）--JS 线程响应缓慢。 */
 public final class HeartbeatTimeoutDetector implements WarningDetector {
     private final ProfileConfig cfg;
 
@@ -28,7 +28,7 @@ public final class HeartbeatTimeoutDetector implements WarningDetector {
         for (var plugin : w.pingedPlugins()) {
             Long rt = w.jsPings().get(plugin);
             if (rt == null) {
-                // 发出 ping 但本窗口无任何 pong —— JS 线程未响应（死循环/长阻塞）
+                // 发出 ping 但本窗口无任何 pong -- JS 线程未响应（死循环/长阻塞）
                 out.add(new Warning(level(), code(), plugin, "heartbeat timeout",
                     List.of(
                         " JS 线程在心跳周期内没有任何响应（可能死循环或长阻塞）。",

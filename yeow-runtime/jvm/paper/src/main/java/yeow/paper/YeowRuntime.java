@@ -8,7 +8,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import yeow.PluginEntity;
 import yeow.PlatformHost;
 import yeow.RuntimeCore;
-import yeow.Scheduler;
 import yeow.task.CommandTasks;
 import yeow.task.GuiTasks;
 import yeow.task.BossBarTasks;
@@ -30,6 +29,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
     private static YeowRuntime instance;
 
     private RuntimeCore core;
+    private PaperScheduler paperScheduler;
     private final EventBridge eventBridge = new EventBridge(this);
     private final CommandBridge commandBridge = new CommandBridge(this);
     private final PermissionRegistry permissionRegistry = new PermissionRegistry();
@@ -47,11 +47,6 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
     @Override public void onGameThread(Runnable r) { Bukkit.getScheduler().runTask(this, r); }
 
     @Override
-    public Object executeTask(String taskType, JsonObject params) throws Exception {
-        return Tasks.execute(taskType, params);
-    }
-
-    @Override
     public void purgePlatformResources(String pluginName) {
         commandBridge.unregisterAll(pluginName);
         eventBridge.unsubscribeAll(pluginName);
@@ -65,7 +60,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
     // ── 任务类 / 事件桥访问入口 ─────────────────────────────────────
 
     public RuntimeCore core() { return core; }
-    public Scheduler getScheduler() { return core.scheduler(); }
+    public PaperScheduler getScheduler() { return paperScheduler; }
     public yeow.YeowConfig getYeowConfig() { return core.config(); }
     public yeow.service.ServiceManager getServiceManager() { return core.serviceManager(); }
     public yeow.profile.Profiler getProfiler() { return core.profiler(); }
@@ -78,7 +73,11 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
 
     @Override public void onLoad() {
         instance = this;
-        this.core = new RuntimeCore(this);
+        var cfg = new yeow.YeowConfig(getDataFolder());
+        this.paperScheduler = new PaperScheduler(cfg, this);
+        this.core = new RuntimeCore(this, cfg, paperScheduler);
+        // 调度器插桩装配（ProfileSink；BudgetScaler 已在 PaperScheduler 构造时装配）
+        paperScheduler.setProfileSink(core.profiler().sink());
         // JS 句柄注册表装配：GUI/BossBar 创建时向 core 注册释放闭包（id 不携带业务信息）
         GuiTasks.setInstances(core.instances());
         BossBarTasks.setInstances(core.instances());
@@ -86,8 +85,8 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
 
     @Override public void onEnable() {
         core.start();
-        // tick 驱动：核心调度器在每 tick 消费三级任务队列（游戏线程）
-        Bukkit.getScheduler().runTaskTimer(this, () -> core.scheduler().tick(), 0L, 1L);
+        // 主线程任务 pump：执行调度线程路由到主线程的游戏任务（每 tick 预算内）
+        Bukkit.getScheduler().runTaskTimer(this, paperScheduler::mainTickPump, 0L, 1L);
 
         eventBridge.setSink(core.profiler().sink());
         eventBridge.setTimeoutMs(core.config().profileCallbackTimeoutEventMs());
@@ -155,7 +154,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                         if (info == null) { s.sendMessage("Update failed (invalid package): " + a[1]); cache.delete(); yield true; }
                         var old = core.findExistingPackage(info[0]);
                         if (old == null) {
-                            s.sendMessage("No existing package found for '" + info[0] + "' — use /yeow install <url>");
+                            s.sendMessage("No existing package found for '" + info[0] + "' - use /yeow install <url>");
                             cache.delete();
                             yield true;
                         }
@@ -172,7 +171,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                         catch (Exception e) { s.sendMessage("Update failed (write error): " + e.getMessage()); cache.delete(); yield true; }
                         cache.delete();
                         if (core.getPlugin(info[0]) != null) {
-                            // The plugin is running — reload from the new package.
+                            // The plugin is running - reload from the new package.
                             core.unloadPlugin(info[0]);
                             core.registerPlugin(dest.getAbsolutePath(), true);
                             syncCommands();
@@ -206,7 +205,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                         }
                         if (core.getPlugin(name) != null) core.unloadPlugin(name);
                         if (pkg == null) {
-                            s.sendMessage("Unloaded: " + name + " — no .yeow.zip found in plugins/Yeow");
+                            s.sendMessage("Unloaded: " + name + " - no .yeow.zip found in plugins/Yeow");
                             yield true;
                         }
                         // 插件本体 + 数据目录一并迁移到 .backup/<时间戳>/（失败则放弃并报告错误）
@@ -236,7 +235,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                         }
                         if (!failed.isEmpty()) {
                             s.sendMessage("Uninstall failed (files may be locked): " + String.join("; ", failed)
-                                + " — check " + backupDir.getAbsolutePath());
+                                + " - check " + backupDir.getAbsolutePath());
                             yield true;
                         }
                         s.sendMessage("Uninstalled: " + name + " (package + data → .backup/" + ts + "/)");
@@ -252,7 +251,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                         } else {
                             var path = a.length >= 3 ? a[2] : null;
                             if (core.reloadPlugin(a[1], path)) s.sendMessage("Reloaded: " + a[1]);
-                            else s.sendMessage("Reload failed: plugin not loaded or bad source — " + a[1]);
+                            else s.sendMessage("Reload failed: plugin not loaded or bad source - " + a[1]);
                         }
                         yield true;
                     }

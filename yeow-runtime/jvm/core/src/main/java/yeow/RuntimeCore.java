@@ -31,7 +31,7 @@ public class RuntimeCore {
 
     private final PlatformHost host;
     private final YeowConfig config;
-    private final Scheduler scheduler;
+    private final TaskScheduler scheduler;
     private final yeow.service.ServiceManager serviceManager;
     private final yeow.profile.Profiler profiler;
     private final ApprovalStore approvals;
@@ -43,20 +43,15 @@ public class RuntimeCore {
     /** 因原生服务未批准而被拒加载的插件（pluginName → 包路径）；批准后自动加载。 */
     private final Map<String, String> pendingLoads = new ConcurrentHashMap<>();
 
-    public RuntimeCore(PlatformHost host) {
+    public RuntimeCore(PlatformHost host, YeowConfig config, TaskScheduler scheduler) {
         this.host = host;
         this.devMode = "true".equals(System.getProperty("yeow.dev"));
-        this.config = new YeowConfig(host.dataFolder());
-        this.scheduler = new Scheduler(config, host);
+        this.config = config;
+        this.scheduler = scheduler;
         this.serviceManager = new yeow.service.ServiceManager(this::getPlugin);
         this.approvals = new ApprovalStore(host.dataFolder());
         this.profiler = yeow.profile.Profiler.create(yeow.profile.ProfileConfig.from(config), host.dataFolder());
-        scheduler.setProfileSink(profiler.sink());
-        var pc = yeow.profile.ProfileConfig.from(config);
-        if (pc.scalerEnabled()) {
-            scheduler.setBudgetScaler(new BudgetScaler(scheduler.tickBudgetNs(),
-                pc.scalerFactor(), pc.scalerMax(), pc.backlogThreshold(), pc.backlogWindowTicks()));
-        }
+        // 调度器插桩（ProfileSink/BudgetScaler）由平台在构造其调度器时装配
         String code = null;
         try (var is = RuntimeCore.class.getResourceAsStream("/js/init.js")) {
             code = new String(is.readAllBytes(), StandardCharsets.UTF_8);
@@ -71,7 +66,7 @@ public class RuntimeCore {
 
     public PlatformHost host() { return host; }
     public YeowConfig config() { return config; }
-    public Scheduler scheduler() { return scheduler; }
+    public TaskScheduler scheduler() { return scheduler; }
     public yeow.service.ServiceManager serviceManager() { return serviceManager; }
     public yeow.profile.Profiler profiler() { return profiler; }
     public boolean devMode() { return devMode; }
@@ -117,9 +112,10 @@ public class RuntimeCore {
 
     // ── 生命周期 ──────────────────────────────────────────────────
 
-    /** 启动服务子系统（宿主在装配完 tick 驱动后调用）。 */
+    /** 启动服务子系统与调度线程（宿主在装配完平台 pump 后调用）。 */
     public void start() {
         try { serviceManager.start(); } catch (Exception e) { LOG.warning("Failed to start native service TCP: " + e.getMessage()); }
+        scheduler.start();
     }
 
     /** 扫描数据目录 *.yeow.zip 自动加载。 */
@@ -157,10 +153,10 @@ public class RuntimeCore {
 
     /**
      * Load a Yeow package (template JAR or .yeow.zip). The plugin name comes from yeow.json.
-     * One plugin name may only have a single instance — a duplicate load is rejected with a warning.
+     * One plugin name may only have a single instance - a duplicate load is rejected with a warning.
      *
      * @param sendLoad whether to send the LOAD message right away (runtime load/reload).
-     *                 Startup registration (template JARs / auto-scan) passes false — the
+     *                 Startup registration (template JARs / auto-scan) passes false - the
      *                 host's LOAD loop sends LOAD to all plugins once the scheduler is ticking.
      * @return true if the plugin was loaded, false if skipped (duplicate) or failed
      */
@@ -180,7 +176,7 @@ public class RuntimeCore {
                 if (obj.has("version")) version = obj.get("version").getAsString();
                 if (obj.has("author")) author = obj.get("author").getAsString();
                 // 最终权限由构建器计算（合并依赖包声明 + 通配归一化）写入 computedPermissions。
-                // v0 阶段不做旧包兼容——旧格式包（仅 permissions）视为无权限。
+                // v0 阶段不做旧包兼容--旧格式包（仅 permissions）视为无权限。
                 if (obj.has("computedPermissions") && obj.get("computedPermissions").isJsonArray()) {
                     for (var el : obj.getAsJsonArray("computedPermissions")) perms.add(el.getAsString());
                 }
@@ -207,7 +203,7 @@ public class RuntimeCore {
             }
 
             // 原生服务批准检查（加载时）：声明了原生服务的插件需要批准，否则拒绝加载本插件。
-            // 一次性批准码只打印在控制台（插件可读日志也无法预知——code 在拒绝时新生成，且
+            // 一次性批准码只打印在控制台（插件可读日志也无法预知--code 在拒绝时新生成，且
             // 插件本身未加载，无法 dispatchCommand）。批准后自动重新加载。
             if (declaresNative && config.requireNativeApproval() && !isNativeApproved(name)) {
                 var code = requestApprovalCode(name);
@@ -216,7 +212,7 @@ public class RuntimeCore {
                     + "\n  [Yeow] " + name + " declares NATIVE SERVICES and is NOT approved"
                     + "\n  The plugin was REFUSED to load (native binaries are untrusted)."
                     + "\n  To approve and load it, run:  /yeow approve " + code
-                    + "\n  (one-time code — visible to server console only)"
+                    + "\n  (one-time code - visible to server console only)"
                     + "\n" + "=".repeat(60);
                 LOG.severe(banner);
                 return false;
@@ -225,7 +221,7 @@ public class RuntimeCore {
             String userCode;
             String devAssetsDir = null;
 
-            // Check for dev mode — .yeow/dev.json contains compiled code path
+            // Check for dev mode - .yeow/dev.json contains compiled code path
             var devEntry = zip.getEntry(".yeow/dev.json");
             if (devMode && devEntry != null) {
                 var devMeta = new String(zip.getInputStream(devEntry).readAllBytes(), StandardCharsets.UTF_8);
@@ -250,7 +246,7 @@ public class RuntimeCore {
             if (devMode) LOG.info("Dev mode active for " + name);
             LOG.info("Loaded plugin: " + name + (version.isEmpty() ? "" : " v" + version)
                 + (author.isEmpty() ? "" : " by " + author)
-                + " — permissions: " + displayPermissions(perms));
+                + " - permissions: " + displayPermissions(perms));
             return true;
         } catch (Exception e) {
             LOG.severe("Failed to register plugin " + jarPath + ": " + e.getMessage());
@@ -259,7 +255,7 @@ public class RuntimeCore {
     }
 
     /**
-     * 公开的插件实体注册接口——第三方适配器（Yeow-Python、Worker、TCP 适配器等）
+     * 公开的插件实体注册接口--第三方适配器（Yeow-Python、Worker、TCP 适配器等）
      * 构造好自己的 {@link PluginEntity} 后调用，接入与普通插件一致的运行时链路：
      * 同名唯一检查、Profile 指标、生命周期（start + LOAD）。
      *
@@ -286,7 +282,7 @@ public class RuntimeCore {
         if (sendLoad) entity.postMessage(new Gson().toJson(Map.of("t", "LOAD")));
         LOG.info("Loaded plugin (entity): " + name + " (" + entity.type() + ")"
             + (entity.isVirtual() ? " [virtual]" : "")
-            + (entity.source() != null ? " — source: " + entity.source() : ""));
+            + (entity.source() != null ? " - source: " + entity.source() : ""));
         return true;
     }
 
@@ -296,13 +292,13 @@ public class RuntimeCore {
     }
 
     /**
-     * 运行时级游戏任务提交——适配器提交游戏任务的统一入口（等价于 JS 的 `$_send('task', ...)`）。
+     * 运行时级游戏任务提交--适配器提交游戏任务的统一入口（等价于 JS 的 `$_send('task', ...)`）。
      * 回调约定：payload 含 `cb` 字段时异步执行（立即返回 null），结果经
      * {@link PluginEntity#postMessage} 回投 `{"t":"cb","p":"<cbId>","r":<data>}`；
      * 无 `cb` 时同步阻塞返回结果 JSON。`cbId` 由适配器自行生成与管理。
      *
      * @param entity  提交方实体（注册表中的插件）
-     * @param message 任务消息：JSON 字符串，或 POJO（**直接使用**，避免序列化开销——
+     * @param message 任务消息：JSON 字符串，或 POJO（**直接使用**，避免序列化开销--
      *               gson `JsonObject` 零转换直接执行；一般 POJO 由运行时一次转换）
      * @return 结果 JSON（同步）或 null（异步）
      */
@@ -320,7 +316,7 @@ public class RuntimeCore {
             var taskType = obj.get("type").getAsString();
             var params = obj.has("params") ? obj.getAsJsonObject("params") : new JsonObject();
             params.addProperty("_plugin", entity.name()); // ownership for per-plugin cleanup (gui/bossbar etc.)
-            // 空字符串 cb（如 `cb: ''` 表示"同步执行，不关心结果"）不视为异步——
+            // 空字符串 cb（如 `cb: ''` 表示"同步执行，不关心结果"）不视为异步--
             // 否则 cbId 为空字符串，结果回投匹配不到任何注册的 pend（事件/补全完成会永久超时）。
             var hasCb = obj.has("cb") && !obj.get("cb").getAsString().isEmpty();
             var priority = parsePriority(obj.has("priority") ? obj.get("priority").getAsString() : null);
@@ -338,9 +334,9 @@ public class RuntimeCore {
         }
     }
 
-    private static Scheduler.Priority parsePriority(String s) {
-        if (s == null) return Scheduler.Priority.NORMAL;
-        return switch (s.toLowerCase()) { case "high" -> Scheduler.Priority.HIGH; case "low" -> Scheduler.Priority.LOW; default -> Scheduler.Priority.NORMAL; };
+    private static TaskScheduler.Priority parsePriority(String s) {
+        if (s == null) return TaskScheduler.Priority.NORMAL;
+        return switch (s.toLowerCase()) { case "high" -> TaskScheduler.Priority.HIGH; case "low" -> TaskScheduler.Priority.LOW; default -> TaskScheduler.Priority.NORMAL; };
     }
 
     /**
@@ -383,7 +379,7 @@ public class RuntimeCore {
     /**
      * Reload a plugin from its original source (or a given path/url). The old instance is fully
      * unloaded (same 5s force-stop logic as hot reload) and the package is re-read from disk.
-     * URL sources are downloaded to the cache (temporary — never persisted).
+     * URL sources are downloaded to the cache (temporary - never persisted).
      */
     public boolean reloadPlugin(String name, String path) {
         var pt = plugins.get(name);
@@ -430,7 +426,7 @@ public class RuntimeCore {
             LOG.info("Downloaded plugin package: " + url + " → " + tmp.getAbsolutePath() + " (" + tmp.length() + " bytes)");
             return tmp;
         } catch (Exception e) {
-            LOG.warning("Download failed: " + url + " — " + e.getMessage());
+            LOG.warning("Download failed: " + url + " - " + e.getMessage());
             return null;
         }
     }
@@ -530,9 +526,9 @@ public class RuntimeCore {
         // Block until connected or timeout (5s), so WebSocket is ready before registerPlugin()
         try {
             if (!latch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
-                host.logger().warning("Dev WebSocket connection timed out (5s) — running without dev WS");
+                host.logger().warning("Dev WebSocket connection timed out (5s) - running without dev WS");
             } else if (devWs == null) {
-                host.logger().warning("Dev WebSocket connection failed — running without dev WS");
+                host.logger().warning("Dev WebSocket connection failed - running without dev WS");
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

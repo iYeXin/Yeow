@@ -13,12 +13,12 @@ import yeow.profile.collector.WindowMetrics;
 
 /**
  * 预警引擎：运行注册的检测器，按 (code, plugin) 节流，统一输出双语告警框。
- * 检测器不直接写日志——引擎是唯一输出口，便于替换（如转发到外部监控）。
+ * 检测器不直接写日志--引擎是唯一输出口，便于替换（如转发到外部监控）。
  */
 public final class WarningEngine {
 
     private static final Logger LOG = Logger.getLogger("Yeow");
-    private static final String HELP_URL = "http://yeow.yeside.top/v1/runtime-warning";
+    private static final String HELP_URL = "https://docs.yexin.wiki/yeow/v1/runtime-warning";
 
     private static final String RED    = "\u001b[31m";
     private static final String YELLOW = "\u001b[33m";
@@ -82,7 +82,7 @@ public final class WarningEngine {
             var entity = pluginLookup.apply(w.plugin());
             String tag = entity != null && entity.isVirtual() && entity.source() != null
                 ? " (worker of " + entity.source() + ")" : "";
-            sb.append("  — ").append(w.plugin()).append(tag);
+            sb.append("  - ").append(w.plugin()).append(tag);
         }
         sb.append("\n");
         for (String l : w.lines()) {

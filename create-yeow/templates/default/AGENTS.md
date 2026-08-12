@@ -51,12 +51,12 @@
 
 | 资料 | 地址 |
 |------|------|
-| 站点地图（全部页面索引） | https://yeow.yeside.top/v1/sitemap |
-| 文档压缩包（全量 Markdown，离线/AI 用） | https://yeow.yeside.top/v1/docs.zip |
-| 快速开始 | https://yeow.yeside.top/v1/getting-started |
-| API 索引 | https://yeow.yeside.top/v1/api/ |
-| 进阶（架构/线程/调度器） | https://yeow.yeside.top/v1/advanced |
-| 平台规范（协议层） | https://yeow.yeside.top/v1/specifications/ |
+| 站点地图（全部页面索引） | https://docs.yexin.wiki/yeow/v1/sitemap |
+| 文档压缩包（全量 Markdown，离线/AI 用） | https://docs.yexin.wiki/yeow/v1/docs.zip |
+| 快速开始 | https://docs.yexin.wiki/yeow/v1/getting-started |
+| API 索引 | https://docs.yexin.wiki/yeow/v1/api/ |
+| 进阶（架构/线程/调度器） | https://docs.yexin.wiki/yeow/v1/advanced |
+| 平台规范（协议层） | https://docs.yexin.wiki/yeow/v1/specifications/ |
 
 ## 项目结构
 

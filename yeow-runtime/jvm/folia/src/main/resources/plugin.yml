@@ -1,0 +1,14 @@
+name: Yeow
+version: ${project.version}
+main: yeow.folia.FoliaRuntime
+api-version: '1.18'
+folia-supported: true
+author: Yeow
+description: Yeow JavaScript plugin runtime (experimental Folia)
+permissions:
+  yeow.admin:
+    description: Yeow plugin management commands
+    default: op
+  yeow.profile:
+    description: Yeow performance profiler (profile/track)
+    default: op

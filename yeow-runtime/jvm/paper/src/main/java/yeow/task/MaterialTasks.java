@@ -19,7 +19,7 @@ public class MaterialTasks {
         return list;
     }
 
-    /** 与 ChunkTasks.blockKeys() 共享同一份缓存——getBlocks 的数组下标即方块类型索引基准。 */
+    /** 与 ChunkTasks.blockKeys() 共享同一份缓存--getBlocks 的数组下标即方块类型索引基准。 */
     public static Object getBlocks(JsonObject p) {
         return ChunkTasks.blockKeys();
     }

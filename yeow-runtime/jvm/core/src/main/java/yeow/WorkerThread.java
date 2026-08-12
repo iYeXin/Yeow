@@ -10,7 +10,7 @@ import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 /**
- * Worker —— 虚拟插件执行单元（基于 PluginEntity 接入运行时全链路）。
+ * Worker -- 虚拟插件执行单元（基于 PluginEntity 接入运行时全链路）。
  *
  * 语义：
  * - 独立 QuickJS 上下文 + 独立线程；注册名 = `&lt;主插件&gt;.&lt;worker&gt;`（全局唯一）
@@ -34,7 +34,7 @@ public class WorkerThread implements PluginEntity, Runnable {
     private final String initCode;
     private String injectCode;
     private volatile String userCode;
-    private final Scheduler scheduler;
+    private final TaskScheduler scheduler;
     private final Logger log;
     private volatile QuickJSContext ctx;
     private volatile boolean running = false;
@@ -127,7 +127,7 @@ public class WorkerThread implements PluginEntity, Runnable {
             try { Thread.sleep(10); } catch (InterruptedException e) { break; }
         }
         if (running) {
-            log.warning("[" + entityName + "] worker unresponsive 5s — forcing stop");
+            log.warning("[" + entityName + "] worker unresponsive 5s - forcing stop");
             running = false;
             thread.interrupt();
             try { thread.join(1000); } catch (InterruptedException ignored) {}

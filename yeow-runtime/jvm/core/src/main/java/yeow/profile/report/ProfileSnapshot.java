@@ -13,7 +13,7 @@ import java.util.Set;
 /**
  * 全量分析快照：从最近 N 个窗口构建的不可变报告数据。
  *
- * 窗口对齐：所有跨窗口聚合按窗口序列索引对齐，缺失窗口补 0——与旧实现不同，
+ * 窗口对齐：所有跨窗口聚合按窗口序列索引对齐，缺失窗口补 0--与旧实现不同，
  * 不存在"只收集出现过的窗口导致索引错位"的问题。
  */
 public final class ProfileSnapshot {
@@ -87,7 +87,7 @@ public final class ProfileSnapshot {
         for (var w : windows) tickSum += w.tickDurationSumNs();
         s.workingMsPerWindow = tickSum / (double) windows.size() / 1_000_000.0;
 
-        // 合并直方图（跨窗口）——sum/max 直接从 TierMetrics 累加，桶分布用 mergeBuckets
+        // 合并直方图（跨窗口）--sum/max 直接从 TierMetrics 累加，桶分布用 mergeBuckets
         var hnHist = new LogHistogram();
         var lowHist = new LogHistogram();
         long hnSum = 0, hnMax = 0, lowSum = 0, lowMax = 0;

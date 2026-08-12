@@ -17,13 +17,25 @@ import java.util.Map;
  */
 public class YeowConfig {
     private final File file;
+    private final boolean folia;
     private final Map<String, Object> values;
 
     public YeowConfig(File dataFolder) {
+        this(dataFolder, false);
+    }
+
+    /**
+     * @param folia Folia 平台：`folia:` section 提供 Folia 专用/语义不同参数
+     *              （调度预算、in-flight、空闲阻塞等待）；Paper 参数保持顶层。
+     *              仅影响首次生成的文件，已存在的 config.yml 保持用户值不变
+     *              （默认值只补缺失键）。
+     */
+    public YeowConfig(File dataFolder, boolean folia) {
+        this.folia = folia;
         var runtimeDir = new File(dataFolder, "runtime");
         runtimeDir.mkdirs();
         this.file = new File(runtimeDir, "config.yml");
-        var defaults = defaults();
+        var defaults = defaults(folia);
         Map<String, Object> v;
         if (file.exists() && file.length() > 0) {
             try {
@@ -35,7 +47,7 @@ public class YeowConfig {
             }
         } else {
             v = defaults;
-            save();
+            save(v); // 注意：save 须在 this.values 赋值前用参数传入，否则落盘的是 null
         }
         this.values = v;
     }
@@ -55,7 +67,15 @@ public class YeowConfig {
     private double getDouble(String path, double def) { var v = get(path); return v instanceof Number n ? n.doubleValue() : def; }
     private boolean getBool(String path, boolean def) { var v = get(path); return v instanceof Boolean b ? b : def; }
 
-    public long tickBudgetNs() { return getInt("tick-budget-ms", 20) * 1_000_000L; }
+    /**
+     * 调度预算。语义平台不同（各自 section，互不混淆）：
+     * - Paper：`tick-budget-ms`（顶层）——每 tick 任务执行预算
+     * - Folia：`folia.tick-budget-ms`——每 50ms 窗口内调度器活跃的**物理时间**上限
+     */
+    public long tickBudgetNs() {
+        int ms = folia ? getInt("folia.tick-budget-ms", 20) : getInt("tick-budget-ms", 20);
+        return ms * 1_000_000L;
+    }
     public double[] priorityRatios() {
         var v = get("priority-ratios");
         if (v instanceof List<?> l) {
@@ -88,9 +108,28 @@ public class YeowConfig {
     /** 同步 task 调用超时（毫秒），默认 10000。 */
     public long taskSyncTimeoutMs() { return getInt("task-sync-timeout-ms", 10000); }
 
+    /** Folia：in-flight 任务上限（同时投递未完成数），默认 100（folia section）。 */
+    public int maxInflight() { return getInt("folia.max-inflight", 100); }
+
+    /**
+     * Folia：调度循环空闲**阻塞等待**上限（微秒，folia section，默认 2000）。
+     * 队列空时区域线程 park 等待新任务（wake 提前唤醒），不再忙等自旋——
+     * region 线程满核饱和下 OS 唤醒延迟本身即 100µs~ms 级，忙等的响应优势消失，
+     * park 释放 CPU 且区域 tick 停顿语义与自旋一致。替代原 scheduler-spin-us。
+     */
+    public int schedulerIdleWaitUs() { return getInt("folia.scheduler-idle-wait-us", 2000); }
+
+    /**
+     * Folia：热点迁移阈值（连续非本区域任务数，folia section，默认 2）。
+     * 达到该数即让出驻留标记等待抢占。**调高**：多人/多插件等热点抖动场景更稳定
+     * （不反复让出-抢占）；但热点迁移延迟增大（需要更多连续外来任务才让出）。
+     * 不建议过高。
+     */
+    public int migrationThreshold() { return getInt("folia.migration-threshold", 2); }
+
     /**
      * 原生服务是否需要批准（默认 true；false = 默认批准）。
-     * config.yml 为信任源——每次调用重新读取文件，运行时直接修改字段即时生效。
+     * config.yml 为信任源--每次调用重新读取文件，运行时直接修改字段即时生效。
      */
     public boolean requireNativeApproval() {
         try {
@@ -104,7 +143,7 @@ public class YeowConfig {
 
     // ── 默认值 / 合并 / 落盘 ────────────────────────────────────────
 
-    private static Map<String, Object> defaults() {
+    private static Map<String, Object> defaults(boolean folia) {
         var scaler = new LinkedHashMap<String, Object>();
         scaler.put("enabled", true);
         scaler.put("expansion-factor", 1.3);
@@ -127,15 +166,28 @@ public class YeowConfig {
         profile.put("scaler", scaler);
 
         var m = new LinkedHashMap<String, Object>();
-        m.put("tick-budget-ms", 20);
+        m.put("tick-budget-ms", 20);               // Paper：每 tick 任务预算（Folia 语义见 folia section）
         m.put("priority-ratios", List.of(0.5, 0.3, 0.2));
         m.put("auto-demote", true);
         m.put("demote-threshold", 200);
-        m.put("idle-spin-us", 100);
+        m.put("idle-spin-us", 100);                // Paper 专用（Folia 用 folia.scheduler-idle-wait-us）
         m.put("concurrent-events", true);
         m.put("task-sync-timeout-ms", 10000);
         m.put("profile", profile);
         m.put("native-service-require-approval", true);
+
+        // ── Folia 专用 section（仅 Folia 生成）：语义与 Paper 不同或仅 Folia 使用的参数 ──
+        if (folia) {
+            var fol = new LinkedHashMap<String, Object>();
+            fol.put("tick-budget-ms", 20);             // 语义不同：每 50ms 窗口内调度器活跃**物理时间**上限
+            fol.put("max-inflight", 100);              // 同时投递未完成任务上限（区域并行度）
+            fol.put("scheduler-idle-wait-us", 2000);   // 调度循环空闲**阻塞等待**上限（替代原 scheduler-spin-us）：
+                                                       //   队列空时区域线程 park 等待新任务（wake 提前唤醒，不烧 CPU）；
+                                                       //   须覆盖 JS 同步往返间隙（region 线程满核饱和下 100µs~ms 级）
+            fol.put("migration-threshold", 2);           // 热点迁移阈值（连续非本区域任务数）：调高更稳（多人/多插件），
+                                                         //   但热点迁移延迟增大，不建议过高
+            m.put("folia", fol);
+        }
         return m;
     }
 
@@ -185,11 +237,11 @@ public class YeowConfig {
         return out;
     }
 
-    private void save() {
+    private void save(Map<String, Object> data) {
         var opts = new DumperOptions();
         opts.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
         try {
-            Files.writeString(file.toPath(), new Yaml(opts).dump(values), StandardCharsets.UTF_8);
+            Files.writeString(file.toPath(), new Yaml(opts).dump(data), StandardCharsets.UTF_8);
         } catch (Exception ignored) {}
     }
 }

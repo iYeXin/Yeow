@@ -322,20 +322,27 @@ async function getSourceMapConsumer() {
     } catch { return null; }
 }
 
+/** 查找 Worker 的 source-map 文件（产物位于 dist/.dev/.assets/<id>/worker/<name>.js.map）。 */
+function findWorkerMapFile(workerName) {
+    const assetsRoot = resolve(ROOT, 'dist', '.dev', '.assets');
+    if (!existsSync(assetsRoot)) return null;
+    for (const id of readdirSync(assetsRoot)) {
+        const mapFile = resolve(assetsRoot, id, 'worker', workerName + '.js.map');
+        if (existsSync(mapFile)) return mapFile;
+    }
+    return null;
+}
+
 /** Worker 的 source-map（产物位于 dist/.dev/.assets/<id>/worker/<name>.js(.map)）。 */
 let _workerConsumers = {};
 async function getWorkerSourceMapConsumer(workerName) {
     if (_workerConsumers[workerName]) return _workerConsumers[workerName];
-    const assetsRoot = resolve(ROOT, 'dist', '.dev', '.assets');
-    if (!existsSync(assetsRoot)) return null;
     try {
-        for (const id of readdirSync(assetsRoot)) {
-            const mapFile = resolve(assetsRoot, id, 'worker', workerName + '.js.map');
-            if (existsSync(mapFile)) {
-                const raw = JSON.parse(readFileSync(mapFile, 'utf-8'));
-                _workerConsumers[workerName] = await new SourceMapConsumer(raw);
-                return _workerConsumers[workerName];
-            }
+        const mapFile = findWorkerMapFile(workerName);
+        if (mapFile) {
+            const raw = JSON.parse(readFileSync(mapFile, 'utf-8'));
+            _workerConsumers[workerName] = await new SourceMapConsumer(raw);
+            return _workerConsumers[workerName];
         }
     } catch { /* 未找到 */ }
     _workerConsumers[workerName] = null;
@@ -360,10 +367,8 @@ async function printFormattedError(err) {
         consumer = isWorker ? await getWorkerSourceMapConsumer(err.origin) : await getSourceMapConsumer();
     }
     if (hasBundle && !consumer) {
-        const mapFile = isWorker
-            ? resolve(ROOT, 'dist', '.dev', '.assets', '**', 'worker', err.origin + '.js.map')
-            : resolve(ROOT, 'dist', '.dev', 'main.js.map');
-        out += `  ${c.D}(source-map not found: ${existsSync(mapFile) ? 'exists but failed to parse' : 'missing at ' + mapFile})${c.r}\n`;
+        const mapFile = isWorker ? findWorkerMapFile(err.origin) : resolve(ROOT, 'dist', '.dev', 'main.js.map');
+        out += `  ${c.D}(source-map not found: ${mapFile && existsSync(mapFile) ? 'exists but failed to parse' : 'missing at ' + (mapFile || '.assets/<id>/worker/' + err.origin + '.js.map')})${c.r}\n`;
     }
 
     const frames = [];

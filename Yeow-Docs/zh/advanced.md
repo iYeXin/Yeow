@@ -9,4 +9,5 @@
 - [环境能力与通道](advanced/channels.md) — $_send/$send、各消息通道、运行时配置
 - [服务机制](advanced/service.md) — Plugin Service（插件间通信）与 Native Service（原生扩展）
 - [运行时运维与安全](advanced/operations.md) — 预警引擎、动态扩容、全量分析、平台无关性、安全
+- [Folia 支持（实验性）](advanced/folia.md) — 区域化多线程平台的运行时架构、推论、平台透明与部署
 - [关于 Yeow](advanced/about.md) — 定位、设计目标、基本原则、未来规划与愿景

@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Yeow 权限节点注册表。
  *
- * - 权限节点注册进 Bukkit 权限系统（PermissionDefault）——Paper 平台兼容
+ * - 权限节点注册进 Bukkit 权限系统（PermissionDefault）--Paper 平台兼容
  *   permissions.yml 静态声明与 LuckPerms 等权限管理插件
  * - 记录节点默认值（all/op/none），供 permissionCheck 事件携带 permission 对象
  * - Yeow 生态权限检查（permissionCheck 事件）优先级高于 Bukkit 权限系统

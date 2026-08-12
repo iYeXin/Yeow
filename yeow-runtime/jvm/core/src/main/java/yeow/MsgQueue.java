@@ -24,7 +24,7 @@ public class MsgQueue {
     /**
      * 消息驱动的消费模型（原子性由 BlockingQueue 保证）：
      * 无消息时阻塞等待（消息循环"未运行"态，零轮询）；收到消息即返回
-     * （入队与唤醒是原子的——发送方 add 后消费者 take 必定可见）。
+     * （入队与唤醒是原子的--发送方 add 后消费者 take 必定可见）。
      */
     public String takeJs() throws InterruptedException {
         return toJs.take();

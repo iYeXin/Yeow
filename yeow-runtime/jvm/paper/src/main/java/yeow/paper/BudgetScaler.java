@@ -1,14 +1,10 @@
-package yeow;
+package yeow.paper;
 
 import java.util.logging.Logger;
 
 /**
- * 运行时预算缩放器（运行时组件，独立于 Profile）。
- *
- * 语义：HIGH/NORMAL 队列承载实时性与交互响应，不应存在积压——
- * 滑动窗口内（默认 40 tick）积压 tick 数达到阈值（默认 35）即自动扩容 tick 预算；
- * 持续无积压后逐级回落。LOW 批量队列不计入。
- */
+ * 杩愯鏃堕绠楃缉鏀惧櫒锛堣繍琛屾椂缁勪欢锛岀嫭绔嬩簬 Profile锛夈€? *
+ * 璇箟锛欻IGH/NORMAL 闃熷垪鎵胯浇瀹炴椂鎬т笌浜や簰鍝嶅簲锛屼笉搴斿瓨鍦ㄧН鍘嬧€斺€? * 婊戝姩绐楀彛鍐咃紙榛樿 40 tick锛夌Н鍘?tick 鏁拌揪鍒伴槇鍊硷紙榛樿 35锛夊嵆鑷姩鎵╁ tick 棰勭畻锛? * 鎸佺画鏃犵Н鍘嬪悗閫愮骇鍥炶惤銆侺OW 鎵归噺闃熷垪涓嶈鍏ャ€? */
 public class BudgetScaler {
     private static final Logger LOG = Logger.getLogger("Yeow");
 
@@ -26,8 +22,7 @@ public class BudgetScaler {
     private final long baseBudgetNs;
     private boolean atMaxWarned;
 
-    private volatile Runnable budgetListener; // 可选：通知预算变化（如 /yeow 输出）
-
+    private volatile Runnable budgetListener; // 鍙€夛細閫氱煡棰勭畻鍙樺寲锛堝 /yeow 杈撳嚭锛?
     public BudgetScaler(long baseBudgetNs, double expansionFactor, double maxMultiplier,
             int thresholdTicks, int windowTicks) {
         this.baseBudgetNs = baseBudgetNs;
@@ -41,7 +36,7 @@ public class BudgetScaler {
 
     public void setBudgetListener(Runnable r) { this.budgetListener = r; }
 
-    /** 每 tick 调用一次：HIGH/NORMAL 是否有积压。 */
+    /** 姣?tick 璋冪敤涓€娆★細HIGH/NORMAL 鏄惁鏈夌Н鍘嬨€?*/
     public synchronized void onTick(boolean hnHasBacklog) {
         backlogCount -= window[idx];
         window[idx] = hnHasBacklog ? 1 : 0;
@@ -56,7 +51,7 @@ public class BudgetScaler {
                 currentBudgetNs = (long) (baseBudgetNs * currentMultiplier);
                 if (currentMultiplier >= maxMultiplier) {
                     if (!atMaxWarned) {
-                        LOG.warning("[Yeow] tick budget reached max expansion (" + currentMultiplier + "x) — "
+                        LOG.warning("[Yeow] tick budget reached max expansion (" + currentMultiplier + "x) 鈥?"
                             + "HIGH/NORMAL queues still congested");
                         atMaxWarned = true;
                     }

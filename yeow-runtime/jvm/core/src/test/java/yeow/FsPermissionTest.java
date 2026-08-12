@@ -22,14 +22,27 @@ class FsPermissionTest {
             @Override public File dataFolder() { return new File("target/test-data"); }
             @Override public boolean isGameThread() { return true; }
             @Override public void onGameThread(Runnable r) { r.run(); }
-            @Override public Object executeTask(String taskType, com.google.gson.JsonObject params) { return null; }
             @Override public void purgePlatformResources(String pluginName) {}
             @Override public void syncCommands() {}
         };
     }
 
+    /** 测试用最小任务调度器（队列即空，不触碰 Bukkit）。 */
+    private static TaskScheduler stubScheduler() {
+        return new TaskScheduler() {
+            @Override public void start() {}
+            @Override public void shutdown() {}
+            @Override public void submitGameSync(String taskType, com.google.gson.JsonObject params, java.util.concurrent.CompletableFuture<String> future, Priority priority, String pluginName) {
+                future.complete("null");
+            }
+            @Override public void submitGameAsync(String taskType, com.google.gson.JsonObject params, java.util.function.Consumer<Object> callback, Priority priority, String pluginName) {}
+            @Override public void purgePluginTasks(String pluginName) {}
+        };
+    }
+
     private static PluginThread pt(Set<String> perms) {
-        var core = new RuntimeCore(stubHost());
+        var cfg = new YeowConfig(new File("target/test-data"));
+        var core = new RuntimeCore(stubHost(), cfg, stubScheduler());
         return new PluginThread("t", "x.jar", "init", "code", core, perms, java.util.Map.of());
     }
 

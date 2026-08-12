@@ -36,7 +36,7 @@ public class EventBridge implements Listener {
     private final java.util.concurrent.atomic.AtomicLong permSeq = new java.util.concurrent.atomic.AtomicLong();
     /** 事件类型 → 是否已注册 Bukkit 监听器（生命周期 = EventBridge，一经注册永久保留）。 */
     private final Map<String, Boolean> reg = new ConcurrentHashMap<>();
-    /** 每次 dispatch 的唯一 id 生成器：pend key 用 eventId 而非 cbId——
+    /** 每次 dispatch 的唯一 id 生成器：pend key 用 eventId 而非 cbId--
      *  同一 cbId 并发/连续触发多次事件时（如 serverPing 多连接同时 ping），
      *  register(cbId) 会互相覆盖，先注册的 pend 永不完成 → 间歇性 event.timeout。
      *  每次 dispatch 独立 eventId，事件完成（event.complete）回传 eventId 精确匹配。 */
@@ -100,18 +100,18 @@ public class EventBridge implements Listener {
         subs.computeIfAbsent(et, k -> new ConcurrentHashMap<>())
             .computeIfAbsent(plugin, k -> ConcurrentHashMap.newKeySet())
             .add(cbId);
-        // 监听器一经注册永久保留（reg 只作去重标记，绝不在 unsubscribe 时移除）——
+        // 监听器一经注册永久保留（reg 只作去重标记，绝不在 unsubscribe 时移除）--
         // Bukkit 无法注销匿名监听器，若热重载后重新注册会累积多个监听器，
         // callEvent 会串行调用每个监听器（每个都走一遍完整超时等待），
         // 死循环插件场景下 N 个监听器 = N × 5s 阻塞主线程。
         // dispatch() 开头已对空订阅短路，空订阅时监听器零开销。
         if (reg.putIfAbsent(et, true) == null) {
-            // AsyncPlayerChatEvent fires on a Netty thread — hop to the main thread before dispatching,
+            // AsyncPlayerChatEvent fires on a Netty thread - hop to the main thread before dispatching,
             // because dispatch() runs the scheduler tick (Bukkit API must stay on the main thread).
             // ServerListPingEvent 也在 Netty 线程触发，但**必须同步 dispatch（不 hop）**：
-            // Paper 的 ping 处理同步等待事件返回后才构建响应——hop 到主线程是异步的，
+            // Paper 的 ping 处理同步等待事件返回后才构建响应--hop 到主线程是异步的，
             // callEvent 立即返回，响应在 dispatch 修改事件字段之前就已构建，mods（motd/icon 等）永远不生效。
-            // Netty 线程自旋等待期间不调 scheduler.tick()——event.complete 由主线程的正常 tick（runTaskTimer）执行。
+            // Netty 线程自旋等待期间不调 pump--event.complete 由主线程的正常 pump（runTaskTimer mainTickPump）执行。
             var async = AsyncPlayerChatEvent.class.isAssignableFrom(c);
             Bukkit.getPluginManager().registerEvent(c, this, EventPriority.NORMAL, (l, e) -> {
                 var ev = (Event) e;
@@ -143,7 +143,7 @@ public class EventBridge implements Listener {
     }
 
     /**
-     * Yeow 生态权限检查：触发 `permissionCheck` 事件——**仅 Yeow 生态内**（
+     * Yeow 生态权限检查：触发 `permissionCheck` 事件--**仅 Yeow 生态内**（
      * `player.hasPermission` 任务与 Yeow 插件注册命令的执行检查）触发；
      * 其他 Java 插件的 hasPermission / 命令执行不会经过此检查。
      *
@@ -185,7 +185,7 @@ public class EventBridge implements Listener {
         while (System.nanoTime() < deadline && latch.getCount() > 0) {
             // 与事件派发同款无预算排空：等待期间消费调度器队列，保证 permissionCheck
             // 的 event.complete 能在超时前执行。超时遵循普通事件配置（默认 5s）。
-            if (primary) runtime.getScheduler().drainAll();
+            if (primary) runtime.getScheduler().drainDuringWait();
             Thread.onSpinWait();
         }
         Boolean result = null;
@@ -240,7 +240,7 @@ public class EventBridge implements Listener {
     }
 
     /** 死亡消息方法（反射）：Bukkit 的 `getDeathMessage()` 返回 String（已格式化文本，翻译 key 丢失）；
-     *  Paper 的 `deathMessage()` 返回 Component（可翻译组件）——优先使用后者。 */
+     *  Paper 的 `deathMessage()` 返回 Component（可翻译组件）--优先使用后者。 */
     private static java.lang.reflect.Method DEATH_MESSAGE_COMPONENT;
     private static java.lang.reflect.Method DEATH_MESSAGE_STRING;
     static {
@@ -286,11 +286,11 @@ public class EventBridge implements Listener {
                     boolean primary = Bukkit.isPrimaryThread();
                     while (System.nanoTime() < deadline && !pend.isDone()) {
                         // 仅主线程 dispatch 时消费调度器任务（无预算排空：event.complete 等
-                        // 事件完成任务不被 tick 预算饿死——繁忙时 tick 的 HIGH 配额会占满预算，
+                        // 事件完成任务不被 tick 预算饿死--繁忙时 tick 的 HIGH 配额会占满预算，
                         // 导致事件完成任务排不到、事件 5s 超时）；
-                        // 非主线程（如 serverPing 的 Netty 线程）纯自旋等待——
+                        // 非主线程（如 serverPing 的 Netty 线程）纯自旋等待--
                         // 事件完成由主线程的正常 tick 执行，Netty 线程不能执行 Bukkit API。
-                        if (primary) runtime.getScheduler().drainAll();
+                        if (primary) runtime.getScheduler().drainDuringWait();
                         Thread.onSpinWait();
                     }
                     long elapsedNs = System.nanoTime() - t0;
@@ -313,7 +313,7 @@ public class EventBridge implements Listener {
         long t0 = System.nanoTime();
         var startNs = new HashMap<String, Long>();
         // cb → eventId。注意：不同插件的独立 JS 上下文 cbId 各自从 cb_1 计数，
-        // 可能同名（如都是 cb_2）——key 必须含插件名，否则跨插件覆盖导致
+        // 可能同名（如都是 cb_2）--key 必须含插件名，否则跨插件覆盖导致
         // waitFor 错位（误判超时）与 pend 泄漏。
         var cbToDispatch = new HashMap<String, String>();
         for (var entry : pluginMap.entrySet()) {
@@ -334,7 +334,7 @@ public class EventBridge implements Listener {
         while (System.nanoTime() < deadline && latch.getCount() > 0) {
             // 无预算排空（同 dispatchSerial）：event.complete 不被 tick 预算饿死；
             // 非主线程纯自旋（主线程正常 tick 处理 event.complete）。
-            if (primary) runtime.getScheduler().drainAll();
+            if (primary) runtime.getScheduler().drainDuringWait();
             Thread.onSpinWait();
         }
         long now = System.nanoTime();
@@ -425,7 +425,7 @@ public class EventBridge implements Listener {
                 if(e.getClickedBlock()!=null){var b=e.getClickedBlock();m.put("block",Map.of("x",b.getX(),"y",b.getY(),"z",b.getZ(),"type",b.getType().getKey().toString()));} break; }
             case "playerCommand":{ var e=(PlayerCommandPreprocessEvent)ev; putP(m,e.getPlayer()); m.put("message",e.getMessage()); break; }
             case "playerDeath":{ var e=(PlayerDeathEvent)ev; putP(m,e.getPlayer());
-                // 死亡消息：Message 对象——key/args 可翻译组件（如有）+ text 纯文本兜底，两者同时传递
+                // 死亡消息：Message 对象--key/args 可翻译组件（如有）+ text 纯文本兜底，两者同时传递
                 m.put("deathMessage", componentToMessage(deathMessageComponent(e)));
                 m.put("deathType",e.getDamageSource()!=null?e.getDamageSource().getDamageType().getKey().getKey():"UNKNOWN"); break; }
             case "playerRespawn":{ var e=(PlayerRespawnEvent)ev; putP(m,e.getPlayer()); m.put("respawnLocation",pos(e.getRespawnLocation())); break; }
@@ -439,7 +439,7 @@ public class EventBridge implements Listener {
             case "playerLevelChange":{ var e=(PlayerLevelChangeEvent)ev; putP(m,e.getPlayer()); m.put("oldLevel",e.getOldLevel()); m.put("newLevel",e.getNewLevel()); break; }
             case "playerGameModeChange":{ var e=(PlayerGameModeChangeEvent)ev; putP(m,e.getPlayer()); m.put("newGameMode",e.getNewGameMode().name()); break; }
             case "playerAdvancementDone":{ var e=(PlayerAdvancementDoneEvent)ev; putP(m,e.getPlayer()); m.put("advancement",e.getAdvancement().getKey().toString());
-                // 进度标题/描述：Paper 的 AdvancementDisplay 提供 Component（title()/description()）——
+                // 进度标题/描述：Paper 的 AdvancementDisplay 提供 Component（title()/description()）--
                 // 可翻译组件（{key,args,text}）或纯文本（{text}）
                 var disp = e.getAdvancement().getDisplay();
                 if (disp != null) {

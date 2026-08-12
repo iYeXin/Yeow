@@ -10,7 +10,7 @@ import java.util.List;
 
 /**
  * 调度饱和告警：窗口内 HIGH+NORMAL 执行时间占 tick 总时长的比例超过阈值（默认 80%）。
- * 实时队列几乎吃满全部 tick——LOW 批量任务将被无限期推迟，交互响应同样受损。
+ * 实时队列几乎吃满全部 tick--LOW 批量任务将被无限期推迟，交互响应同样受损。
  */
 public final class SchedulerSaturationDetector implements WarningDetector {
     private final ProfileConfig cfg;

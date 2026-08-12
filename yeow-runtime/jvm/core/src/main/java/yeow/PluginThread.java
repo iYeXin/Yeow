@@ -22,7 +22,7 @@ public class PluginThread implements Runnable, PluginEntity {
     public final MsgQueue queue = new MsgQueue();
     private String initCode;
     private volatile String userCode;
-    private final Scheduler scheduler;
+    private final TaskScheduler scheduler;
     private final RuntimeCore core;
     private final Logger log;
     /** 依附于本插件的 Worker（虚拟插件）：key = worker 名；主插件卸载时连带卸载。 */
@@ -129,7 +129,7 @@ public class PluginThread implements Runnable, PluginEntity {
         }
 
         if (running) {
-            log.warning("[" + name + "] JS thread unresponsive for 5s — forcing stop");
+            log.warning("[" + name + "] JS thread unresponsive for 5s - forcing stop");
             running = false;
             thread.interrupt();
             try { thread.join(1000); } catch (InterruptedException ignored) {}
@@ -211,7 +211,7 @@ public class PluginThread implements Runnable, PluginEntity {
                         while (ctx.isJobPending()) ctx.executePendingJob();
                     } catch (QuickJSException ex) {
                         // A pending job threw (e.g. an async error surfaced by the native wrapper).
-                        // Report it but keep the message loop alive — the plugin must not die here.
+                        // Report it but keep the message loop alive - the plugin must not die here.
                         handleJSError(ex);
                     } catch (Exception e) {
                         log.warning("[" + name + "] job error: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
@@ -358,7 +358,7 @@ public class PluginThread implements Runnable, PluginEntity {
 
     /**
      * Worker 通道：主插件 JS 侧的 createWorker/load/unload/postMessage/reload。
-     * 请求：{ "t": "create|unload|post|reload|postToMain", "p": {...} }——p 含 cb（异步回调 ok/err）。
+     * 请求：{ "t": "create|unload|post|reload|postToMain", "p": {...} }--p 含 cb（异步回调 ok/err）。
      */
     private String handleWorker(String pld) {
         try {
@@ -402,7 +402,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     yield null;
                 }
                 case "unload" -> {
-                    // 卸载：停止线程并清理（物理销毁 JS 上下文），句柄保留在注册表——可重新 load
+                    // 卸载：停止线程并清理（物理销毁 JS 上下文），句柄保留在注册表--可重新 load
                     var w = workers.get(p.get("name").getAsString());
                     if (w != null) core.unloadPlugin(w.name());
                     respond.accept("true");
@@ -453,7 +453,7 @@ public class PluginThread implements Runnable, PluginEntity {
 
     /** 数据目录（fs plugin 级 base；Worker 共享）。 */
     public String getDataDirPublic() { return "plugins/" + name; }
-    public Scheduler getSchedulerRef() { return scheduler; }
+    public TaskScheduler getSchedulerRef() { return scheduler; }
     public String checkChannelPermissionPublic(String channel, String op) { return checkChannelPermission(channel, op); }
     public String handleFsPublic(String pld) { return handleFs(pld); }
     public String handleAssetsPublic(String pld) { return handleAssets(pld); }
@@ -492,7 +492,7 @@ public class PluginThread implements Runnable, PluginEntity {
             "now", nowUs));
     }
 
-    /** 禁止对 Yeow 运行时配置目录（含 approve.json / config.yml）的修改——fs 写操作（全部级别）一律拦截。 */
+    /** 禁止对 Yeow 运行时配置目录（含 approve.json / config.yml）的修改--fs 写操作（全部级别）一律拦截。 */
     private void assertNotRuntimeDir(Path path) throws SecurityException {
         if (path.startsWith(RUNTIME_DIR)) {
             throw new SecurityException("Cannot modify Yeow runtime directory (plugins/Yeow/runtime): " + path);
@@ -745,7 +745,11 @@ public class PluginThread implements Runnable, PluginEntity {
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
     }
 
-    private void handleJSReport(String pld) { handleJSReport(pld, name); }
+    /**
+     * 主插件错误上报：origin = "main"（dev-server 契约：'main' = 主插件 bundle，
+     * 其他值 = worker 名，对应各自 source-map 产物）。
+     */
+    private void handleJSReport(String pld) { handleJSReport(pld, "main"); }
 
     private void handleJSReport(String pld, String origin) {
         try {
@@ -796,7 +800,8 @@ public class PluginThread implements Runnable, PluginEntity {
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
     }
 
-    private void handleJSError(QuickJSException e) { handleJSError(e, name); }
+    /** 主插件错误上报（origin = "main"，见 {@link #handleJSReport(String)}）。 */
+    private void handleJSError(QuickJSException e) { handleJSError(e, "main"); }
 
     private void handleJSError(QuickJSException e, String origin) {
         try {

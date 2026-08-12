@@ -58,7 +58,7 @@ public class ApprovalStore {
 
     /**
      * 为插件的本次拒绝生成一次性批准码（6 位 36 进制，去重）。
-     * 只通过控制台日志告知管理员——插件无法预知，杜绝 dispatchCommand 自动批准。
+     * 只通过控制台日志告知管理员--插件无法预知，杜绝 dispatchCommand 自动批准。
      */
     public synchronized String requestApprovalCode(String pluginName) {
         String code;

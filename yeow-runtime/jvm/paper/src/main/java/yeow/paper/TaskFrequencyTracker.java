@@ -1,4 +1,4 @@
-package yeow;
+package yeow.paper;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

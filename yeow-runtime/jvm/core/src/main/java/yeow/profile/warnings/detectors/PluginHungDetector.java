@@ -44,7 +44,7 @@ public final class PluginHungDetector implements WarningDetector {
         for (var plugin : w.pingedPlugins()) {
             if (w.jsPings().containsKey(plugin)) continue; // 本窗口有响应
             // 从未响应过（或从加载起就死循环）的插件：以第一个无响应窗口为基准，
-            // 而不是当前窗口——否则 silentMs 恒为 0，hung 永不触发。
+            // 而不是当前窗口--否则 silentMs 恒为 0，hung 永不触发。
             long last = lastResponsive.computeIfAbsent(plugin, p -> windowEndMs);
             long silentMs = windowEndMs - last;
             if (silentMs >= thresholdMs) {

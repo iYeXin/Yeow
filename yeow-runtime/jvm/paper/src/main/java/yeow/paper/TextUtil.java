@@ -14,7 +14,7 @@ public class TextUtil {
     private static final LegacyComponentSerializer LEGACY = LegacyComponentSerializer.legacySection();
     /** 真实控制字符的临时保护标记（私有区 PUA 双字符组合，正常文本不会出现）：
      * 序列化前把真实换行/tab 等替换为标记（legacy 序列化只转义控制字符、反斜杠原样），
-     * 序列化后还原——真实控制字符不消失，且字面反斜杠序列（如 `\\n` 转义出的 `\n`）
+     * 序列化后还原--真实控制字符不消失，且字面反斜杠序列（如 `\\n` 转义出的 `\n`）
      * 不会被序列化转义或误还原。 */
     private static final String NL_MARK = "\uE000\uE010";
     private static final String TAB_MARK = "\uE000\uE011";
@@ -26,7 +26,7 @@ public class TextUtil {
         if (t == null || t.isEmpty()) return Component.empty();
         try {
             var parsed = MM.deserialize(t);
-            // MiniMessage succeeded — but if the result is just literal text
+            // MiniMessage succeeded - but if the result is just literal text
             // and the input has §, the user probably intended legacy format
             if (t.indexOf('§') != -1 && parsed.equals(Component.text(t))) {
                 return LEGACY.deserialize(t);

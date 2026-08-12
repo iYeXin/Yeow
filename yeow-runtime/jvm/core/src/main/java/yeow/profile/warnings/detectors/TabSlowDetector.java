@@ -11,8 +11,8 @@ import java.util.List;
 
 /**
  * Tab 补全响应告警：
- * - {@code tab.slow}    — 窗口内补全响应超过 tab-slow-threshold-ms（默认 500ms）。
- * - {@code tab.timeout} — 补全等待超时（callback-timeout-tabcomplete-ms = 1s）。
+ * - {@code tab.slow}    - 窗口内补全响应超过 tab-slow-threshold-ms（默认 500ms）。
+ * - {@code tab.timeout} - 补全等待超时（callback-timeout-tabcomplete-ms = 1s）。
  */
 public final class TabSlowDetector implements WarningDetector {
     private final ProfileConfig cfg;

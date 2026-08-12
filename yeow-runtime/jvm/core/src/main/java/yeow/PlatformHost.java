@@ -35,12 +35,6 @@ public interface PlatformHost {
     void onGameThread(Runnable r);
 
     /**
-     * 执行一个游戏任务（平台任务分表）。对应协议层 task 通道；
-     * Paper 实现为 {@code yeow.task.Tasks.execute}。
-     */
-    Object executeTask(String taskType, JsonObject params) throws Exception;
-
-    /**
      * 清理插件的平台侧资源：命令注销、事件退订、GUI/BossBar 句柄释放。
      * 插件卸载、热重载、Worker 卸载时由引擎调用。
      */

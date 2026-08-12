@@ -3,13 +3,13 @@
 // 文档源：docs/ 是 Yeow-Docs/zh 的目录联接（junction / symlink，见 scripts/setup-docs.mjs）。
 // 零复制、始终同步；preserveSymlinks 保证模块路径保持在项目根内，裸导入（vue 等）可正常解析。
 // base：站点部署在 /v1/ 路径下（版本化文档，后续 v2 可并存）。
-const base = '/v1/'
+const base = '/yeow/v1/'
 
 export default defineConfig({
     lang: 'zh-CN',
     title: 'Yeow',
     description: '用 TypeScript 写 Minecraft Paper 插件 · QuickJS 引擎',
-    site: 'https://yeow.yeside.top',
+    site: 'https://docs.yexin.wiki/yeow/v1/',
     base,
     srcDir: 'docs',
     appearance: 'dark',

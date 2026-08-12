@@ -4,7 +4,7 @@ package yeow.profile.instrumentation;
  * 插桩接口（Profile 的唯一耦合面）。
  *
  * 运行时组件（Scheduler / EventBridge / CommandTasks / PluginThread）只依赖本接口，
- * 不依赖任何 profile 实现。插桩点共 5 个，每个均为薄调用——不做聚合、不做告警。
+ * 不依赖任何 profile 实现。插桩点共 5 个，每个均为薄调用--不做聚合、不做告警。
  *
  * 关闭相关采集时，组件持有 null 引用并在调用前判空，不构造样本对象。
  */

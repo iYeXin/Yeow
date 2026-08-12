@@ -123,7 +123,7 @@ public final class Profiler implements AutoCloseable {
         }
         List<WindowMetrics> windows = new ArrayList<>(ring);
         if (windows.size() < 5) {
-            out.accept("Not enough data yet (" + windows.size() + "/5 windows) — wait a few seconds and try again.");
+            out.accept("Not enough data yet (" + windows.size() + "/5 windows) - wait a few seconds and try again.");
             return true;
         }
         var snap = ProfileSnapshot.build(windows, cfg.eventSlowMs(), cfg.tabSlowMs(), plugins);

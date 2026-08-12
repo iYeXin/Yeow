@@ -45,7 +45,7 @@ public class CommandBridge {
         var cmdName = p.get("commandName").getAsString();
         var cbId = p.has("callbackId") ? p.get("callbackId").getAsString() : null;
         var compCbId = p.has("completerCbId") ? p.get("completerCbId").getAsString() : null;
-        // permission：对象 { node, default }（default 默认 op）——字符串包装在 JS 侧完成，Java 不做兼容
+        // permission：对象 { node, default }（default 默认 op）--字符串包装在 JS 侧完成，Java 不做兼容
         final String perm;
         final String permDefault;
         if (p.has("permission") && !p.get("permission").isJsonNull()) {
@@ -63,7 +63,7 @@ public class CommandBridge {
         var cmd = new BukkitCommand(cmdName) {
             public boolean execute(CommandSender s, String l, String[] a) {
                 // Yeow 生态权限检查：permissionCheck 事件结果优先，无处理时回退 Bukkit hasPermission。
-                // 命令不设 Bukkit setPermission（不拦截）——执行时检查，保证 permissionCheck 可拦截。
+                // 命令不设 Bukkit setPermission（不拦截）--执行时检查，保证 permissionCheck 可拦截。
                 if (perm != null && !perm.isEmpty()) {
                     String target = s instanceof Player pl ? pl.getUniqueId().toString() : "CONSOLE";
                     var r = runtime.getEventBridge().checkPermission(target, perm);
@@ -90,11 +90,11 @@ public class CommandBridge {
                 long timeout = timeoutMs;
                 var deadline = System.nanoTime() + timeout * 1_000_000;
                 while (System.nanoTime() < deadline && !pend.isDone()) {
-                    // 与事件派发同款无预算排空：等待期间消费调度器队列，保证
+                    // 与事件派发同款 pump：等待期间执行主线程队列任务，保证
                     // command.tabComplete 完成任务能在补全超时前执行。
                     if (Bukkit.isPrimaryThread()) {
                         var rt = YeowRuntime.inst();
-                        if (rt != null) rt.getScheduler().drainAll();
+                        if (rt != null) rt.getScheduler().drainDuringWait();
                     }
                     Thread.onSpinWait();
                 }
@@ -113,7 +113,7 @@ public class CommandBridge {
         cmd.setUsage("/" + cmdName);
         if (p.has("aliases")) { var as = new ArrayList<String>(); for(var e:p.getAsJsonArray("aliases")) as.add(e.getAsString()); cmd.setAliases(as); }
         // 权限节点注册进 Bukkit 权限系统（传统 Java 插件/权限插件可管理）；
-        // 命令本身不设 setPermission——执行时的权限检查在 executor 内（permissionCheck 优先）。
+        // 命令本身不设 setPermission--执行时的权限检查在 executor 内（permissionCheck 优先）。
         if (perm != null && !perm.isEmpty()) {
             try {
                 runtime.getPermissionRegistry().register(perm, permDefault);

@@ -181,16 +181,16 @@ public class ServiceManager {
                         + " (declared " + expected + ", actual " + actual + ")");
                     cleanDir(svcDir);
                     return gson.toJson(Map.of("err", "Native service hash mismatch for " + packagedPath
-                        + " — refused to load (plugin '" + pluginName + "' declares a different SHA-256;"
+                        + " - refused to load (plugin '" + pluginName + "' declares a different SHA-256;"
                         + " the executable may have been tampered with)"));
                 }
                 LOG.info("Native service " + id + ": SHA-256 verified (" + packagedPath + ")");
             } else if (packagedPath == null) {
                 LOG.warning("Native service " + id + " (" + pluginName + "): directory-mode native services"
-                    + " do not support trust declarations yet — treat as untrusted.");
+                    + " do not support trust declarations yet - treat as untrusted.");
             } else {
                 LOG.warning("Native service " + id + " (" + pluginName + "): no trusted SHA-256 declaration for "
-                    + packagedPath + " — treat as untrusted. Declare 'native' in yeow.config.json to pin hashes.");
+                    + packagedPath + " - treat as untrusted. Declare 'native' in yeow.config.json to pin hashes.");
             }
 
             execFile.toFile().setExecutable(true);
@@ -477,7 +477,7 @@ public class ServiceManager {
 
     /**
      * Java 插件订阅服务事件（回调直接接收事件载荷 {@code {serviceId, eventPath, body}}）。
-     * 返回 {@link AutoCloseable}——{@code close()} 取消订阅。
+     * 返回 {@link AutoCloseable}--{@code close()} 取消订阅。
      */
     public AutoCloseable subscribeJava(String serviceId, String eventPath, java.util.function.Consumer<Object> callback) {
         subscriptions.computeIfAbsent(serviceId, k -> ConcurrentHashMap.newKeySet())
@@ -576,7 +576,7 @@ public class ServiceManager {
                         var reqId = msg.get("requestId").getAsString();
                         var body = msg.get("body");
                         // Find which consumer plugin sent this request
-                        // The requestId encodes the consumer — we need to look it up
+                        // The requestId encodes the consumer - we need to look it up
                         var pr = findConsumerForRequest(reqId);
                         if (pr != null) respond(reqId, pr.consumerPlugin(), body != null ? gson.fromJson(body.toString(), Object.class) : null);
                     } else if ("publish".equals(type)) {
@@ -586,7 +586,7 @@ public class ServiceManager {
                     }
                 } catch (Exception ignored) {}
             }
-            // Connection closed — mark service disconnected and fail pending requests.
+            // Connection closed - mark service disconnected and fail pending requests.
             markDisconnected(entry, socket);
         } catch (Exception e) {
             LOG.warning("Native socket: " + e.getMessage());
@@ -674,7 +674,7 @@ public class ServiceManager {
         final Type type;
         final String ownerPlugin;
         final String onRequestCb; // PLUGIN only
-        volatile String terminateCb; // NATIVE only — onTerminate hook
+        volatile String terminateCb; // NATIVE only - onTerminate hook
         final java.util.concurrent.atomic.AtomicBoolean terminated = new java.util.concurrent.atomic.AtomicBoolean(false);
         Process nativeProc;
         Socket nativeSocket;

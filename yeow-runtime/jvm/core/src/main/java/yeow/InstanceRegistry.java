@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * JS 句柄实例注册表（id → 释放器）。
  *
- * 实例 id 是**不透明句柄**——不带任何业务信息（不约定前缀/格式）；
+ * 实例 id 是**不透明句柄**--不带任何业务信息（不约定前缀/格式）；
  * 释放语义由注册方（平台）以闭包提供。JS 侧 GC 回收句柄后经
  * lifecycle gc-collect 通道回传原始 id，运行时查表释放。
  */
