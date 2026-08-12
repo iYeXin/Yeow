@@ -92,6 +92,10 @@ public class FoliaScheduler implements TaskScheduler {
     private final TaskFrequencyTracker freqTracker;
     /** 热点迁移阈值（连续非本区域任务数，folia.migration-threshold，默认 2）。 */
     private final int migrationThreshold;
+    /** 预算尽 pending 重启标记（cycle 保持占位；每 tick 定时任务在下一个 tick 边界重启）。 */
+    private volatile boolean pendingRestart = false;
+    /** 每 tick 重启定时任务句柄（start 注册，shutdown 取消）。 */
+    private volatile io.papermc.paper.threadedregions.scheduler.ScheduledTask restartTickTask;
 
     private volatile ProfileSink sink;
     private long lastLowQueueWarnMs;
@@ -119,11 +123,27 @@ public class FoliaScheduler implements TaskScheduler {
 
     @Override public void start() {
         running = true;
-        // 无独立线程：首个任务提交时经 wake 启动调度循环
+        // 每 tick 定时任务（全局 region）：预算尽 pending 的 cycle 在**下一个 tick 边界**重启——
+        // 等待 ≈ 窗口剩余时间（预算 20ms 用尽后典型 ~30ms），优于 runDelayed 的"从调度时刻起整 tick"。
+        // 无独立线程原则不变（借用 Folia 调度器任务，非自建线程）。
+        // **重叠安全性（不变量链）**：pendingRestart 仅在 finishCycle（cycle 循环 finally）置位，
+        // 而循环绝不在任务执行中途退出——长任务（如 50ms）期间 pendingRestart 恒 false，定时任务必然
+        // no-op；重启经 runCycleOn 投递到下一个 task phase，旧 cycle 线程早已回到区域 tick 循环。
+        restartTickTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(runtime, t -> {
+            if (pendingRestart && running) {
+                pendingRestart = false;
+                runCycleOn(schedRegion);
+            }
+        }, 1, 1);
     }
 
     @Override public void shutdown() {
         running = false;
+        pendingRestart = false;
+        if (restartTickTask != null) {
+            try { restartTickTask.cancel(); } catch (Exception ignored) {}
+            restartTickTask = null;
+        }
         synchronized (cycleLock) {
             cycleRunning = false;
             schedRegion = null;
@@ -183,58 +203,54 @@ public class FoliaScheduler implements TaskScheduler {
             cycleRunning = true;
             toRun = schedRegion; // null → 全局瞬态（仅剩全局任务时）
         }
-        runCycleOn(toRun, 0);
+        runCycleOn(toRun);
     }
 
     /**
-     * 投递调度循环到驻留区域线程（代表对象解析在全局 region 线程进行；
-     * 解析失败/无驻留 → 全局瞬态）。delayMs>0 为预算尽后的 delayed 重试。
-     * **注意：Folia 的 runDelayed 参数是 tick 数（1 tick = 50ms），必须毫秒转 tick**——
-     * 直接把 delayMs 当 tick 传入会把 30ms 变成 30 ticks = 1.5s 停顿（实测故障）。
-     * 解析失败时**清掉过期驻留权**（实体已下线/世界已卸载）——否则每次 cycle 启动
-     * 都白付一次失败解析 + 全局瞬态，且新热点无法抢占（wake 只在 schedRegion==null 时抢占）。
+     * 投递调度循环到驻留区域线程。
+     * - world 目标：解析（注册表查询）与投递（region 调度器）均线程安全，**直接在当前线程
+     *   完成，无需全局线程中转**（省一跳）；实体引用解析受 AsyncCatcher 约束，才需全局线程
+     * - 解析失败：清掉过期驻留权（实体已下线/世界已卸载）——否则每次 cycle 启动
+     *   都白付一次失败解析 + 全局瞬态，且新热点无法抢占（wake 只在 schedRegion==null 时抢占）
+     * - null/GLOBAL → 全局瞬态（驻留标记无主或全局目标）
      */
-    private void runCycleOn(String region, long delayMs) {
-        Runnable global = () -> {
-            if (delayMs > 0) Bukkit.getGlobalRegionScheduler().runDelayed(runtime, t -> dispatchCycle(), msToTicks(delayMs));
-            else Bukkit.getGlobalRegionScheduler().run(runtime, t -> dispatchCycle());
-        };
+    private void runCycleOn(String region) {
+        Runnable global = () -> Bukkit.getGlobalRegionScheduler().run(runtime, t -> dispatchCycle());
         if (TargetKey.isGlobal(region)) { global.run(); return; }
-        Bukkit.getGlobalRegionScheduler().run(runtime, t -> {
+        if (region.startsWith(TargetKey.WORLD_PREFIX)) {
+            // world 目标：免全局跳（getWorld 是注册表查询；region 调度器投递任意线程可调）
             try {
-                if (region.startsWith(TargetKey.UUID_PREFIX)) {
-                    var entity = TargetKey.resolveEntity(region);
-                    if (entity != null) {
-                        if (delayMs > 0) {
-                            entity.getScheduler().runDelayed(runtime, t2 -> dispatchCycle(),
-                                () -> { /* retired：回退全局瞬态 */ global.run(); }, msToTicks(delayMs));
-                        } else {
-                            entity.getScheduler().run(runtime, t2 -> dispatchCycle(),
-                                () -> global.run());
-                        }
-                        return;
-                    }
-                } else if (region.startsWith(TargetKey.WORLD_PREFIX)) {
-                    var w = TargetKey.resolveWorld(region);
-                    if (w != null) {
-                        var c = TargetKey.chunkCoords(region);
-                        if (delayMs > 0) Bukkit.getRegionScheduler().runDelayed(runtime, w, c[0], c[1], t2 -> dispatchCycle(), msToTicks(delayMs));
-                        else Bukkit.getRegionScheduler().run(runtime, w, c[0], c[1], t2 -> dispatchCycle());
-                        return;
-                    }
+                var w = TargetKey.resolveWorld(region);
+                if (w != null) {
+                    var c = TargetKey.chunkCoords(region);
+                    Bukkit.getRegionScheduler().run(runtime, w, c[0], c[1], t -> dispatchCycle());
+                    return;
                 }
             } catch (Exception ignored) {}
-            // 解析失败：实体/世界已不存在——清除过期驻留权（仅当未被并发抢占时才清）
-            synchronized (cycleLock) {
-                if (region.equals(schedRegion)) schedRegion = null;
-            }
+            clearStaleResidency(region);
+            global.run();
+            return;
+        }
+        // uuid 目标：实体引用只能在 owned/全局 region 线程解析（AsyncCatcher 约束）
+        Bukkit.getGlobalRegionScheduler().run(runtime, t -> {
+            try {
+                var entity = TargetKey.resolveEntity(region);
+                if (entity != null) {
+                    entity.getScheduler().run(runtime, t2 -> dispatchCycle(),
+                        () -> { /* retired：回退全局瞬态 */ global.run(); });
+                    return;
+                }
+            } catch (Exception ignored) {}
+            clearStaleResidency(region);
             global.run();
         });
     }
 
-    /** 毫秒 → tick（Folia runDelayed 单位为 tick；1 tick = 50ms，向上取整至少 1）。 */
-    private static long msToTicks(long ms) {
-        return Math.max(1, (ms + 49) / 50);
+    /** 解析失败：实体/世界已不存在——清除过期驻留权（仅当未被并发抢占时才清）。 */
+    private void clearStaleResidency(String region) {
+        synchronized (cycleLock) {
+            if (region.equals(schedRegion)) schedRegion = null;
+        }
     }
 
     /**
@@ -295,14 +311,13 @@ public class FoliaScheduler implements TaskScheduler {
 
     /**
      * 循环退出收尾（cycleLock 内）：释放驻留权（等 wake 恢复），或预算尽时保持占位
-     * 并 delayed 重启（窗口滚动后，避免 submit 争抢导致双 cycle）。
+     * 并 **pending 重启**——每 tick 定时任务在下一个 tick 边界重启（等待 ≈ 窗口剩余
+     * 时间，典型 ~30ms；周期任务与 tick 对齐，无需 runDelayed 的整 tick 等待）。
      * 竞态兜底：空闲退出窗口内新任务入队且预算未耗尽 → **立即重启**，防止丢失唤醒
      * （否则任务滞留直到 10s 同步超时）。
      */
     private void finishCycle() {
-        boolean delayed = false;
         boolean immediateRestart = false;
-        long delay = 0;
         synchronized (cycleLock) {
             if (!running || eventModeCount.get() > 0 || inflight.get() >= maxInflight || queueEmpty()) {
                 // 事件模式 / in-flight 满（等 complete 唤醒）/ 队列空（等 submit 唤醒）
@@ -311,20 +326,18 @@ public class FoliaScheduler implements TaskScheduler {
                 return;
             }
             // 到这里：队列非空且预算未耗尽（空闲退出窗口内新任务入队）→ 立即重启；
-            // 或预算尽 → delayed 重启（窗口滚动后，保持占位防双 cycle）。
+            // 或预算尽 → pending 重启（保持 cycleRunning=true 占位，阻止他人争抢避免双 cycle）。
             long now = System.nanoTime();
             if (now - windowStart >= BUDGET_WINDOW_NS) windowStart = now;
             if (now - windowStart >= budgetNs) {
-                delayed = true; // 保持 cycleRunning=true，窗口滚动后重启（阻止他人争抢，避免双 cycle）
-                delay = Math.max(1, BUDGET_WINDOW_NS / 1_000_000L - (now - windowStart) / 1_000_000L);
+                pendingRestart = true;
+                if (DBG) LOG.info("[sched] cycle exit: budget exhausted, pending restart region=" + schedRegion);
             } else {
                 immediateRestart = true; // 保持 cycleRunning=true，立即重启（见类注释竞态）
+                if (DBG) LOG.info("[sched] cycle exit: immediate restart region=" + schedRegion);
             }
-            if (DBG) LOG.info("[sched] cycle exit: delayed=" + delayed + " immediate=" + immediateRestart
-                + " region=" + schedRegion);
         }
-        if (delayed) runCycleOn(schedRegion, delay);
-        else if (immediateRestart) runCycleOn(schedRegion, 0);
+        if (immediateRestart) runCycleOn(schedRegion);
     }
 
     /**
@@ -373,7 +386,10 @@ public class FoliaScheduler implements TaskScheduler {
         // B 路径抢占尤为重要：纯外来流量下让出后若无抢占，cycle 无法恢复驻留，
         // 预算尽重启会退化为全局瞬态（全投递）直到出现空闲间隙。
         claimResidency(dt.marker());
-        if (FoliaTasks.ownedHere(taskType, params)) {
+        // 就地执行条件：目标在当前线程（ownedHere）或 GLOBAL 任务在全局线程
+        // （全局瞬态下 cycle 跑在全局线程，GLOBAL 任务免二次投递的双跳）
+        if (FoliaTasks.ownedHere(taskType, params)
+                || (TargetKey.isGlobal(dt.marker()) && Bukkit.isGlobalTickThread())) {
             var execStart = System.nanoTime();
             var result = executeOrErr(taskType, params);
             if (DBG) {
@@ -501,11 +517,12 @@ public class FoliaScheduler implements TaskScheduler {
     }
 
     /**
-     * 事件/补全线程自旋期间调用：取本事件订阅插件的任务（JS 单线程支点——事件期间该插件
-     * 任务只可能来自 handler），**并顺带取当前线程所属区域的其他插件任务**——修复事件期间
-     * 其他插件同步调用被冻结的问题（Paper 的 drainDuringWait 排空全部任务，此处对齐其语义）。
-     * 非阻塞执行（就地/投递，ownedHere 保证线程安全）；每轮有执行上限，防止其他插件积压
-     * 拖住事件响应（事件完成由 SpinPump 的 latch 检查，两轮 drain 之间及时退出）。
+     * 事件/补全线程自旋期间调用：**纯 L 方案——只取本事件订阅插件的任务**（插件名过滤，
+     * 无 ownedHere 解析，扫描为 O(n) 纯字符串比较）。设计依据：事件与（区域, 插件集）
+     * 一一对应，多个事件并发时按插件天然分流、互不争抢，且加快事件处理速度。
+     * 其他插件的任务在事件期间等待（cycle 暂停）——冻结延迟有界（≤事件超时 5s），
+     * 属可接受妥协；唯一死锁场景（事件手动模式 + await 其他插件涉及游戏操作的服务）
+     * 是绝对反模式，由 5s 超时兜底。每轮有执行上限，防止事件自身积压拖慢响应。
      */
     public void drainForPlugins(java.util.Set<String> pluginNames) {
         int budget = SPIN_DRAIN_BUDGET;
@@ -516,11 +533,7 @@ public class FoliaScheduler implements TaskScheduler {
         }
     }
 
-    /**
-     * 事件自旋取任务（与通用 pollAny 互斥：queueLock）：
-     * ① 事件插件任务（任意目标）；② 其他插件中**目标属于当前线程区域**的任务（就地执行安全）。
-     * 非本区域的非事件任务留给通用调度器（cycle 在事件期间暂停，事件结束即恢复）。
-     */
+    /** 事件自旋取任务（纯 L：只取事件插件任务，任意目标；与通用 pollAny 互斥：queueLock）。 */
     private PendingTask pollForSpin(java.util.Set<String> pluginNames) {
         synchronized (queueLock) {
             for (var pool : java.util.List.of(highPool, normalPool, lowPool)) {
@@ -528,10 +541,6 @@ public class FoliaScheduler implements TaskScheduler {
                 while (it.hasNext()) {
                     var t = it.next();
                     if (pluginNames.contains(t.pluginName())) {
-                        it.remove();
-                        return t;
-                    }
-                    if (FoliaTasks.ownedHere(t.taskType(), t.params())) {
                         it.remove();
                         return t;
                     }
