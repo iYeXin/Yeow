@@ -42,7 +42,7 @@ npm run build
 2. 上传 **`.jar`** 作为兼容文件
 3. 标记 `Folia Support`
 4. 在项目描述中注明前置要求：**需要安装 Yeow 插件作为前置**（https://modrinth.com/plugin/yeow）
-5. 建议同时上传 `yeow.config.json` 或 README 中说明插件声明的[权限](getting-started.md#权限声明)，便于用户评估
+5. 建议同时上传 `yeow.config.json` 或 README 中说明插件声明的[权限](permissions.md)，便于用户评估
 
 用户根据自身服务器情况二选一：装了 Yeow 运行时 → 用 `.yeow.zip`；纯兼容场景 → 用 `.jar`。
 
@@ -80,6 +80,6 @@ npm run build
 
 - [ ] `npm run build` 生成 `.jar` 与 `.yeow.zip`，两者均上传
 - [ ] 项目描述注明前置：Yeow 插件（https://modrinth.com/plugin/yeow）
-- [ ] 说明插件声明的[权限节点](getting-started.md#权限声明)（`fs:server.*` / `fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 等）
+- [ ] 说明插件声明的[权限节点](permissions.md)（`fs:server.*` / `fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 等）
 - [ ] 提供 `/yeow install <直链>` 一键安装示例
 - [ ] 说明数据目录位置（`plugins/<name>/`）与备份机制（`plugins/Yeow/.backup/`）

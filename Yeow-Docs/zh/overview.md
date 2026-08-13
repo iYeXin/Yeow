@@ -17,19 +17,22 @@ Yeow 是一个面向 Minecraft 服务端的插件开发框架（**Paper 与 [Fol
 | **初学者**       | 了解 Yeow 能做什么、上手第一个插件 | [快速开始](getting-started.md) 从零创建项目并部署；[构建与分发](distribution.md) 了解两种产物格式                                               |
 | **插件开发者**   | 日常写插件、查 API                 | [快速开始](getting-started.md) 掌握生命周期与异步/同步约定；[API 参考](api/README.md) 按模块查文档                                              |
 | **进阶学习者**   | 理解底层机制、排查性能问题         | [进阶知识](advanced.md) 架构、线程模型、三级调度器；[运行时警告](runtime-warning.md) 告警类型与解决方案                                         |
-| **依赖包开发者** | 封装可复用的 npm 包                | [编写依赖包](package-author.md) 资源封装、三类 Service 包（SDK / JS 服务 / 原生服务）与权限声明                                                 |
-| **插件使用者**   | 服务器管理员：安装与管理插件       | [构建与分发](distribution.md) 部署方式与一键安装；[快速开始 - 插件管理命令](getting-started.md#插件管理命令)（`/yeow load/install/update/...`） |
+| **依赖包开发者** | 封装可复用的 npm 包                | [编写依赖包](package-author.md) 包结构与资源封装；[封装 Service 的依赖包](package-service.md) 三类 Service 模式                               |
+| **插件使用者**   | 服务器管理员：安装与管理插件       | [运行时运维](operations.md) `/yeow` 管理命令与配置；[构建与分发](distribution.md) 部署方式与一键安装                                          |
 | **平台实现者**   | 实现 Yeow 兼容运行时               | [平台规范](specifications/README.md) 包结构、消息协议、任务/事件/运行时环境标准                                                                 |
 | **适配器开发者** | 让其他语言/引擎接入 Yeow           | [适配器规范](specifications/adapter/index.md) `PluginEntity` 接口、注册 API 与消息契约                                                          |
 
 ## 文档地图
 
 ```
-快速开始      getting-started.md     创建 → 开发 → 构建 → 部署（生命周期、权限声明、/yeow 命令）
+快速开始      getting-started.md     创建 → 开发 → 构建 → 部署（第一个插件、异步优先）
+权限与安全    permissions.md          敏感权限声明、原生服务可信性与批准
+运行时运维    operations.md           /yeow 管理命令、运行时配置（config.yml）
 API 参考      api/README.md           按模块分组的完整索引（Player / World / Event / Service …）
 进阶知识      advanced.md             架构、线程模型、调度器、热重载、安全
 构建与分发    distribution.md         .jar 与 .yeow.zip 两种格式、一键安装
-编写依赖包    package-author.md       资源与 Service 封装、权限声明
+编写依赖包    package-author.md       包结构、资源封装、构建自动处理
+封装 Service  package-service.md      SDK / JS 服务 / 原生服务三种封装模式
 运行时警告    runtime-warning.md      告警类型、原因、解决方案
 路线图        todo.md                 开发调试工具 / Folia 支持 / Worker API（v1 规划）
 平台规范      specifications/          协议层（包结构、消息、任务、事件、运行时）

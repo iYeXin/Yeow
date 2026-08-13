@@ -40,8 +40,8 @@ inv.fill(item)                    // 用同一物品填充全部槽位
 inv.addItem(item)                 // 添加物品到空位 → Promise<number>（未放入数量；0=全部放入。
                                   //   玩家物品栏溢出部分掉落在地上，同样返回 0）
 inv.addItemSync(item)
-inv.removeItem(item)              // 移除指定物品（按类型 + meta 匹配，amount 默认 1）
-inv.removeItemSync(item)
+inv.removeItem(item)              // 移除指定物品 → Promise<number>（未移除数量；0 = 全部移除成功）
+inv.removeItemSync(item)          //   按类型 + meta 匹配，amount 默认 1
 inv.clear(slot?)                  // 清空（slot 可选，不传清空全部）
 inv.clearSync(slot?)
 inv.getSize()                     // Promise<number> — 容器槽位数

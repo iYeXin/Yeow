@@ -126,8 +126,8 @@ player.sendTabHeader(header, footer)    // Promise — Tab 列表 header/footer�
 player.sendTabHeaderSync(header, footer)
 player.setPlayerListName(name)          // Promise — Tab 列表显示名（null 恢复默认）
 player.setPlayerListNameSync(name)
-player.setBorder(size)                  // Promise — 客户端世界边界（null 重置为服务端边界）
-player.setBorderSync(size)
+player.setBorder(size, centerX?, centerZ?)  // Promise — 客户端世界边界（null 重置为服务端边界；centerX/centerZ 可选，指定边界中心）
+player.setBorderSync(size, centerX?, centerZ?)
 ```
 
 ### ActionBar 与资源包

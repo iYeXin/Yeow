@@ -183,25 +183,7 @@ try {
 
 ## 性能分析
 
-### 预警引擎（默认开启）
-
-运行时预警独立于全量分析，`profile.warnings-enabled: true` 时每秒聚合窗口级指标并输出告警（心跳/事件/补全/积压/饱和）。阈值见 [运行时警告](runtime-warning.md#配置)。
-
-### 全量分析（`/yeow profile` / `/yeow track`）
-
-逐任务级采集（每任务计时 + 插件/任务分解）默认关闭，避免采集开销。在 `plugins/Yeow/runtime/config.yml` 中开启：
-
-```yaml
-profile:
-  enabled: true
-```
-
-然后：
-
-- `/yeow profile` — 性能快照：健康评分 + 实时（HIGH/NORMAL）与批量（LOW）队列指标 + 各插件/任务分解，同时保存详细报告到 `plugins/Yeow/yeow-profile-*.txt`
-- `/yeow track <plugin> <seconds>` — 单插件深度追踪（任务/事件/补全/心跳明细），报告保存到 `plugins/Yeow/yeow-track-*.txt`
-
-> 语义提示：HIGH/NORMAL 是实时队列（不应积压）；LOW 是批量队列（允许积压与延迟）。报告与告警均按此口径分析。
+运行时健康检测（预警引擎）与全量性能分析（`/yeow profile` / `/yeow track`）的完整说明见 [运行时警告指南](runtime-warning.md)。
 
 ## 权限计算
 
@@ -209,7 +191,7 @@ profile:
 npm run permissions
 ```
 
-只读计算（会回写 `yeow.config.json` 的 `computedPermissions` 字段）：合并主项目与全部依赖包声明的 `permissions`（去重 + 通配归一化），打印**最终权限**与**来源分布**（每个权限来自哪个包），用于排查权限缺失与冗余。详见 [权限声明](getting-started.md#权限声明)。
+只读计算（会回写 `yeow.config.json` 的 `computedPermissions` 字段）：合并主项目与全部依赖包声明的 `permissions`（去重 + 通配归一化），打印**最终权限**与**来源分布**（每个权限来自哪个包），用于排查权限缺失与冗余。完整参考见 [权限与原生服务可信性](permissions.md)。
 
 ## 构建
 

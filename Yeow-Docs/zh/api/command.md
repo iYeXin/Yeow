@@ -12,7 +12,7 @@ import { registerCommand } from 'yeow-api';
 | `description` | `string`                                         | 描述       |
 | `permission`  | `string \| Permission \| { node, default? }` | 权限节点（字符串兼容 / 权限节点对象 / `registerPermission` 返回值）；注册进 Paper 系权限系统供管理；**执行时检查**——`permissionCheck` 事件优先，无处理时回退 `hasPermission` |
 | `aliases`     | `string[]`                                       | 别名       |
-| `completer`   | `(sender, args) => string[]` / `ManualCompleter` | Tab 补全器 |
+| `completer`   | `(sender, args) => string[] \| Promise<string[]>` / `ManualCompleter` | Tab 补全器（自动模式支持同步数组或 Promise，异步结果会被等待） |
 
 ```js
 // 声明权限节点 + 普通玩家默认可执行（服主可用权限插件撤销）
@@ -55,11 +55,11 @@ registerCommand('hello', {
     completer: (sender, args) => ['opt1', 'opt2'],
 });
 
-// 自动模式 + async — 立即返回空补全，不等待 async 结果
+// 自动模式 + async — 等待 Promise 结果后再回传（2026-08-13 起支持）
 registerCommand('hello', {
     executor: (p) => p.sender.sendMessage('Hi!'),
     completer: async (sender, args) => {
-        return await fetchOptions();  // 返回空补全，不等待
+        return await fetchOptions();  // 异步结果会被等待并回传
     },
 });
 

@@ -23,6 +23,6 @@ payload 以 `tasks` 数组替代单个 `{type, params}`，一次提交多个任�
 | `tasks` | 任务数组：`[{ "type": "<taskType>", "params": {...}, "priority": "high"\|"normal"\|"low"? }]` |
 | `cb` | 可选。有 → 异步（全部完成后 `r` 为结果数组）；无 → 同步阻塞返回结果数组 JSON |
 
-- 单个任务失败不中断批处理——对应结果项为错误对象 `{"err": ...}`
+- 单个任务失败不中断批处理——对应结果项为错误对象 `{"err": "<msg>", "type": "<异常类>", "task": "<taskType>"}`（与单任务错误同形状，`type`/`task` 尽力填充；入口解析失败时可能只有 `err`）
 - `_plugin` 归属由运行时为每个任务自动注入（对齐单任务）
 - JS 侧封装：`callBatch(tasks)`（同步，返回结果数组）/ `postBatch(tasks)`（异步，Promise 结果数组）

@@ -28,11 +28,11 @@ export default defineConfig({
     themeConfig: {
         logo: '/favicon.svg',
         nav: [
-            { text: '指南', link: '/overview', activeMatch: '/overview|/getting-started|/ai-agent|/cli|/runtime-warning' },
+            { text: '指南', link: '/overview', activeMatch: '/overview|/getting-started|/ai-agent|/cli|/runtime-warning|/permissions|/operations' },
             { text: 'API', link: '/api/', activeMatch: '/api/' },
             { text: '进阶', link: '/advanced', activeMatch: '/advanced' },
             { text: '分发', link: '/distribution', activeMatch: '/distribution' },
-            { text: '包开发', link: '/package-author', activeMatch: '/package-author' },
+            { text: '包开发', link: '/package-author', activeMatch: '/package-author|/package-service' },
             { text: '规范', link: '/specifications/', activeMatch: '/specifications/' },
             { text: '路线图', link: '/todo', activeMatch: '/todo' },
             { text: 'GitHub', link: 'https://github.com/iyexin/yeow' },
@@ -47,6 +47,8 @@ export default defineConfig({
                     { text: 'AI 启动指南', link: '/ai-agent' },
                     { text: 'CLI 参考', link: '/cli' },
                     { text: '构建与分发', link: '/distribution' },
+                    { text: '权限与原生服务可信性', link: '/permissions' },
+                    { text: '运行时运维', link: '/operations' },
                     { text: '运行时警告', link: '/runtime-warning' },
                     { text: '更新日志', link: '/changelog' },
                     { text: '路线图', link: '/todo' },
@@ -168,6 +170,7 @@ export default defineConfig({
                 text: '依赖包开发',
                 items: [
                     { text: '编写依赖包', link: '/package-author' },
+                    { text: '封装 Service 的依赖包', link: '/package-service' },
                 ],
             },
             {

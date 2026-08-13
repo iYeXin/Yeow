@@ -24,7 +24,7 @@ fs.server.readFileSync('eula.txt');      // fs:server.readFile：服务器根/eu
 fs.outer.readFileSync('/etc/hosts');     // fs:outer.readFile：任意路径
 ```
 
-> **权限**：plugin 段节点（`fs.*`）默认允许。`fs.server.*` / `fs.outer.*` 默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明（构建后自动计算进 `computedPermissions`）：`"fs:server.*"`（整组）或节点级（如 `"fs:server.readFile"`）。`"fs:*"` 通配整个 fs 通道（含 server/outer）。未声明调用返回错误 `Permission denied: fs:server.<op>`（异步 API 以 Promise reject 呈现）。详见 [快速开始 - 权限声明](../getting-started.md#权限声明)。
+> **权限**：plugin 段节点（`fs.*`）默认允许。`fs.server.*` / `fs.outer.*` 默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明（构建后自动计算进 `computedPermissions`）：`"fs:server.*"`（整组）或节点级（如 `"fs:server.readFile"`）。`"fs:*"` 通配整个 fs 通道（含 server/outer）。未声明调用返回错误 `Permission denied: fs:server.<op>`（异步 API 以 Promise reject 呈现）。详见 [权限与原生服务可信性](../permissions.md)。
 
 ## fs.readFile(path) / fs.readFileSync(path)
 

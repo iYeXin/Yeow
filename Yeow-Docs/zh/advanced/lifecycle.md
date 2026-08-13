@@ -94,9 +94,12 @@ dev-server → WebSocket hot-reload → Java 主线程
        ├─ 发送 RELOAD → JS 队列 → 等待 JS 线程自然退出
        │    ├─ _hm → onUnload 回调
        │    ├─ $send('lifecycle', {type:'unloadDone'})
-       │    └─ running = false → 消息循环退出 → 旧上下文销毁
+       │    └─ running = false → 消息循环退出 → 旧上下文销毁（JS 线程自毁）
        │
-       ├─ 超时未退出 → 强制终止（running=false + ctx.destroy）
+       ├─ 超时未退出 → 强杀路径（2026-08-13 起）
+       │    ├─ ctx.interrupt()（wrapper 3.9.0 原生中断）→ JS 线程在自身执行流中止后自毁上下文
+       │    ├─ 仍无法退出 → 重建全新实体（新线程/新队列/新上下文），旧实体被遗弃
+       │    └─ **绝不跨线程 destroy 上下文**（QuickJS 单线程模型，跨线程销毁 = 崩溃）
        │
        ├─ 清理旧 timer / io / http / 残留任务
        ├─ 清空消息队列
@@ -104,6 +107,8 @@ dev-server → WebSocket hot-reload → Java 主线程
 ```
 
 热重载在主线程上同步等待（最多 5s），期间不影响其他 Yeow 插件。
+
+> **强杀机制**：卡死在**纯 JS 死循环**的线程由 QuickJS 原生中断（`QuickJSContext.interrupt()`，wrapper 3.9.0+ 经 `JS_SetInterruptHandler`）在**其自身执行流**中止——线程随后正常退出并销毁自己的上下文；卡在无法返回 JS 的 Java 调用时，热重载会重建全新实体（旧实体被遗弃，线程为 daemon 不阻塞关服）。
 
 ### 生产环境 reload / unload
 

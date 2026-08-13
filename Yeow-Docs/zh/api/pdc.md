@@ -81,6 +81,8 @@ await pdcKeysBlock('world', 0, 64, 0);
 await pdcGetAllBlock('world', 0, 64, 0);
 ```
 
+> **持久化**：方块 PDC 写入会立即更新方块状态并持久化（`TileState.update()`），重启不丢失。**离线玩家**：读写离线玩家 PDC 自动回退离线存储（仅对玩过该服务器的玩家生效；旧版本服务端写入离线数据可能失败并返回 `false`）。
+
 ## Key 格式
 
 支持 `namespace:key` 格式（如 `myplugin:config`）；**纯字符串（无冒号）默认使用插件命名空间**——不同插件的裸 key（如 `score`）互不冲突：

@@ -57,6 +57,38 @@
 - 域名迁移：`docs.yexin.wiki` → `yexin.wiki`（含运行时告警框的 HELP_URL）
 - API / 规范文档全面同步（PDC / ItemStack / Inventory / 事件字段 / 任务规范）
 
+### 运行时修复：8 项审计确认 Bug（`477052b`）
+
+- **挂死插件强杀路径修复**：QuickJS 上下文**不再跨线程 destroy**（wrapper 的 `checkSameThread` 守卫使跨线程 destroy 恒为空操作、上下文从未释放；去掉守卫则 use-after-free）——改由 JS 线程自身销毁；热重载强杀后**重建全新实体**（新线程/新队列/新上下文），旧实体遗弃，杜绝"旧线程从共享队列偷消息"双线程并发；插件/Worker 的 JS 线程改 daemon（挂死不阻塞关服）
+- **BudgetScaler 动态扩容真正生效**：调度器此前始终读固定 `tick-budget-ms`，扩容（×1.3~×3）只计算未应用——`drainRound`/`mainTickPump` 改读扩容后预算
+- **同步任务超时"幽灵执行"修复**：超时后任务仍留在主线程队列稍后执行（调用方已报错、副作用仍发生）——Paper 超时按引用移除未执行任务；Folia 投递闭包返回取消动作（捕获 `ScheduledTask`），超时回收先 `cancel()` 再补 err
+- **block 级 PDC 写入不持久化修复**（Paper + Folia）：`TileState` 快照写 PDC 后不调 `update()` 不写回世界——补 `update()`
+- **assets.extractDir zip-slip 防护**：entry 相对路径含 `../` 不得逃逸目标目录；extract 路径补运行时目录写保护（`plugins/Yeow/runtime`）
+- **fs 读操作副作用修复**：`readFile`/`exists`/`list` 等不再静默创建父目录
+- **HTTP 未响应请求泄漏修复**：JS 侧 30s 不 `respond` 的连接自动 503 关闭（周期清扫）
+- **init.js 回调注册泄漏修复**：一次性回调改为调用前注销（handler 同步抛错不再泄漏注册项）
+- dev 模式 `assets.read` 路径逃逸防护；EventBridge/checkPermission 投递失败时 pend 注册表清理
+
+### quickjs-wrapper 3.9.0：`QuickJSContext.interrupt()`（原生中断）
+
+- **跨线程安全强制中止 JS 执行**：经 `JS_SetInterruptHandler` 在**执行线程自身**周期性检查中断标志，返回非 0 即中止当前 `evaluate`/`call`（一次性语义，自清标志）——让挂死死循环的插件线程"杀得掉"且上下文由其自身销毁（配合上方强杀路径修复）；四平台原生库经 CI 构建发布（主仓库 `v3.9.0`）
+
+### 任务执行器审计修复：30 项（`bb4ddcd`）
+
+- **Folia 与 Paper 行为对齐**（此前按家族复制实现时的契约漂移）：
+  - 缺失实体语义：`entity.get`/`player.get`/`player.isOnline` 返回 `null`/`false`（此前 Folia dispatch 层一律报错）
+  - 执行体实体解析回退玩家表（Folia `getEntity` 不含在线玩家）；`pdcHolder` 玩家回退——**Folia 玩家 PDC 全家族恢复**；`world.getBlock` 补 `x/y/z/world` 字段；`server.getMaterials` 改对象数组（此前与 getItems 相同）；`entity.teleport` 保留 yaw/pitch；`getCustomName` 空串；药水 `ambient` 默认 true + `icon` 参数；`getActivePotionEffects` 返回小写全字段结构；手持物品读回完整 meta；`world.spawnItem` 接受 item 对象；`server.getTps` 显式返回 null 字段（此前 Gson 丢弃成 `{}`）
+  - inventory `close`/`destroy` 查看者关闭改按玩家 region 调度（此前 GLOBAL 线程跨 region 违规）；BossBar/自定义 Inventory 接入 InstanceRegistry（JS GC 自动回收）；`advancement.*` 强制 GLOBAL 路由（全局注册表 AsyncCatcher 约束）
+- **Paper 侧**：`hasPermission` 兼容字符串与 `{node}` 对象（此前字符串形式报错）；`sendTitle` 走 MiniMessage 组件管道；`stopSound` 注册表解析 + 未知音效报错（此前静默 `stopAllSounds` 误停全部）；`setGamemode`/难度大小写不敏感；`removeItem` 返回未移除数量（此前恒 true）；setGameRule 按 JSON 类型显式转换；setBlock 未知材质明确报错；ItemStack 序列化往返补齐（color/potionEffects/skullOwner/attributeModifiers/hideTooltip/itemFlags 读回）
+- **yeow-api**：事件 `player` 字段适配补全（inventoryClick/advancementDone/toggleSneak/toggleFlight/resourcePackStatus 此前漏包成 Player 对象）；异步 completer 真正等待 Promise 结果（此前立即返回空补全）；`call()` 错误携带 type/task/Java 堆栈；`setBorder` 补 centerX/centerZ；`removeItem` 类型改 `number`
+- 批量任务错误对象形状统一（`{err, type, task}`）
+
+### 文档结构优化
+
+- **拆分**：`getting-started.md` 拆出 [权限与原生服务可信性](permissions.md)（安全主题）与 [运行时运维](operations.md)（`/yeow` 命令 + config.yml）；`package-author.md` 拆出 [封装 Service 的依赖包](package-service.md)（三种类型）
+- **瘦身去重**：`specifications/README.md` 的任务执行器/事件/命令细节改为链接（与 task/index.md、event/index.md 重复）；`cli.md` 性能分析节并入 runtime-warning.md
+- 入口更新：README/overview 文档地图、站点侧边栏、sitemap 同步三个新页面
+
 ## 2026-08-12
 
 ### Folia：调度器脚手架 + 运行时拆分收尾（`396e536`）

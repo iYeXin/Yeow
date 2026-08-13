@@ -1,4 +1,4 @@
-﻿# Yeow v0
+# Yeow v0
 
 **用 JavaScript / TypeScript 编写 Minecraft Paper 插件。QuickJS 引擎。**
 
@@ -65,8 +65,11 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 | ------------------------------------ | ---------------------------------------------- |
 | [快速开始](getting-started.md)       | 创建项目 → 开发 → 构建 → 部署                  |
 | [构建与分发](distribution.md)        | JAR / `.yeow.zip` 两种格式与一键安装           |
+| [权限与原生服务可信性](permissions.md) | 敏感权限声明、SHA-256 可信性、原生服务批准    |
+| [运行时运维](operations.md)          | `/yeow` 管理命令、运行时配置（config.yml）     |
 | [API 参考](api/README.md)            | 按模块分组的完整索引                           |
-| [编写依赖包](package-author.md)      | 封装资源与 Service（SDK / JS 服务 / 原生服务） |
+| [编写依赖包](package-author.md)      | 包结构、资源、构建自动处理                     |
+| [封装 Service 的依赖包](package-service.md) | SDK / JS 服务 / 原生服务三种封装模式     |
 | [进阶知识](advanced.md)              | 架构、线程模型、调度器                         |
 | [平台规范](specifications/README.md) | 协议层（其他运行时实现者参考）                 |
 

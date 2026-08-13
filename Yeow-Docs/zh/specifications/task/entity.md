@@ -107,10 +107,10 @@
 
 | 任务                            | 请求                                         | 返回                                             |
 | ------------------------------- | -------------------------------------------- | ------------------------------------------------ |
-| `entity.addPotionEffect`        | `{ "uuid": "<uuid>", ...PotionEffect 参数 }` | `true`                                           |
+| `entity.addPotionEffect`        | `{ "uuid": "<uuid>", ...PotionEffect 参数 }` | `true`。`type` 大小写不敏感；`ambient`/`particles`/`icon` 缺省 `true`（与输入结构一致）；未知 `type` 返回错误 |
 | `entity.removePotionEffect`     | `{ "uuid": "<uuid>", "type": "<potion>" }`   | `true`                                           |
 | `entity.clearPotionEffects`     | `{ "uuid": "<uuid>" }`                       | `true`                                           |
-| `entity.getActivePotionEffects` | `{ "uuid": "<uuid>" }`                       | `[PotionEffect, ...]` — 返回与输入相同结构的数组 |
+| `entity.getActivePotionEffects` | `{ "uuid": "<uuid>" }`                       | `[{ "type": "<小写>", "duration": <int>, "amplifier": <int>, "ambient": <bool>, "particles": <bool>, "icon": <bool> }]` — 与输入相同结构 |
 
 ---
 

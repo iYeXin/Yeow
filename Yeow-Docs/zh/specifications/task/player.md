@@ -87,13 +87,13 @@
 |------|------|------|------|
 | `player.sendMessage` | `{ "uuid": "<uuid>", "message": <Message> }` | `true` | 发送消息（`message` 为 [Message 对象](#message-对象可翻译组件) 或纯文本） |
 | `player.sendActionBar` | `{ "uuid": "<uuid>", "message": <Message> }` | `true` | 发送操作栏消息（同上） |
-| `player.sendTitle` | `{ "uuid": "<uuid>", "title": "<text>", "subtitle": "<text>", "fadeIn": <int>, "stay": <int>, "fadeOut": <int> }` | `true` | 发送标题/副标题。`fadeIn`/`stay`/`fadeOut` 单位为 tick（默认 10/70/20） |
+| `player.sendTitle` | `{ "uuid": "<uuid>", "title": "<text>", "subtitle": "<text>", "fadeIn": <int>, "stay": <int>, "fadeOut": <int> }` | `true` | 发送标题/副标题（MiniMessage）。`fadeIn`/`stay`/`fadeOut` 单位为 tick（默认 10/70/20）；`title`/`subtitle` 传 `null` 清空对应栏 |
 | `player.playSound` | `{ "uuid": "<uuid>", "sound": "<key>", "volume": <float>, "pitch": <float> }` | `true` | 播放音效（sound 为 Paper 系 Sound 枚举名，如 `block.note_block.pling`） |
-| `player.stopSound` | `{ "uuid": "<uuid>", "sound": "<key>" }` | `true` | 停止指定音效 |
+| `player.stopSound` | `{ "uuid": "<uuid>", "sound": "<key>" }` | `true` | 停止指定音效。`sound` 按注册表 key 解析（如 `minecraft:block.note_block.pling`），**未知音效返回错误**（不会误停所有音效） |
 | `player.stopAllSounds` | `{ "uuid": "<uuid>" }` | `true` | 停止所有音效 |
 | `player.kick` | `{ "uuid": "<uuid>", "reason": "<text>" }` | `true` | 踢出玩家 |
 | `player.giveExp` | `{ "uuid": "<uuid>", "amount": <int> }` | `true` | 给予经验值 |
-| `player.hasPermission` | `{ "uuid": "<uuid>", "permission": "<node>" }` | `boolean` | 检查权限 |
+| `player.hasPermission` | `{ "uuid": "<uuid>", "permission": "<node>" }` | `boolean` | 检查权限。`permission` 为节点字符串，也接受对象 `{ "node": "<node>" }`（与命令注册的权限对象格式一致）；经 `permissionCheck` 生态事件优先，无处理时回退 Bukkit |
 | `player.performCommand` | `{ "uuid": "<uuid>", "command": "<cmd>" }` | `boolean` | 以玩家身份执行命令（**不含 `/` 前缀**，如 `say hi`；与服务器 `command.dispatch`（控制台）相对） |
 
 ### Message 对象（可翻译组件）

@@ -5,7 +5,7 @@ import { request } from 'yeow-api';
 ```
 
 > [!WARNING]
-> **全局 `fetch` 依赖 `http:requestAsync` 权限**：`fetch` 底层走 http 通道的 `requestAsync`，未在 `yeow.config.json` 的 `permissions` 中声明 `"http:*"`（或 `"http:requestAsync"`）时，`fetch` 会以 `Permission denied: http:requestAsync` 拒绝。`request` 同理。详见 [快速开始 - 权限声明](../getting-started.md#权限声明)。
+> **全局 `fetch` 依赖 `http:requestAsync` 权限**：`fetch` 底层走 http 通道的 `requestAsync`，未在 `yeow.config.json` 的 `permissions` 中声明 `"http:*"`（或 `"http:requestAsync"`）时，`fetch` 会以 `Permission denied: http:requestAsync` 拒绝。`request` 同理。详见 [权限与原生服务可信性](../permissions.md)。
 
 ## request(url, options?)
 
