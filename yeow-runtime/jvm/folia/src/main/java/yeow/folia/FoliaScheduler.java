@@ -600,6 +600,10 @@ public class FoliaScheduler implements TaskScheduler {
     public void drainForPlugins(java.util.Set<String> pluginNames) {
         int budget = SPIN_DRAIN_BUDGET;
         while (budget-- > 0) {
+            // in-flight 上限对事件/补全模式同样生效（此前事件路径绕过 maxInflight——
+            // 事件风暴下跨 region 投递峰值失控）；满时停止取件，任务留给通用 cycle
+            // （事件结束 exitEventMode → wake 恢复），仅延迟、不丢任务。
+            if (inflight.get() >= maxInflight) break;
             var t = pollForSpin(pluginNames);
             if (t == null) break;
             processTask(t);
