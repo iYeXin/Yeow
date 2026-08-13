@@ -12,11 +12,11 @@ public class PlayerTasks {
     public static Object getAll() { return Bukkit.getOnlinePlayers().stream().map(x->Map.of("uuid",x.getUniqueId().toString(),"name",x.getName())).toList(); }
     public static Object getPing(JsonObject p) { return player(p).getPing(); }
     public static Object getGamemode(JsonObject p) { return player(p).getGameMode().name(); }
-    public static Object setGamemode(JsonObject p) { player(p).setGameMode(GameMode.valueOf(p.get("value").getAsString())); return true; }
+    public static Object setGamemode(JsonObject p) { player(p).setGameMode(GameMode.valueOf(p.get("value").getAsString().toUpperCase())); return true; }
     public static Object getHealth(JsonObject p) { return player(p).getHealth(); }
     public static Object setHealth(JsonObject p) { player(p).setHealth(p.get("value").getAsDouble()); return true; }
     public static Object sendMessage(JsonObject p) { player(p).sendMessage(TextUtil.parseMessage(p.get("message"))); return true; }
-    public static Object kick(JsonObject p) { player(p).kickPlayer(p.has("reason")?p.get("reason").getAsString():null); return true; }
+    public static Object kick(JsonObject p) { player(p).kickPlayer(p.has("reason") && !p.get("reason").isJsonNull() ? p.get("reason").getAsString() : null); return true; }
     public static Object getFood(JsonObject p) { return player(p).getFoodLevel(); }
     public static Object setFood(JsonObject p) { player(p).setFoodLevel(p.get("value").getAsInt()); return true; }
     public static Object getExp(JsonObject p) { return (double)player(p).getExp(); }
@@ -43,7 +43,14 @@ public class PlayerTasks {
     public static Object getTotalExperience(JsonObject p) { return player(p).getTotalExperience(); }
     public static Object sendTitle(JsonObject p) {
         var pl = player(p);
-        pl.sendTitle(p.has("title")?p.get("title").getAsString():"", p.has("subtitle")?p.get("subtitle").getAsString():"", p.has("fadeIn")?p.get("fadeIn").getAsInt():10, p.has("stay")?p.get("stay").getAsInt():70, p.has("fadeOut")?p.get("fadeOut").getAsInt():20);
+        // 组件管道（MiniMessage）：与 sendMessage 同体系，null 显式传值安全清空
+        pl.showTitle(net.kyori.adventure.title.Title.title(
+            p.has("title") && !p.get("title").isJsonNull() ? TextUtil.parse(p.get("title").getAsString()) : net.kyori.adventure.text.Component.empty(),
+            p.has("subtitle") && !p.get("subtitle").isJsonNull() ? TextUtil.parse(p.get("subtitle").getAsString()) : net.kyori.adventure.text.Component.empty(),
+            net.kyori.adventure.title.Title.Times.times(
+                java.time.Duration.ofMillis((p.has("fadeIn") ? p.get("fadeIn").getAsInt() : 10) * 50L),
+                java.time.Duration.ofMillis((p.has("stay") ? p.get("stay").getAsInt() : 70) * 50L),
+                java.time.Duration.ofMillis((p.has("fadeOut") ? p.get("fadeOut").getAsInt() : 20) * 50L))));
         return true;
     }
     public static Object playSound(JsonObject p) {
@@ -58,8 +65,9 @@ public class PlayerTasks {
     public static Object performCommand(JsonObject p) { return player(p).performCommand(p.get("command").getAsString()); }
     public static Object hasPermission(JsonObject p) {
         var pl = player(p);
-        // permission 参数为对象 { node }（字符串包装在 JS 侧完成，Java 不做兼容）
-        var node = p.getAsJsonObject("permission").get("node").getAsString();
+        // permission 参数兼容：字符串（协议文档格式）或对象 { node }
+        var perm = p.get("permission");
+        var node = perm != null && perm.isJsonObject() ? perm.getAsJsonObject().get("node").getAsString() : perm.getAsString();
         // Yeow 生态权限检查：permissionCheck 事件结果优先，无处理时回退 Bukkit
         var r = YeowRuntime.inst().getEventBridge().checkPermission(pl.getUniqueId().toString(), node);
         return r != null ? r : pl.hasPermission(node);
@@ -88,13 +96,13 @@ public class PlayerTasks {
         var pl = player(p);
         var item = pl.getInventory().getItemInMainHand();
         if (item.getType() == Material.AIR) return null;
-        return serializeItem(item);
+        return InventoryTasks.serializeItem(item);
     }
     public static Object getItemInOffHand(JsonObject p) {
         var pl = player(p);
         var item = pl.getInventory().getItemInOffHand();
         if (item.getType() == Material.AIR) return null;
-        return serializeItem(item);
+        return InventoryTasks.serializeItem(item);
     }
     // ── 手持设置 / Tab / 列表名 / 客户端边界（2026-08-13） ──
     public static Object setItemInMainHand(JsonObject p) {
@@ -133,27 +141,6 @@ public class PlayerTasks {
         } catch (Exception ignored) {}
         return true;
     }
-    private static Object serializeItem(org.bukkit.inventory.ItemStack item) {
-        var m = new LinkedHashMap<String, Object>();
-        m.put("type", item.getType().getKey().toString());
-        m.put("amount", item.getAmount());
-        if (item.hasItemMeta()) {
-            var meta = item.getItemMeta();
-            var metaMap = new LinkedHashMap<String, Object>();
-            if (meta.hasDisplayName()) metaMap.put("displayName", TextUtil.toLegacy(meta.displayName()));
-            if (meta.hasLore()) metaMap.put("lore", meta.lore().stream().map(TextUtil::toLegacy).toList());
-            if (meta.hasCustomModelData()) metaMap.put("customModelData", meta.getCustomModelData());
-            if (meta.isUnbreakable()) metaMap.put("unbreakable", true);
-            if (meta.hasEnchants()) {
-                var enchs = new LinkedHashMap<String, Object>();
-                meta.getEnchants().forEach((ench, lvl) -> enchs.put(ench.getKey().toString(), lvl));
-                metaMap.put("enchantments", enchs);
-            }
-            m.put("meta", metaMap);
-        }
-        return m;
-    }
-
     static Player player(JsonObject p) { var pl = Bukkit.getPlayer(UUID.fromString(p.get("uuid").getAsString())); if (pl == null) throw new IllegalArgumentException("Player not found"); return pl; }
     static Player resolve(String id) {
         if (id == null) return null;

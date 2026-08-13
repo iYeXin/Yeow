@@ -39,6 +39,11 @@ export function deleteBoard(id: string, options?: TaskOptions): Promise<void> {
 
 // ── Objectives ──
 
+/**
+ * 创建计分项。⚠️ **Folia 平台限制**：Folia 不支持注册新 objective（registerNewObjective
+ * 抛 UnsupportedOperationException）——在 Folia 上本调用会 reject（错误消息含
+ * "Folia does not support creating new objectives"）；已存在的 objective 会更新 displayName 后返回。
+ */
 export function createObjective(name: string, criteria: string, displayName: string, board?: string, options?: TaskOptions): Promise<ObjectiveInfo> {
   return post<ObjectiveInfo>('scoreboard.createObjective', { name, criteria, displayName, ...boardParam(board) }, options);
 }
@@ -69,6 +74,10 @@ export function resetScore(objective: string, entry: string, board?: string, opt
 
 // ── Teams ──
 
+/**
+ * 创建队伍。⚠️ **Folia 平台限制**：Folia 不支持注册新 team（registerNewTeam 抛
+ * UnsupportedOperationException）——在 Folia 上本调用会 reject；已存在的 team 返回其信息。
+ */
 export function createTeam(name: string, board?: string, options?: TaskOptions): Promise<void> {
   return post('scoreboard.createTeam', { name, ...boardParam(board) }, options);
 }

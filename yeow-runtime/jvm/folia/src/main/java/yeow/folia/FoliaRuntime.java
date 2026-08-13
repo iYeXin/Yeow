@@ -61,6 +61,8 @@ public class FoliaRuntime extends JavaPlugin implements PlatformHost {
     @Override public void onEnable() {
         core.start();
         FoliaTasks.init(scheduler);
+        // 句柄实例注册表装配：BossBar/自定义 Inventory 的 JS GC 自动回收（与 Paper 对齐）
+        FoliaTasks.setInstances(core.instances());
         FoliaEventBridge.init(this, scheduler);
         FoliaCommandBridge.init(this, scheduler);
         FoliaCommandBridge.setTimeoutMs(core.config().profileCallbackTimeoutTabCompleteMs());

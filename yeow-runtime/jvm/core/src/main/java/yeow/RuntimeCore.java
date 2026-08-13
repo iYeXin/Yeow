@@ -11,6 +11,7 @@ import java.net.http.WebSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
@@ -367,6 +368,15 @@ public class RuntimeCore {
         }
     }
 
+    /** 批量任务错误项：与执行器 errObject 同形状（含 type/task），避免同一数组内两种错误形状并存。 */
+    private static Map<String, Object> batchErr(Exception e, String taskType) {
+        var m = new LinkedHashMap<String, Object>();
+        m.put("err", e.getMessage() != null ? e.getMessage() : e.toString());
+        m.put("type", e.getClass().getSimpleName());
+        if (taskType != null) m.put("task", taskType);
+        return m;
+    }
+
     /**
      * 批量任务：按顺序提交 `tasks` 数组，结果按原顺序收集（同步阻塞返回结果数组 JSON；
      * 含非空 `cb` 时异步——全部完成后一次回调结果数组）。任务逐个独立执行，无原子性。
@@ -381,9 +391,10 @@ public class RuntimeCore {
         }
         var out = new java.util.ArrayList<Object>();
         for (var el : tasks) {
+            String taskType = null;
             try {
                 var t = el.getAsJsonObject();
-                var taskType = t.get("type").getAsString();
+                taskType = t.get("type").getAsString();
                 var params = t.has("params") ? t.getAsJsonObject("params") : new JsonObject();
                 params.addProperty("_plugin", entity.name());
                 var priority = parsePriority(t.has("priority") ? t.get("priority").getAsString() : null);
@@ -393,10 +404,10 @@ public class RuntimeCore {
                     var r = future.get(config.taskSyncTimeoutMs(), TimeUnit.MILLISECONDS);
                     out.add(gson.fromJson(r.isEmpty() ? "null" : r, Object.class));
                 } catch (Exception e) {
-                    out.add(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
+                    out.add(batchErr(e, taskType));
                 }
             } catch (Exception e) {
-                out.add(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
+                out.add(batchErr(e, taskType));
             }
         }
         return gson.toJson(out);
@@ -410,9 +421,10 @@ public class RuntimeCore {
         var pending = new java.util.concurrent.atomic.AtomicInteger(n);
         for (int i = 0; i < n; i++) {
             final int idx = i;
+            String taskType = null;
             try {
                 var t = tasks.get(i).getAsJsonObject();
-                var taskType = t.get("type").getAsString();
+                taskType = t.get("type").getAsString();
                 var params = t.has("params") ? t.getAsJsonObject("params") : new JsonObject();
                 params.addProperty("_plugin", entity.name());
                 var priority = parsePriority(t.has("priority") ? t.get("priority").getAsString() : null);
@@ -423,7 +435,7 @@ public class RuntimeCore {
                     }
                 }, priority, entity.name());
             } catch (Exception e) {
-                results[idx] = Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString());
+                results[idx] = batchErr(e, taskType);
                 if (pending.decrementAndGet() == 0) {
                     entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, java.util.Arrays.asList(results)));
                 }

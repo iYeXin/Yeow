@@ -372,6 +372,8 @@ function adaptEvent<K extends keyof EventMap>(type: K, data: RawEvent): EventMap
     'playerBucketEmpty', 'playerExpChange', 'playerLevelChange',
     'playerGameModeChange', 'foodLevelChange', 'blockBreak',
     'blockPlace', 'inventoryOpen', 'inventoryClose',
+    'playerAdvancementDone', 'playerToggleSneak', 'playerToggleFlight',
+    'inventoryClick', 'playerResourcePackStatus',
   ] as K[];
   if (hasPlayer.includes(type) && data.player) {
     wrap.player = Player.getSync(data.player as string);

@@ -79,11 +79,23 @@ export function registerCommand(name: string, options: CommandOptions, taskOptio
         } else {
           const result = completerFn(sender, data.args);
           if (result && typeof result.then === 'function') {
-            $send('task', {
-              type: 'command.tabComplete',
-              params: { callbackId: compCbId, completions: [] },
-              cb: '',
-            });
+            // 异步 completer：await 结果后再回传（原实现立即发空补全、Promise 结果被丢弃）
+            (result as Promise<string[]>).then(
+              (list) => {
+                $send('task', {
+                  type: 'command.tabComplete',
+                  params: { callbackId: compCbId, completions: list || [] },
+                  cb: '',
+                });
+              },
+              () => {
+                $send('task', {
+                  type: 'command.tabComplete',
+                  params: { callbackId: compCbId, completions: [] },
+                  cb: '',
+                });
+              },
+            );
           } else {
             $send('task', {
               type: 'command.tabComplete',

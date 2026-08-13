@@ -36,6 +36,8 @@ public class PdcTasks {
             var elVal = p.get("value");
             if (elKey == null || elVal == null) return false;
             pdc.set(makeKey(p, elKey.getAsString()), PersistentDataType.STRING, elVal.getAsString());
+            // 方块持有者（TileState 快照）：不 update() 修改不会写回世界（2026-08-13 审计修复）
+            if (holder instanceof org.bukkit.block.TileState ts) { try { ts.update(); } catch (Exception ignored) {} }
             return true;
         } catch (Exception e) {
             LOG.warning("[PDC.set] " + e.getClass().getSimpleName() + ": " + e.getMessage());
@@ -69,6 +71,7 @@ public class PdcTasks {
             var el = p.get("key");
             if (el == null) return false;
             pdc.remove(makeKey(p, el.getAsString()));
+            if (holder instanceof org.bukkit.block.TileState ts) { try { ts.update(); } catch (Exception ignored) {} }
             return true;
         } catch (Exception e) {
             LOG.warning("[PDC.remove] " + e.getClass().getSimpleName() + ": " + e.getMessage());
@@ -142,6 +145,9 @@ public class PdcTasks {
                     if (pl != null) return pl;
                     var ent = Bukkit.getEntity(uuid);
                     if (ent instanceof org.bukkit.persistence.PersistentDataHolder h) return h;
+                    // 离线回退：离线玩家 PDC（Paper 1.20.4+ 支持读写；旧版本写入抛错由调用方 catch）
+                    var off = Bukkit.getOfflinePlayer(uuid);
+                    if (off.hasPlayedBefore() && off instanceof org.bukkit.persistence.PersistentDataHolder h2) return h2;
                 } catch (IllegalArgumentException ignored) {}
             }
         }

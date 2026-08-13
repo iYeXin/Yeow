@@ -148,10 +148,10 @@ export class Player {
   giveExpSync(amount: number, options?: TaskOptions): void { call('player.giveExp', { uuid: this.uuid, amount }, options); }
   /** 检查权限（经 Yeow 权限检查：`permissionCheck` 事件优先，无处理时回退 Bukkit）。node 可为权限节点对象。 */
   hasPermission(node: string | Permission, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('player.hasPermission', { uuid: this.uuid, permission: typeof node === 'string' ? node : { node: node.node } }, options);
+    return post<boolean>('player.hasPermission', { uuid: this.uuid, permission: typeof node === 'string' ? { node } : { node: node.node } }, options);
   }
   hasPermissionSync(node: string | Permission, options?: TaskOptions): boolean {
-    return call<boolean>('player.hasPermission', { uuid: this.uuid, permission: typeof node === 'string' ? node : { node: node.node } }, options);
+    return call<boolean>('player.hasPermission', { uuid: this.uuid, permission: typeof node === 'string' ? { node } : { node: node.node } }, options);
   }
   /** 以玩家身份执行命令（**不含 `/` 前缀**，如 `say hi`；前缀会自动剥离；与服务器 `dispatchCommand`（控制台）相对）。 */
   performCommand(cmd: string, options?: TaskOptions): Promise<boolean> {
@@ -206,12 +206,12 @@ export class Player {
     return call<boolean>('player.setPlayerListName', { uuid: this.uuid, name }, options);
   }
 
-  /** 设置客户端世界边界（传 null 重置为服务端边界；可带 centerX/centerZ）。 */
-  setBorder(size: number | null, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('player.setBorder', { uuid: this.uuid, size }, options);
+  /** 设置客户端世界边界（传 null 重置为服务端边界；centerX/centerZ 可选，指定边界中心）。 */
+  setBorder(size: number | null, centerX?: number, centerZ?: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('player.setBorder', { uuid: this.uuid, size, centerX, centerZ }, options);
   }
-  setBorderSync(size: number | null, options?: TaskOptions): boolean {
-    return call<boolean>('player.setBorder', { uuid: this.uuid, size }, options);
+  setBorderSync(size: number | null, centerX?: number, centerZ?: number, options?: TaskOptions): boolean {
+    return call<boolean>('player.setBorder', { uuid: this.uuid, size, centerX, centerZ }, options);
   }
 
   // ── PDC（玩家持久数据） ──

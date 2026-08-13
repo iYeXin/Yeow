@@ -47,7 +47,18 @@ export function call<T = unknown>(
   applyOptions(pld, options);
   const r = $send('task', pld);
   if (r == null) return undefined as T;
-  if ((r as any)?.err) throw new Error((r as any).err);
+  if ((r as any)?.err) {
+    // 与 post() 对齐的错误上下文（type/task/Java 堆栈），2026-08-13 审计修复
+    const errObj = r as any;
+    const msg = errObj.type ? `[${errObj.type}] ${errObj.err}` : errObj.err;
+    const e = new Error(msg);
+    if (errObj.stack) {
+      e.stack += '\n    --- runtime executer error(for reference) ---\n' + errObj.stack;
+    }
+    (e as any).javaType = errObj.type || null;
+    (e as any).taskType = errObj.task || null;
+    throw e;
+  }
   return r as T;
 }
 

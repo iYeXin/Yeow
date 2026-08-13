@@ -4,6 +4,7 @@ import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
+import java.util.Map;
 import java.util.UUID;
 
 public class SoundTasks {
@@ -29,10 +30,13 @@ public class SoundTasks {
 
     public static Object stopSound(JsonObject p) {
         var pl = Bukkit.getPlayer(UUID.fromString(p.get("uuid").getAsString()));
-        if (pl != null) {
-            var sound = p.get("sound").getAsString();
-            try { pl.stopSound(Sound.valueOf(sound.toUpperCase())); } catch (Exception e) { pl.stopAllSounds(); }
-        }
+        if (pl == null) return true;
+        var s = p.get("sound").getAsString();
+        var key = org.bukkit.NamespacedKey.fromString(s);
+        var sound = key != null ? org.bukkit.Registry.SOUNDS.get(key) : null;
+        // 未知音效明确报错（原实现 catch 后静默 stopAllSounds——副作用过大，2026-08-13 审计修复）
+        if (sound == null) return Map.of("err", "Unknown sound: " + s);
+        pl.stopSound(sound);
         return true;
     }
 }

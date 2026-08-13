@@ -224,11 +224,11 @@ public class InventoryTasks {
         return left.values().stream().mapToInt(ItemStack::getAmount).sum();
     }
 
-    /** 移除指定物品（按类型 + meta 匹配，amount 默认 1）。 */
+    /** 移除指定物品（按类型 + meta 匹配，amount 默认 1）。返回**未移除数量**（0 = 全部移除）。 */
     public static Object removeItem(JsonObject p) {
         var inv = resolve(p);
-        inv.removeItem(buildItem(p.getAsJsonObject("item")));
-        return true;
+        var left = inv.removeItem(buildItem(p.getAsJsonObject("item")));
+        return left.values().stream().mapToInt(ItemStack::getAmount).sum();
     }
 
     // ── ItemStack 工具（原 GuiTasks 迁入；buildItem/serializeItem/colorOf） ──
@@ -360,8 +360,57 @@ public class InventoryTasks {
                 meta.getEnchants().forEach((ench, lvl) -> enchs.put(ench.getKey().toString(), lvl));
                 metaMap.put("enchantments", enchs);
             }
+            if (meta.isHideTooltip()) metaMap.put("hideTooltip", true);
+            if (!meta.getItemFlags().isEmpty()) {
+                metaMap.put("itemFlags", meta.getItemFlags().stream().map(Enum::name).toList());
+            }
             if (meta instanceof org.bukkit.inventory.meta.Damageable d && d.hasDamage()) {
                 metaMap.put("damage", d.getDamage());
+            }
+            // 扩展 meta 回读（与 buildItem 写侧对称，2026-08-13 审计修复）：
+            // color / potionEffects / skullOwner / attributeModifiers
+            if (meta instanceof org.bukkit.inventory.meta.LeatherArmorMeta lam && lam.getColor() != null) {
+                metaMap.put("color", "#" + Integer.toHexString(lam.getColor().asRGB()));
+            }
+            if (meta instanceof org.bukkit.inventory.meta.PotionMeta pm) {
+                if (pm.hasColor()) metaMap.put("color", "#" + Integer.toHexString(pm.getColor().asRGB()));
+                if (pm.hasCustomEffects()) {
+                    var effs = new ArrayList<Object>();
+                    for (var pe : pm.getCustomEffects()) {
+                        var em = new LinkedHashMap<String, Object>();
+                        em.put("type", pe.getType().getName().toLowerCase());
+                        em.put("duration", pe.getDuration());
+                        em.put("amplifier", pe.getAmplifier());
+                        em.put("ambient", pe.isAmbient());
+                        em.put("particles", pe.hasParticles());
+                        effs.add(em);
+                    }
+                    metaMap.put("potionEffects", effs);
+                }
+            }
+            if (meta instanceof org.bukkit.inventory.meta.SkullMeta sm && sm.getPlayerProfile() != null) {
+                var profile = sm.getPlayerProfile();
+                String textures = null;
+                for (var pr : profile.getProperties()) {
+                    if ("textures".equals(pr.getName())) { textures = pr.getValue(); break; }
+                }
+                if (textures != null) {
+                    metaMap.put("skullOwner", textures);
+                } else if (profile.getName() != null) {
+                    metaMap.put("skullOwner", profile.getName());
+                }
+            }
+            if (meta instanceof org.bukkit.inventory.meta.ItemMeta im && !im.getAttributeModifiers().isEmpty()) {
+                var mods = new ArrayList<Object>();
+                im.getAttributeModifiers().forEach((attr, mod) -> {
+                    var am = new LinkedHashMap<String, Object>();
+                    am.put("attribute", attr.getKey().toString());
+                    am.put("amount", mod.getAmount());
+                    am.put("operation", mod.getOperation().name().toLowerCase());
+                    if (mod.getSlotGroup() != null) am.put("slot", mod.getSlotGroup().toString());
+                    mods.add(am);
+                });
+                metaMap.put("attributeModifiers", mods);
             }
             m.put("meta", metaMap);
         }

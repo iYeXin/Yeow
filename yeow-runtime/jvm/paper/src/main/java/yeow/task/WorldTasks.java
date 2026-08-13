@@ -15,14 +15,25 @@ public class WorldTasks {
     public static Object setStorm(JsonObject p) { world(p).setStorm(p.get("value").getAsBoolean()); return true; }
     public static Object getThundering(JsonObject p) { return world(p).isThundering(); }
     public static Object setThundering(JsonObject p) { world(p).setThundering(p.get("value").getAsBoolean()); return true; }
-    public static Object getDifficulty(JsonObject p) { return world(p).getDifficulty().name(); }
-    public static Object setDifficulty(JsonObject p) { world(p).setDifficulty(Difficulty.valueOf(p.get("value").getAsString())); return true; }
+    public static Object getDifficulty(JsonObject p) { return world(p).getDifficulty().name().toLowerCase(); }
+    public static Object setDifficulty(JsonObject p) { world(p).setDifficulty(Difficulty.valueOf(p.get("value").getAsString().toUpperCase())); return true; }
     public static Object getSpawnLocation(JsonObject p) { var l = world(p).getSpawnLocation(); return Map.of("x",l.getX(),"y",l.getY(),"z",l.getZ(),"yaw",(double)l.getYaw(),"pitch",(double)l.getPitch()); }
     public static Object setSpawnLocation(JsonObject p) { world(p).setSpawnLocation(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()); return true; }
     @SuppressWarnings({"unchecked","rawtypes"})
     public static Object getGameRule(JsonObject p) { try { var r = (GameRule) GameRule.class.getField(p.get("rule").getAsString().toUpperCase()).get(null); return world(p).getGameRuleValue(r); } catch(Exception e) { return null; } }
     @SuppressWarnings({"unchecked","rawtypes"})
-    public static Object setGameRule(JsonObject p) { try { var r = (GameRule) GameRule.class.getField(p.get("rule").getAsString().toUpperCase()).get(null); world(p).setGameRule(r, p.get("value")); } catch(Exception e) { /* ignore */ } return true; }
+    public static Object setGameRule(JsonObject p) {
+        try {
+            var r = (GameRule) GameRule.class.getField(p.get("rule").getAsString().toUpperCase()).get(null);
+            var v = p.get("value");
+            // JsonElement 原样传入 setGameRule 会对布尔/整数规则抛 ClassCastException——
+            // 按值的 JSON 类型显式转换（2026-08-13 审计修复）
+            if (v.isJsonPrimitive() && v.getAsJsonPrimitive().isBoolean()) world(p).setGameRule(r, v.getAsBoolean());
+            else if (v.isJsonPrimitive() && v.getAsJsonPrimitive().isNumber()) world(p).setGameRule(r, v.getAsInt());
+            else world(p).setGameRule(r, v.getAsString());
+        } catch (Exception e) { /* ignore */ }
+        return true;
+    }
     public static Object getBiome(JsonObject p) { return world(p).getBiome(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getKey().toString(); }
     public static Object getHighestBlockY(JsonObject p) { return world(p).getHighestBlockYAt(p.get("x").getAsInt(), p.get("z").getAsInt()); }
     // ── 世界信息（2026-08-13） ──
@@ -32,6 +43,7 @@ public class WorldTasks {
         try { return world(p).getWorldType().name(); } catch (Exception e) { return null; }
     }
     public static Object getGameRules(JsonObject p) {
+        // Bukkit World.getGameRules() 返回 String[]（规则名），直接透传即 API 声明的 string[]
         return java.util.Arrays.asList(world(p).getGameRules());
     }
     // ── WorldBorder（2026-08-13） ──
@@ -90,6 +102,7 @@ public class WorldTasks {
     }
     public static Object setBlock(JsonObject p) {
         var mat = Material.matchMaterial(p.get("blockType").getAsString());
+        if (mat == null) throw new IllegalArgumentException("Unknown block type: " + p.get("blockType").getAsString());
         var b = world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt());
         if (p.has("state") && p.get("state").isJsonObject() && p.getAsJsonObject("state").size() > 0) {
             var sb = new StringBuilder(mat.getKey().toString()).append('[');

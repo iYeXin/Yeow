@@ -123,12 +123,12 @@ export class Inventory {
     return call<number>('inventory.addItem', { ...this.address(), item }, options);
   }
 
-  /** 移除指定物品（按类型 + meta 匹配，amount 默认 1）。 */
-  removeItem(item: ItemStack, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('inventory.removeItem', { ...this.address(), item }, options);
+  /** 移除指定物品（按类型 + meta 匹配，amount 默认 1）。返回**未移除数量**（0 = 全部移除成功）。 */
+  removeItem(item: ItemStack, options?: TaskOptions): Promise<number> {
+    return post<number>('inventory.removeItem', { ...this.address(), item }, options);
   }
-  removeItemSync(item: ItemStack, options?: TaskOptions): boolean {
-    return call<boolean>('inventory.removeItem', { ...this.address(), item }, options);
+  removeItemSync(item: ItemStack, options?: TaskOptions): number {
+    return call<number>('inventory.removeItem', { ...this.address(), item }, options);
   }
 
   /** 清空（slot 可选，不传清空全部）。 */

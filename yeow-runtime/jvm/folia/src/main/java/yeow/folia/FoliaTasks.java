@@ -14,6 +14,7 @@ import org.bukkit.Registry;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -53,6 +54,8 @@ import java.util.UUID;
  */
 public class FoliaTasks {
     private static FoliaScheduler scheduler;
+    /** JS 句柄实例注册表（id → 释放器；FoliaRuntime 装配——BossBar/自定义 Inventory GC 回收）。 */
+    private static volatile yeow.InstanceRegistry instances;
     static final com.google.gson.Gson gson = new com.google.gson.Gson();
 
     /** GUI 实例注册表（id → Inventory）与归属（id → 插件名，purge 用）。 */
@@ -68,6 +71,33 @@ public class FoliaTasks {
     /** 运行时装配（FoliaRuntime.onEnable）。 */
     public static void init(FoliaScheduler s) { scheduler = s; }
 
+    /** 句柄实例注册表装配（FoliaRuntime：core.instances()）。 */
+    public static void setInstances(yeow.InstanceRegistry r) { instances = r; }
+
+    /**
+     * 在玩家所属 region 线程关闭其打开的 Inventory（跨 region 安全：
+     * close/destroy 可能在 GLOBAL 线程执行，直接调用会触发 AsyncCatcher）。
+     */
+    private static void closeOnOwnRegion(Player pl) {
+        try {
+            pl.getScheduler().run(rt(), t -> { try { pl.closeInventory(); } catch (Exception ignored) {} }, () -> {});
+        } catch (Exception ignored) {}
+    }
+
+    /** 释放自定义 Inventory：移除注册/归属、异步关闭所有查看者、同步注销句柄释放器。 */
+    private static void removeCustom(String id) {
+        var inv = guis.remove(id);
+        owners.remove(id);
+        if (inv != null) byInv.remove(inv);
+        var reg = instances;
+        if (reg != null) reg.release(id);
+        if (inv != null) {
+            for (var v : new java.util.ArrayList<>(inv.getViewers())) {
+                if (v instanceof Player pl) closeOnOwnRegion(pl);
+            }
+        }
+    }
+
     /** 卸载清理：关闭并移除插件拥有的 GUI/BossBar/Scoreboard（热重载、卸载时调用）。 */
     public static void purgePlugin(String pluginName) {
         for (var e : new java.util.ArrayList<>(owners.entrySet())) {
@@ -75,9 +105,10 @@ public class FoliaTasks {
             var id = e.getKey();
             var inv = guis.remove(id);
             owners.remove(id);
+            if (inv != null) byInv.remove(inv);
             if (inv != null) {
                 for (var v : new java.util.ArrayList<>(inv.getViewers())) {
-                    if (v instanceof Player pl) { try { pl.closeInventory(); } catch (Exception ignored) {} }
+                    if (v instanceof Player pl) closeOnOwnRegion(pl);
                 }
             }
         }
@@ -112,6 +143,9 @@ public class FoliaTasks {
      */
     public static DispatchTarget getScheduler(String taskType, JsonObject params) {
         if (params == null) return global(taskType, params);
+        // advancement 家族：全局注册表（Bukkit.getAdvancement）受 AsyncCatcher 全局线程约束——
+        // 强制 GLOBAL 路由（与 world.set* 全局状态写入同策略，2026-08-13 审计修复）
+        if (taskType.startsWith("advancement.")) return global(taskType, params);
         // inventory 家族（统一三寻址）：uuid → 玩家 region；world+x+y+z → 容器方块 region；其余（id 寻址/create）→ GLOBAL
         if (taskType.startsWith("inventory.") && params != null
                 && params.has("uuid") && !params.get("uuid").isJsonNull()) {
@@ -185,7 +219,10 @@ public class FoliaTasks {
                     holder.set(entity.getScheduler().run(rt(), t2 -> finish.accept(execOrErr(taskType, params)),
                         () -> finish.accept(Map.of("err", "entity retired"))));
                 } else {
-                    finish.accept(Map.of("err", "entity not found: " + id));
+                    // 缺失语义与 Paper 对齐：查询类任务（entity.get/player.get/player.isOnline）
+                    // 对不存在的目标返回 null/false；其余操作返回明确错误
+                    if (isMissingQuery(taskType)) finish.accept(null);
+                    else finish.accept(Map.of("err", "entity not found: " + id));
                 }
             } catch (Exception e) {
                 finish.accept(FoliaScheduler.errObject(e, taskType));
@@ -363,7 +400,7 @@ public class FoliaTasks {
             case "player.giveExp" -> { player(p).giveExp(p.get("amount").getAsInt()); yield true; }
             case "player.getPing" -> player(p).getPing();
             case "player.getGamemode" -> player(p).getGameMode().name();
-            case "player.setGamemode" -> { player(p).setGameMode(GameMode.valueOf(p.get("value").getAsString())); yield true; }
+            case "player.setGamemode" -> { player(p).setGameMode(GameMode.valueOf(p.get("value").getAsString().toUpperCase())); yield true; }
             case "player.getDisplayName" -> player(p).getDisplayName();
             case "player.setDisplayName" -> { player(p).setDisplayName(p.has("value") && !p.get("value").isJsonNull() ? p.get("value").getAsString() : null); yield true; }
             case "player.isOp" -> player(p).isOp();
@@ -392,19 +429,21 @@ public class FoliaTasks {
             case "player.sendActionBar" -> { player(p).sendActionBar(FoliaTextUtil.parse(p.get("message"))); yield true; }
             case "player.sendTitle" -> {
                 player(p).showTitle(net.kyori.adventure.title.Title.title(
-                    p.has("title") ? FoliaTextUtil.parse(p.get("title")) : Component.empty(),
-                    p.has("subtitle") ? FoliaTextUtil.parse(p.get("subtitle")) : Component.empty(),
+                    p.has("title") && !p.get("title").isJsonNull() ? FoliaTextUtil.parse(p.get("title")) : Component.empty(),
+                    p.has("subtitle") && !p.get("subtitle").isJsonNull() ? FoliaTextUtil.parse(p.get("subtitle")) : Component.empty(),
                     net.kyori.adventure.title.Title.Times.times(
                         java.time.Duration.ofMillis((p.has("fadeIn") ? p.get("fadeIn").getAsInt() : 10) * 50L),
                         java.time.Duration.ofMillis((p.has("stay") ? p.get("stay").getAsInt() : 70) * 50L),
                         java.time.Duration.ofMillis((p.has("fadeOut") ? p.get("fadeOut").getAsInt() : 20) * 50L))));
                 yield true;
             }
-            case "player.kick" -> { player(p).kickPlayer(p.has("reason") ? p.get("reason").getAsString() : null); yield true; }
+            case "player.kick" -> { player(p).kickPlayer(p.has("reason") && !p.get("reason").isJsonNull() ? p.get("reason").getAsString() : null); yield true; }
             case "player.isOnline" -> playerOrNull(p) != null;
             case "player.hasPermission" -> {
                 var pl = player(p);
-                var node = p.getAsJsonObject("permission").get("node").getAsString();
+                // permission 参数兼容：字符串（协议文档格式）或对象 { node }
+                var perm = p.get("permission");
+                var node = perm != null && perm.isJsonObject() ? perm.getAsJsonObject().get("node").getAsString() : perm.getAsString();
                 // Yeow 生态权限检查：permissionCheck 事件结果优先，无处理时回退 Bukkit
                 var r = FoliaEventBridge.checkPermission(pl.getUniqueId().toString(), node);
                 yield r != null ? r : pl.hasPermission(node);
@@ -422,13 +461,11 @@ public class FoliaTasks {
             }
             case "player.getItemInMainHand" -> {
                 var item = player(p).getInventory().getItemInMainHand();
-                yield item.getType() == Material.AIR ? null
-                    : Map.of("type", item.getType().getKey().toString(), "amount", item.getAmount());
+                yield item.getType() == Material.AIR ? null : serializeItem(item);
             }
             case "player.getItemInOffHand" -> {
                 var item = player(p).getInventory().getItemInOffHand();
-                yield item.getType() == Material.AIR ? null
-                    : Map.of("type", item.getType().getKey().toString(), "amount", item.getAmount());
+                yield item.getType() == Material.AIR ? null : serializeItem(item);
             }
             case "player.setItemInMainHand" -> {
                 player(p).getInventory().setItemInMainHand(p.has("item") && !p.get("item").isJsonNull() ? itemFromObject(p.getAsJsonObject("item")) : new ItemStack(Material.AIR));
@@ -470,8 +507,11 @@ public class FoliaTasks {
             }
             case "player.stopSound" -> {
                 var pl = player(p);
-                try { pl.stopSound(Sound.valueOf(p.get("sound").getAsString().toUpperCase())); }
-                catch (Exception e) { pl.stopAllSounds(); }
+                var s = p.get("sound").getAsString();
+                var key = org.bukkit.NamespacedKey.fromString(s);
+                var sound = key != null ? org.bukkit.Registry.SOUNDS.get(key) : null;
+                if (sound == null) yield Map.of("err", "Unknown sound: " + s);
+                pl.stopSound(sound);
                 yield true;
             }
             case "player.stopAllSounds" -> { player(p).stopAllSounds(); yield true; }
@@ -492,30 +532,30 @@ public class FoliaTasks {
             }
             // ── Entity ──────────────────────────────────────────────
             case "entity.get" -> {
-                var e = Bukkit.getEntity(uuid(p));
-                yield e != null ? Map.of("uuid", e.getUniqueId().toString(), "type", e.getType().name()) : null;
+                var e = entityOrNull(p);
+                yield e != null ? Map.of("uuid", e.getUniqueId().toString()) : null;
             }
-            case "entity.getType" -> Bukkit.getEntity(uuid(p)).getType().name();
-            case "entity.getName" -> Bukkit.getEntity(uuid(p)).getName();
-            case "entity.getCustomName" -> Bukkit.getEntity(uuid(p)).getCustomName();
-            case "entity.setCustomName" -> { Bukkit.getEntity(uuid(p)).setCustomName(p.has("value") && !p.get("value").isJsonNull() ? p.get("value").getAsString() : null); yield true; }
+            case "entity.getType" -> entity(p).getType().name();
+            case "entity.getName" -> entity(p).getName();
+            case "entity.getCustomName" -> { var n = entity(p).getCustomName(); yield n != null ? n : ""; }
+            case "entity.setCustomName" -> { entity(p).setCustomName(p.has("value") && !p.get("value").isJsonNull() ? p.get("value").getAsString() : null); yield true; }
             case "entity.getHealth" -> living(p).getHealth();
             case "entity.setHealth" -> { living(p).setHealth(p.get("value").getAsDouble()); yield true; }
             case "entity.getMaxHealth" -> living(p).getMaxHealth();
-            case "entity.isDead" -> Bukkit.getEntity(uuid(p)).isDead();
-            case "entity.remove" -> { Bukkit.getEntity(uuid(p)).remove(); yield true; }
-            case "entity.getVelocity" -> { var v = Bukkit.getEntity(uuid(p)).getVelocity(); yield Map.of("x", v.getX(), "y", v.getY(), "z", v.getZ()); }
-            case "entity.setVelocity" -> { Bukkit.getEntity(uuid(p)).setVelocity(new org.bukkit.util.Vector(p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble())); yield true; }
-            case "entity.getFireTicks" -> Bukkit.getEntity(uuid(p)).getFireTicks();
-            case "entity.setFireTicks" -> { Bukkit.getEntity(uuid(p)).setFireTicks(p.get("value").getAsInt()); yield true; }
-            case "entity.getTicksLived" -> Bukkit.getEntity(uuid(p)).getTicksLived();
-            case "entity.setTicksLived" -> { Bukkit.getEntity(uuid(p)).setTicksLived(p.get("value").getAsInt()); yield true; }
-            case "entity.isOnGround" -> Bukkit.getEntity(uuid(p)).isOnGround();
+            case "entity.isDead" -> entity(p).isDead();
+            case "entity.remove" -> { entity(p).remove(); yield true; }
+            case "entity.getVelocity" -> { var v = entity(p).getVelocity(); yield Map.of("x", v.getX(), "y", v.getY(), "z", v.getZ()); }
+            case "entity.setVelocity" -> { entity(p).setVelocity(new org.bukkit.util.Vector(p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble())); yield true; }
+            case "entity.getFireTicks" -> entity(p).getFireTicks();
+            case "entity.setFireTicks" -> { entity(p).setFireTicks(p.get("value").getAsInt()); yield true; }
+            case "entity.getTicksLived" -> entity(p).getTicksLived();
+            case "entity.setTicksLived" -> { entity(p).setTicksLived(p.get("value").getAsInt()); yield true; }
+            case "entity.isOnGround" -> entity(p).isOnGround();
             case "entity.damage" -> {
                 var e = living(p);
                 var amount = p.get("amount").getAsDouble();
                 if (p.has("damager") && !p.get("damager").isJsonNull()) {
-                    var d = Bukkit.getEntity(UUID.fromString(p.get("damager").getAsString()));
+                    var d = entityOf(UUID.fromString(p.get("damager").getAsString()));
                     if (d != null) { e.damage(amount, d); yield true; }
                 }
                 e.damage(amount);
@@ -525,7 +565,7 @@ public class FoliaTasks {
             case "entity.setTarget" -> {
                 var e = living(p);
                 if (p.has("targetUuid") && !p.get("targetUuid").isJsonNull()) {
-                    var t = Bukkit.getEntity(UUID.fromString(p.get("targetUuid").getAsString()));
+                    var t = entityOf(UUID.fromString(p.get("targetUuid").getAsString()));
                     if (t instanceof LivingEntity le && e instanceof org.bukkit.entity.Mob mob) mob.setTarget(le);
                     yield true;
                 }
@@ -540,38 +580,41 @@ public class FoliaTasks {
                 yield false;
             }
             case "entity.teleport" -> {
-                Bukkit.getEntity(uuid(p)).teleport(new Location(Bukkit.getWorld(p.get("world").getAsString()),
-                    p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble()));
+                entity(p).teleport(new Location(Bukkit.getWorld(p.get("world").getAsString()),
+                    p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble(),
+                    (float) p.get("yaw").getAsDouble(), (float) p.get("pitch").getAsDouble()));
                 yield true;
             }
             case "entity.getLocation" -> {
-                var l = Bukkit.getEntity(uuid(p)).getLocation();
+                var l = entity(p).getLocation();
                 yield Map.of("x", l.getX(), "y", l.getY(), "z", l.getZ(), "yaw", (double) l.getYaw(), "pitch", (double) l.getPitch(), "world", l.getWorld().getName());
             }
-            case "entity.getWorld" -> Bukkit.getEntity(uuid(p)).getWorld().getName();
-            case "entity.isGlowing" -> Bukkit.getEntity(uuid(p)).isGlowing();
-            case "entity.setGlowing" -> { Bukkit.getEntity(uuid(p)).setGlowing(p.get("value").getAsBoolean()); yield true; }
-            case "entity.isInvulnerable" -> Bukkit.getEntity(uuid(p)).isInvulnerable();
-            case "entity.setInvulnerable" -> { Bukkit.getEntity(uuid(p)).setInvulnerable(p.get("value").getAsBoolean()); yield true; }
-            case "entity.isSilent" -> Bukkit.getEntity(uuid(p)).isSilent();
-            case "entity.setSilent" -> { Bukkit.getEntity(uuid(p)).setSilent(p.get("value").getAsBoolean()); yield true; }
-            case "entity.getPassengers" -> Bukkit.getEntity(uuid(p)).getPassengers().stream().map(e -> e.getUniqueId().toString()).toList();
-            case "entity.getVehicle" -> { var v = Bukkit.getEntity(uuid(p)).getVehicle(); yield v != null ? v.getUniqueId().toString() : null; }
-            case "entity.setCustomNameVisible" -> { Bukkit.getEntity(uuid(p)).setCustomNameVisible(p.get("value").getAsBoolean()); yield true; }
-            case "entity.hasGravity" -> Bukkit.getEntity(uuid(p)).hasGravity();
-            case "entity.setGravity" -> { Bukkit.getEntity(uuid(p)).setGravity(p.get("value").getAsBoolean()); yield true; }
+            case "entity.getWorld" -> entity(p).getWorld().getName();
+            case "entity.isGlowing" -> entity(p).isGlowing();
+            case "entity.setGlowing" -> { entity(p).setGlowing(p.get("value").getAsBoolean()); yield true; }
+            case "entity.isInvulnerable" -> entity(p).isInvulnerable();
+            case "entity.setInvulnerable" -> { entity(p).setInvulnerable(p.get("value").getAsBoolean()); yield true; }
+            case "entity.isSilent" -> entity(p).isSilent();
+            case "entity.setSilent" -> { entity(p).setSilent(p.get("value").getAsBoolean()); yield true; }
+            case "entity.getPassengers" -> entity(p).getPassengers().stream().map(e -> e.getUniqueId().toString()).toList();
+            case "entity.getVehicle" -> { var v = entity(p).getVehicle(); yield v != null ? v.getUniqueId().toString() : null; }
+            case "entity.setCustomNameVisible" -> { entity(p).setCustomNameVisible(p.get("value").getAsBoolean()); yield true; }
+            case "entity.hasGravity" -> entity(p).hasGravity();
+            case "entity.setGravity" -> { entity(p).setGravity(p.get("value").getAsBoolean()); yield true; }
             case "entity.getBoundingBox" -> {
-                var b = Bukkit.getEntity(uuid(p)).getBoundingBox();
+                var b = entity(p).getBoundingBox();
                 yield Map.of("minX", b.getMinX(), "minY", b.getMinY(), "minZ", b.getMinZ(), "maxX", b.getMaxX(), "maxY", b.getMaxY(), "maxZ", b.getMaxZ());
             }
             // ── Potion ──────────────────────────────────────────────
             case "entity.addPotionEffect" -> {
-                var effect = new PotionEffect(
-                    PotionEffectType.getByName(p.get("type").getAsString().toUpperCase()),
+                var type = PotionEffectType.getByName(p.get("type").getAsString().toUpperCase());
+                if (type == null) yield Map.of("err", "Unknown potion type: " + p.get("type").getAsString());
+                var effect = new PotionEffect(type,
                     p.has("duration") ? p.get("duration").getAsInt() : 200,
                     p.has("amplifier") ? p.get("amplifier").getAsInt() : 0,
-                    p.has("ambient") && p.get("ambient").getAsBoolean(),
-                    p.has("particles") && p.get("particles").getAsBoolean());
+                    !p.has("ambient") || p.get("ambient").getAsBoolean(),
+                    !p.has("particles") || p.get("particles").getAsBoolean(),
+                    !p.has("icon") || p.get("icon").getAsBoolean());
                 living(p).addPotionEffect(effect);
                 yield true;
             }
@@ -582,7 +625,16 @@ public class FoliaTasks {
             }
             case "entity.clearPotionEffects" -> { living(p).clearActivePotionEffects(); yield true; }
             case "entity.getActivePotionEffects" -> living(p).getActivePotionEffects().stream()
-                .map(e -> Map.of("type", e.getType().getName(), "duration", e.getDuration(), "amplifier", e.getAmplifier())).toList();
+                .map(pe -> {
+                    var m = new LinkedHashMap<String, Object>();
+                    m.put("type", pe.getType().getName().toLowerCase());
+                    m.put("duration", pe.getDuration());
+                    m.put("amplifier", pe.getAmplifier());
+                    m.put("ambient", pe.isAmbient());
+                    m.put("particles", pe.hasParticles());
+                    m.put("icon", pe.hasIcon());
+                    return m;
+                }).toList();
             // ── Inventory（统一三寻址：uuid 玩家 / world+xyz 容器方块 / id 自定义） ──
             case "inventory.create" -> {
                 var inv = Bukkit.createInventory(null, p.get("size").getAsInt(), FoliaTextUtil.toLegacy(FoliaTextUtil.parse(p.get("title"))));
@@ -590,17 +642,12 @@ public class FoliaTasks {
                 guis.put(id, inv);
                 owners.put(id, p.has("_plugin") ? p.get("_plugin").getAsString() : "");
                 byInv.put(inv, id);
+                var reg = instances;
+                if (reg != null) reg.register(id, () -> removeCustom(id));
                 yield id;
             }
             case "inventory.destroy" -> {
-                var inv = guis.remove(p.get("id").getAsString());
-                owners.remove(p.get("id").getAsString());
-                if (inv != null) {
-                    byInv.remove(inv);
-                    for (var v : new java.util.ArrayList<>(inv.getViewers())) {
-                        if (v instanceof Player pl) { try { pl.closeInventory(); } catch (Exception ignored) {} }
-                    }
-                }
+                removeCustom(p.get("id").getAsString());
                 yield true;
             }
             case "inventory.open" -> {
@@ -614,7 +661,7 @@ public class FoliaTasks {
                 var inv = guis.get(p.get("id").getAsString());
                 if (inv == null) yield false;
                 for (var v : new java.util.ArrayList<>(inv.getViewers())) {
-                    if (v instanceof Player pl) { try { pl.closeInventory(); } catch (Exception ignored) {} }
+                    if (v instanceof Player pl) closeOnOwnRegion(pl);
                 }
                 yield true;
             }
@@ -708,12 +755,16 @@ public class FoliaTasks {
                 var id = p.get("id").getAsString();
                 bars.put(id, bb);
                 owners.put(id, p.has("_plugin") ? p.get("_plugin").getAsString() : "");
+                var reg = instances;
+                if (reg != null) reg.register(id, () -> { bars.remove(id); owners.remove(id); });
                 yield id;
             }
             case "bossbar.destroy" -> {
                 var bb = bars.remove(p.get("id").getAsString());
                 owners.remove(p.get("id").getAsString());
                 if (bb != null) { bb.removeAll(); bb.setVisible(false); }
+                var reg = instances;
+                if (reg != null) reg.release(p.get("id").getAsString());
                 yield true;
             }
             case "bossbar.setTitle" -> { var bb = bars.get(p.get("id").getAsString()); if (bb != null) bb.setTitle(FoliaTextUtil.toLegacy(FoliaTextUtil.parse(p.get("title")))); yield true; }
@@ -940,11 +991,14 @@ public class FoliaTasks {
             case "pdc.get" -> { var h = pdcHolder(p); yield h != null ? h.getPersistentDataContainer().get(pdcKey(p), PersistentDataType.STRING) : null; }
             case "pdc.set" -> {
                 var h = pdcHolder(p);
-                if (h != null) h.getPersistentDataContainer().set(pdcKey(p), PersistentDataType.STRING, p.get("value").getAsString());
-                yield h != null;
+                if (h == null) yield false;
+                h.getPersistentDataContainer().set(pdcKey(p), PersistentDataType.STRING, p.get("value").getAsString());
+                // 方块持有者（TileState 快照）：不 update() 修改不会写回世界（2026-08-13 审计修复）
+                if (h instanceof org.bukkit.block.TileState ts) { try { ts.update(); } catch (Exception ignored) {} }
+                yield true;
             }
             case "pdc.has" -> { var h = pdcHolder(p); yield h != null && h.getPersistentDataContainer().has(pdcKey(p), PersistentDataType.STRING); }
-            case "pdc.remove" -> { var h = pdcHolder(p); if (h != null) h.getPersistentDataContainer().remove(pdcKey(p)); yield h != null; }
+            case "pdc.remove" -> { var h = pdcHolder(p); if (h != null) { h.getPersistentDataContainer().remove(pdcKey(p)); if (h instanceof org.bukkit.block.TileState ts) { try { ts.update(); } catch (Exception ignored) {} } } yield h != null; }
             case "pdc.keys" -> { var h = pdcHolder(p); yield h != null ? h.getPersistentDataContainer().getKeys().stream().map(NamespacedKey::toString).toList() : java.util.List.of(); }
             case "pdc.getAll" -> {
                 var h = pdcHolder(p);
@@ -967,7 +1021,13 @@ public class FoliaTasks {
             }
             case "material.isAir" -> Material.matchMaterial(p.get("type").getAsString()).isAir();
             case "server.getMaterials" -> Registry.MATERIAL.stream()
-                .filter(m -> m.isItem()).map(m -> m.getKey().toString()).toList();
+                .map(m -> {
+                    var o = new LinkedHashMap<String, Object>();
+                    o.put("key", m.getKey().toString());
+                    o.put("isBlock", m.isBlock());
+                    o.put("isItem", m.isItem());
+                    return o;
+                }).toList();
             case "server.getBlocks" -> Registry.MATERIAL.stream()
                 .filter(Material::isBlock).map(m -> m.getKey().toString()).toList();
             case "server.getItems" -> Registry.MATERIAL.stream()
@@ -984,8 +1044,8 @@ public class FoliaTasks {
             case "world.setStorm" -> { world(p).setStorm(p.get("value").getAsBoolean()); yield true; }
             case "world.getThundering" -> world(p).isThundering();
             case "world.setThundering" -> { world(p).setThundering(p.get("value").getAsBoolean()); yield true; }
-            case "world.getDifficulty" -> world(p).getDifficulty().name();
-            case "world.setDifficulty" -> { world(p).setDifficulty(Difficulty.valueOf(p.get("value").getAsString())); yield true; }
+            case "world.getDifficulty" -> world(p).getDifficulty().name().toLowerCase();
+            case "world.setDifficulty" -> { world(p).setDifficulty(Difficulty.valueOf(p.get("value").getAsString().toUpperCase())); yield true; }
             case "world.getSpawnLocation" -> {
                 var l = world(p).getSpawnLocation();
                 yield Map.of("x", l.getX(), "y", l.getY(), "z", l.getZ(), "yaw", (double) l.getYaw(), "pitch", (double) l.getPitch());
@@ -997,7 +1057,14 @@ public class FoliaTasks {
             }
             case "world.setGameRule" -> {
                 var r = gameRule(p.get("rule").getAsString());
-                if (r != null) world(p).setGameRule(r, p.get("value"));
+                if (r != null) {
+                    var v = p.get("value");
+                    // JsonElement 原样传入 setGameRule 会对布尔/整数规则抛 ClassCastException——
+                    // 按值的 JSON 类型显式转换（2026-08-13 审计修复）
+                    if (v.isJsonPrimitive() && v.getAsJsonPrimitive().isBoolean()) world(p).setGameRule(r, v.getAsBoolean());
+                    else if (v.isJsonPrimitive() && v.getAsJsonPrimitive().isNumber()) world(p).setGameRule(r, v.getAsInt());
+                    else world(p).setGameRule(r, v.getAsString());
+                }
                 yield true;
             }
             case "world.getBiome" -> world(p).getBiome(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getKey().toString();
@@ -1072,10 +1139,13 @@ public class FoliaTasks {
                     }
                     str = str.substring(0, lb);
                 }
-                yield Map.of("type", str, "state", state);
+                // 与 Paper/规范一致：返回完整坐标字段（API 用 r.x/r.y/r.z/r.world 构造 Location）
+                yield Map.of("type", b.getType().getKey().toString(), "state", state,
+                    "x", b.getX(), "y", b.getY(), "z", b.getZ(), "world", world(p).getName());
             }
             case "world.setBlock" -> {
                 var mat = Material.matchMaterial(p.get("blockType").getAsString());
+                if (mat == null) yield Map.of("err", "Unknown block type: " + p.get("blockType").getAsString());
                 var b = world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt());
                 if (p.has("state") && p.get("state").isJsonObject() && p.getAsJsonObject("state").size() > 0) {
                     var sb = new StringBuilder(mat.getKey().toString()).append('[');
@@ -1110,7 +1180,14 @@ public class FoliaTasks {
                 yield true;
             }
             case "world.spawnEntity" -> world(p).spawnEntity(loc(p), EntityType.valueOf(p.get("type").getAsString().toUpperCase())).getUniqueId().toString();
-            case "world.spawnItem" -> world(p).dropItem(loc(p), itemOf(p)).getUniqueId().toString();
+            case "world.spawnItem" -> {
+                // 与 Paper/规范一致：item 对象（{type, amount, meta?}）；兼容旧 itemType 字符串
+                ItemStack it;
+                if (p.has("item") && p.get("item").isJsonObject()) it = itemFromObject(p.getAsJsonObject("item"));
+                else if (p.has("itemType")) it = itemOf(p);
+                else it = new ItemStack(Material.STONE);
+                yield world(p).dropItem(loc(p), it).getUniqueId().toString();
+            }
             // ── Chunk 快照（x/z 为区块坐标；索引基准 = server.getBlocks 数组下标） ──
             case "chunk.getSnapshot" -> {
                 var w = world(p);
@@ -1162,11 +1239,12 @@ public class FoliaTasks {
             case "server.getMaxPlayers" -> Bukkit.getMaxPlayers();
             case "server.setMotd" -> { Bukkit.getServer().setMotd(FoliaTextUtil.toLegacy(FoliaTextUtil.parse(p.get("motd")))); yield true; }
             case "server.getTps" -> {
-                // Folia 无全局 TPS 概念：三个值均返回 null，插件侧据此判断不可用
-                var tps = new LinkedHashMap<String, Object>();
-                tps.put("tps1m", null);
-                tps.put("tps5m", null);
-                tps.put("tps15m", null);
+                // Folia 无全局 TPS 概念：三个值均返回 null（JsonObject 显式携带 null——
+                // Gson 默认丢弃 Map 的 null 值，JS 侧会收到 {}），插件侧据此判断不可用
+                var tps = new com.google.gson.JsonObject();
+                tps.add("tps1m", com.google.gson.JsonNull.INSTANCE);
+                tps.add("tps5m", com.google.gson.JsonNull.INSTANCE);
+                tps.add("tps15m", com.google.gson.JsonNull.INSTANCE);
                 yield tps;
             }
             case "event.subscribe" -> {
@@ -1228,9 +1306,36 @@ public class FoliaTasks {
     }
 
     private static LivingEntity living(JsonObject p) {
-        var e = Bukkit.getEntity(uuid(p));
+        var e = entity(p);
         if (!(e instanceof LivingEntity le)) throw new IllegalArgumentException("Not a living entity");
         return le;
+    }
+
+    /**
+     * 实体解析（执行体）：Folia 的 {@code Bukkit.getEntity} 不含在线玩家——
+     * 失败时回退玩家表（与 {@link TargetKey#resolveEntity} 同策略，2026-08-13 审计修复）。
+     */
+    private static Entity entityOf(UUID uuid) {
+        var e = Bukkit.getEntity(uuid);
+        if (e != null) return e;
+        return Bukkit.getPlayer(uuid);
+    }
+
+    /** 执行体实体解析：找不到抛异常（其余操作语义 = 明确错误）。 */
+    private static Entity entity(JsonObject p) {
+        var e = entityOf(uuid(p));
+        if (e == null) throw new IllegalArgumentException("Entity not found");
+        return e;
+    }
+
+    /** 执行体实体解析（查询语义）：找不到返回 null（entity.get 与 Paper 对齐）。 */
+    private static Entity entityOrNull(JsonObject p) {
+        try { return entity(p); } catch (Exception e) { return null; }
+    }
+
+    /** 缺失语义为"返回 null/false"的查询类任务（与 Paper 行为对齐）；其余操作缺失时报错。 */
+    private static boolean isMissingQuery(String taskType) {
+        return taskType.equals("player.get") || taskType.equals("player.isOnline") || taskType.equals("entity.get");
     }
 
     private static World world(JsonObject p) {
@@ -1267,11 +1372,19 @@ public class FoliaTasks {
 
     // ── PDC ─────────────────────────────────────────────────────────
 
-    /** 目标 region 线程内解析持久化数据持有者（实体或方块）。 */
+    /** 目标 region 线程内解析持久化数据持有者（实体/玩家或方块）。 */
     private static org.bukkit.persistence.PersistentDataHolder pdcHolder(JsonObject p) {
         if (p.has("uuid") && !p.get("uuid").isJsonNull()) {
-            var e = Bukkit.getEntity(UUID.fromString(p.get("uuid").getAsString()));
-            if (e instanceof org.bukkit.persistence.PersistentDataHolder h) return h;
+            try {
+                var uuid = UUID.fromString(p.get("uuid").getAsString());
+                var e = Bukkit.getEntity(uuid);
+                if (e instanceof org.bukkit.persistence.PersistentDataHolder h) return h;
+                // Folia 的 getEntity 不含在线玩家——回退玩家表（2026-08-13 审计修复）
+                var pl = Bukkit.getPlayer(uuid);
+                if (pl != null) return pl;
+                var off = Bukkit.getOfflinePlayer(uuid);
+                if (off.hasPlayedBefore() && off instanceof org.bukkit.persistence.PersistentDataHolder h2) return h2;
+            } catch (IllegalArgumentException ignored) {}
             return null;
         }
         if (p.has("x") && p.has("world")) {
@@ -1489,8 +1602,57 @@ public class FoliaTasks {
                 meta.getEnchants().forEach((ench, lvl) -> enchs.put(ench.getKey().toString(), lvl));
                 metaMap.put("enchantments", enchs);
             }
+            if (meta.isHideTooltip()) metaMap.put("hideTooltip", true);
+            if (!meta.getItemFlags().isEmpty()) {
+                metaMap.put("itemFlags", meta.getItemFlags().stream().map(Enum::name).toList());
+            }
             if (meta instanceof org.bukkit.inventory.meta.Damageable d && d.hasDamage()) {
                 metaMap.put("damage", d.getDamage());
+            }
+            // 扩展 meta 回读（与 itemFromObject 写侧对称，2026-08-13 审计修复）：
+            // color / potionEffects / skullOwner / attributeModifiers
+            if (meta instanceof org.bukkit.inventory.meta.LeatherArmorMeta lam && lam.getColor() != null) {
+                metaMap.put("color", "#" + Integer.toHexString(lam.getColor().asRGB()));
+            }
+            if (meta instanceof org.bukkit.inventory.meta.PotionMeta pm) {
+                if (pm.hasColor()) metaMap.put("color", "#" + Integer.toHexString(pm.getColor().asRGB()));
+                if (pm.hasCustomEffects()) {
+                    var effs = new java.util.ArrayList<Object>();
+                    for (var pe : pm.getCustomEffects()) {
+                        var em = new LinkedHashMap<String, Object>();
+                        em.put("type", pe.getType().getName().toLowerCase());
+                        em.put("duration", pe.getDuration());
+                        em.put("amplifier", pe.getAmplifier());
+                        em.put("ambient", pe.isAmbient());
+                        em.put("particles", pe.hasParticles());
+                        effs.add(em);
+                    }
+                    metaMap.put("potionEffects", effs);
+                }
+            }
+            if (meta instanceof org.bukkit.inventory.meta.SkullMeta sm && sm.getPlayerProfile() != null) {
+                var profile = sm.getPlayerProfile();
+                String textures = null;
+                for (var pr : profile.getProperties()) {
+                    if ("textures".equals(pr.getName())) { textures = pr.getValue(); break; }
+                }
+                if (textures != null) {
+                    metaMap.put("skullOwner", textures);
+                } else if (profile.getName() != null) {
+                    metaMap.put("skullOwner", profile.getName());
+                }
+            }
+            if (meta instanceof org.bukkit.inventory.meta.ItemMeta im && !im.getAttributeModifiers().isEmpty()) {
+                var mods = new java.util.ArrayList<Object>();
+                im.getAttributeModifiers().forEach((attr, mod) -> {
+                    var am = new LinkedHashMap<String, Object>();
+                    am.put("attribute", attr.getKey().toString());
+                    am.put("amount", mod.getAmount());
+                    am.put("operation", mod.getOperation().name().toLowerCase());
+                    if (mod.getSlotGroup() != null) am.put("slot", mod.getSlotGroup().toString());
+                    mods.add(am);
+                });
+                metaMap.put("attributeModifiers", mods);
             }
             m.put("meta", metaMap);
         }
