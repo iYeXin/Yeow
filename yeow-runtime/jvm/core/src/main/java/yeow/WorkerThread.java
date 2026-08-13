@@ -136,9 +136,9 @@ public class WorkerThread implements PluginEntity, Runnable {
 
     /**
      * 等待 JS 线程退出（最长 5s）。超时未退出 → 强杀路径：
-     * ① wrapper 3.9.0+：原生中断（PluginThread.requestInterrupt）——JS 线程在自身
-     * 执行流中止，随后正常退出并在 run() finally 自毁上下文；
-     * ② 旧 wrapper / 卡在 Java 调用无法回 JS 的线程：thread.interrupt() 唤醒阻塞点，
+     * ① {@code ctx.interrupt()}（wrapper 3.9.0+，JS_SetInterruptHandler）原生中断——
+     * JS 线程在自身执行流中中止，随后正常退出并在 run() finally 自毁上下文；
+     * ② 卡在 Java 调用无法回 JS 的线程：thread.interrupt() 唤醒阻塞点，
      * 仍无法退出则置 forceKilled 标记，由调用方重建全新实体将其遗弃。
      * **绝不在本线程调用 ctx.destroy()**（QuickJS wrapper 的 destroy 要求创建线程调用，
      * 跨线程调用必然抛异常、上下文从未释放；去掉守卫则演变为 use-after-free）。
@@ -152,12 +152,13 @@ public class WorkerThread implements PluginEntity, Runnable {
         if (running) {
             log.warning("[" + entityName + "] worker unresponsive 5s - forcing stop");
             running = false;
-            PluginThread.requestInterrupt(ctx); // 原生中断（3.9.0+）：JS 线程在自身执行流中止
+            var c = ctx;
+            if (c != null) { try { c.interrupt(); } catch (Exception ignored) {} } // 原生中断（3.9.0+）
             thread.interrupt();
             try { thread.join(1000); } catch (InterruptedException ignored) {}
             if (thread.isAlive()) {
-                // 线程仍卡住（旧 wrapper 无中断支持，或卡在无法返回 JS 的 Java 调用）。
-                // 不跨线程 destroy（见方法注释）：标记强杀，让调用方重建实体。
+                // 线程仍卡住（卡在无法返回 JS 的 Java 调用等）。不跨线程 destroy
+                // （见方法注释）：标记强杀，让调用方重建实体。
                 forceKilled = true;
                 try { thread.join(1000); } catch (InterruptedException ignored) {}
             }

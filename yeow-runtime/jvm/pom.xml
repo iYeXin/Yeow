@@ -24,7 +24,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <paper.version>1.21.4-R0.1-SNAPSHOT</paper.version>
         <gson.version>2.11.0</gson.version>
-        <quickjs.version>3.8.0</quickjs.version>
+        <quickjs.version>3.9.0</quickjs.version>
         <snakeyaml.version>2.2</snakeyaml.version>
         <junit.version>5.11.0</junit.version>
     </properties>
