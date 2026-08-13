@@ -108,6 +108,28 @@ Java → 插件: postMessage(msg) → 入队（原子）→ 唤醒插件消息�
 JS  → Java: $_send 通道消息 → Scheduler tick() 处理 game 任务 / 插件线程直接处理 fs 等
 ```
 
+### 定时器资源管理
+
+- 每个插件拥有独立的 `ScheduledExecutorService`（线程名 `timer-<插件名>`）
+- 所有 `ScheduledFuture` 存储在 `timerFutures` 列表
+- 卸载/重载时 `cancel()` 所有 Future + `shutdownNow()`；`scheduler.purgePluginTasks(name)` 清理残留的 PendingTask
+
+## 平台无关性
+
+Yeow 插件本身**平台无关**：
+
+- 插件包是一个 ZIP（`.yeow.zip` 或部署为 JAR），内含 `.yeow/main.js`（打包后的 JS）、`assets/`、`yeow.json`（含权限声明）
+- 不依赖 Java 环境——运行时不限语言/平台
+- 放入 `plugins/Yeow/` 会被运行时自动扫描加载（也可用 `/yeow load` 手动加载）
+- 任何符合 [平台规范](/specifications/README) 的运行时都能加载并运行 Yeow 插件：
+  1. 理解插件包结构（读取 `yeow.json`、`.yeow/main.js`、`assets/`）
+  2. 实现调度器（任务队列 + 优先级 + 时间片）
+  3. 实现执行器（把任务翻译为宿主平台的游戏操作）
+  4. 实现符合标准的 JS 运行时（`$_send` 桥、回调协议、生命周期消息）
+  5. 实现通道（fs / http / assets / service / timer 等）
+
+Paper 系（Paper/Purpur/Leaf 等）的 yeow-runtime 是官方实现的运行时示例；Folia 版运行时是第二个官方实现（[Folia 支持](folia.md)）。更多插件包格式见 [平台规范](/specifications/README)。
+
 ## 插件实体抽象
 
 运行时以 **`PluginEntity`** 接口看待每个插件：可接收消息（`postMessage`）、有生命周期（`start` / `stopAndWait` / `reload`）与行为指标（`ping()` 心跳往返）。JS 的特殊性（QuickJS 上下文、`$hm` 消息协议、init.js）只存在于 JS 适配器（`PluginThread`）内；调度器 / 事件桥 / 命令桥 / Service / Profile 均只依赖该接口：

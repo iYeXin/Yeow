@@ -162,7 +162,6 @@ export default defineConfig({
                     { text: '生命周期与热重载', link: '/advanced/lifecycle' },
                     { text: '环境能力与通道', link: '/advanced/channels' },
                     { text: '服务机制', link: '/advanced/service' },
-                    { text: '运行时运维与安全', link: '/advanced/operations' },
                     { text: '关于 Yeow', link: '/advanced/about' },
                 ],
             },

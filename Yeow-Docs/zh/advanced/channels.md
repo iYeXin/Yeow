@@ -100,42 +100,4 @@ init.js 封装层
 
 ## 运行时配置
 
-`plugins/Yeow/runtime/config.yml`（首次启动自动生成）：
-
-```yaml
-# 每 tick 游戏任务预算（毫秒）
-tick-budget-ms: 20
-
-# 三级优先级预算比例
-priority-ratios: [0.5, 0.3, 0.2]
-
-# 自动降级
-auto-demote: true
-demote-threshold: 200
-
-# 空闲自旋等待（微秒），0 关闭
-idle-spin-us: 100
-
-# 实验性：并发处理事件
-# 启用后，多个插件订阅同一事件时并发执行事件处理器，
-# 操作通过调度器串行化，不会产生竞态。
-concurrent-events: true
-
-# 运行时警告与动态扩容
-profile:
-  warnings-enabled: true           # 预警引擎（默认开启，独立于全量分析）
-  warn-cooldown-seconds: 1800      # 同类警告冷却（30min）
-  latency-warn-threshold-ms: 200   # 心跳超时阈值
-  event-slow-threshold-ms: 2000    # 事件响应警告阈值（超时仍为 5000）
-  tab-slow-threshold-ms: 500       # 补全响应警告阈值（超时仍为 1000）
-  callback-timeout-event-ms: 5000  # 事件等待上限（运行时生效）
-  callback-timeout-tabcomplete-ms: 1000
-  suspend-warn-seconds: 30         # 插件挂起检测
-  backlog-threshold: 35            # 扩容信号：40 tick 中积压次数阈值
-  backlog-window-ticks: 40
-  scheduler-saturation-pct: 80     # 调度饱和告警百分比
-  scaler:
-    enabled: true                  # 动态扩容
-    expansion-factor: 1.3
-    max-multiplier: 3.0
-```
+`plugins/Yeow/runtime/config.yml`（首次启动自动生成）的完整参考（含 Folia 节与预警配置）见 [运行时运维 - 运行时配置](/operations#运行时配置)；预警阈值与动态扩容见 [运行时警告指南](/runtime-warning)。

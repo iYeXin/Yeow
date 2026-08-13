@@ -2,7 +2,7 @@
 
 > 事件桥（EventBridge）：并发/串行模式、事件数据、处理器操作与模式选择；统一回调系统。
 
-### EventBridge
+## EventBridge
 
 ```
 Paper 系事件触发
@@ -27,7 +27,7 @@ Paper 系事件触发
   → applyMods(): if (cancelled) event.setCancelled(true)
 ```
 
-### 并发事件处理
+## 并发事件处理
 
 当多个插件订阅同一事件时，Yeow 支持串行（默认）和并发两种模式：
 
@@ -38,13 +38,13 @@ Paper 系事件触发
 
 并发模式下，每个插件使用独立的 callbackId，`CountDownLatch` 等待所有插件完成。事件数据对所有插件共享同一份快照。由于游戏操作通过调度器串行化，不会产生竞态。`cancelled` 合并策略：任一插件取消则取消。
 
-### 事件数据
+## 事件数据
 
 所有事件字段是基本类型（string/number/boolean/object），JS 端 yeow-api 的 `adaptEvent()` 自动包装：
 - `player` UUID → `Player.getSync(uuid)` 对象（同步转换，不影响事件处理）
 - `from`/`to`/`respawnLocation` → `Location` 对象
 
-### 事件处理器中的操作
+## 事件处理器中的操作
 
 ```js
 // 自动模式（默认）
@@ -75,7 +75,7 @@ eventOn('blockBreak', { manualRelease: true }, (e, complete) => {
 });
 ```
 
-### 事件重入死锁
+## 事件重入死锁
 
 事件派发期间，**事件线程自旋等待 JS handler 完成**，同时**排空调度器队列**——这会执行事件插件的**同步任务**（`call` 提交的）。若某个同步任务在事件线程上执行时**触发了新的事件**，且插件监听了它，就会发生**事件重入**：
 
@@ -100,7 +100,7 @@ blockBreak 事件 → 事件线程自旋
 >
 > 事件内请使用**异步 API**（`await xxx()`）。异步操作不阻塞 JS 线程，事件可正常完成。
 
-### 事件处理模式选择
+## 事件处理模式选择
 
 自动模式下，事件处理器返回 Promise 时立即释放事件。这意味着 async handler 中的 `await` 之后设置 `event.cancelled` 无效。
 

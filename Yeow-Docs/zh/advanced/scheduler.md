@@ -1,36 +1,10 @@
 # 调度器与任务
 
-> 三级优先级调度器：时间片预算、自动降级、空闲自旋；异步 vs 同步、手动分片；开始执行游戏任务的时机（onLoad/onInit）。
+> 三级优先级调度器：时间片预算、自动降级、空闲自旋；异步 vs 同步、手动分片；开始执行游戏任务的时机（onLoad/onInit）。调度器内部机制（三级队列、自动降级算法、空队自旋）见下文「调度器设计」。
 
-## 调度器
+## 任务配置（TaskOptions）
 
-三级优先级队列 + 时间片预算机制。
-
-```
-tick() 每 50ms 调用:
-  budget = tick-budget-ms (默认 20ms)
-  deadline = now + budget
-
-  ① HIGH   50% 预算 → 用完溢出给 NORMAL
-  ② NORMAL 30% 预算 → 用完溢出给 LOW
-                      → 同时检查自动降级（>200次/秒 → LOW）
-  ③ LOW    20% 预算 → 不溢出
-```
-
-- 每个 tier 独立预算，用完后该 tier 的任务留到下一 tick
-- 每次检查全局 deadline，超时即停止，不打断当前执行中的任务
-- NORMAL 任务调用频率超过阈值时自动降级到 LOW，减少对 HIGH 的干扰
-
-### 优先级参数
-
-```js
-// yeow-api 的 call/post 支持可选优先级
-call('player.get', { id }, 'high')      // 高优先级
-post('player.sendMessage', {...}, 'low') // 低优先级
-// 默认 normal
-```
-
-**任务配置（TaskOptions）**：所有走 task 通道的 API 方法（`player.sendMessage`、`world.setBlock` 等，含 Sync 变体）均可在**参数末尾**传入可选任务配置对象，透传给调度器：
+所有走 task 通道的 API 方法（`player.sendMessage`、`world.setBlock` 等，含 Sync 变体）均可在**参数末尾**传入可选任务配置对象，透传给调度器：
 
 ```js
 await player.sendMessage('Hello', { priority: 'high' });   // 高优先级
@@ -203,13 +177,7 @@ tick() 每 50ms 被 Paper 系主线程调用:
 
 每个 tick 的总预算默认 20ms（`tick-budget-ms: 20`），由 `plugins/Yeow/runtime/config.yml` 配置。超过 deadline 的任务排队到下一 tick。
 
-### 优先级参数
-
-```js
-call('player.get', { id }, 'high')      // 高优先级
-post('player.sendMessage', {...}, 'low') // 低优先级
-// 不传或传 'normal' 为默认
-```
+> **优先级参数**：API 层经 `TaskOptions` 传入（见上文「任务配置」）；底层 `call`/`post` 也接受旧式字符串优先级（`'high'` / `'normal'` / `'low'`）。
 
 ### 自动降级算法
 
