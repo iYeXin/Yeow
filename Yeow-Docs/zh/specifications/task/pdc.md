@@ -2,7 +2,7 @@
 
 自定义持久化数据（Persistent Data Container）。pdc 通用键值存储，支持 Player、Entity、World、Block 四种持有者。
 
-所有值类型为 `string`。
+所有值类型为 `string`（JSON 序列化由 yeow-api 层自动处理）。
 
 ---
 
@@ -16,7 +16,10 @@
 | `pdc.set` | `{ "uuid": "<uuid>" \| "world": "<name>", "key": "<key>", "value": "<value>" }` | `true` |
 | `pdc.has` | `{ "uuid": "<uuid>" \| "world": "<name>", "key": "<key>" }` | `boolean` |
 | `pdc.remove` | `{ "uuid": "<uuid>" \| "world": "<name>", "key": "<key>" }` | `true` |
-| `pdc.keys` | `{ "uuid": "<uuid>" \| "world": "<name>" }` | `string[]` |
+| `pdc.keys` | `{ "uuid": "<uuid>" \| "world": "<name>" }` | `string[]`（完整 key 格式，含命名空间） |
+| `pdc.getAll` | `{ "uuid": "<uuid>" \| "world": "<name>" }` | `{ "<key>": "<value>" }`（**本插件命名空间**的键值，key 不含命名空间） |
+
+> `pdc.getAll`（2026-08-13）：仅返回当前插件命名空间的键——配合 `_plugin` 归属注入，避免跨插件数据串扰。
 
 ---
 
@@ -40,11 +43,14 @@
 
 ## Key 格式
 
-Key 支持 `namespace:key` 格式（如 `yeow:mykey`），也支持纯字符串（运行时默认命名空间为 `yeow`）。key 在存储前自动转为小写，允许字符受限于 `[a-z0-9/._-]`。
+Key 支持 `namespace:key` 格式（如 `myplugin:mykey`）。**纯字符串（无冒号）默认使用插件命名空间**（任务参数 `_plugin`，运行时注入）——不同插件的裸 key 互不冲突；`_plugin` 缺失时回退 `yeow`。key 在存储前自动转为小写，允许字符受限于 `[a-z0-9/._-]`。
 
 ```json
-// 等价
+// 插件 folia-test 场景下的等价关系：
+{ "key": "myplugin:mykey" }    // 显式命名空间
+{ "key": "mykey" }             // → <插件名>:mykey（如 folia-test:mykey）
+{ "key": "MyPlugin.DeathLoc" } // → <插件名>:myplugin.deathloc（自动转为小写）
+
+// 旧数据兼容：历史版本默认 yeow 命名空间，迁移读取：
 { "key": "yeow:mykey" }
-{ "key": "mykey" }          // 解析为 yeow:mykey
-{ "key": "MyPlugin.DeathLoc" }  // → yeow:myplugin.deathloc（自动转为小写）
 ```

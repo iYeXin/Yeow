@@ -54,10 +54,13 @@ public class FoliaCommandBridge {
 
         var cmd = new BukkitCommand(cmdName) {
             public boolean execute(CommandSender s, String l, String[] a) {
-                // 骨架：直接 Bukkit 权限检查（permissionCheck 生态钩子后续补充）
-                if (perm != null && !perm.isEmpty() && !s.hasPermission(perm)) {
-                    s.sendMessage("No permission.");
-                    return true;
+                // Yeow 生态权限检查：permissionCheck 事件结果优先，无处理时回退 Bukkit hasPermission。
+                // 命令不设 Bukkit setPermission（不拦截）--执行时检查，保证 permissionCheck 可拦截。
+                if (perm != null && !perm.isEmpty()) {
+                    String target = s instanceof Player pl ? pl.getUniqueId().toString() : "CONSOLE";
+                    var r = FoliaEventBridge.checkPermission(target, perm);
+                    boolean ok = r != null ? r : s.hasPermission(perm);
+                    if (!ok) { s.sendMessage("No permission."); return true; }
                 }
                 var payload = Map.of("sender", Map.of("name", s.getName(),
                     "uuid", s instanceof Player pl ? pl.getUniqueId().toString() : "CONSOLE",
@@ -96,12 +99,10 @@ public class FoliaCommandBridge {
             for (var e : p.getAsJsonArray("aliases")) as.add(e.getAsString());
             cmd.setAliases(as);
         }
-        // 权限节点注册进 Bukkit 权限系统（PermissionDefault 语义：all/op/none）
+        // 权限节点注册进 Bukkit 权限系统（PermissionDefault 语义：all/op/none）；
+        // 默认值记录供 permissionCheck 事件携带（PermissionRegistry 幂等注册）
         if (perm != null && !perm.isEmpty()) {
-            try {
-                var pd = org.bukkit.permissions.PermissionDefault.getByName(permDefault.toUpperCase());
-                Bukkit.getPluginManager().addPermission(new org.bukkit.permissions.Permission(perm, pd));
-            } catch (Exception ignored) {}
+            FoliaPermissionRegistry.register(perm, permDefault);
         }
         map.register(pluginName.toLowerCase(), cmd);
         pluginCommands.computeIfAbsent(pluginName, k -> new ArrayList<>()).add(cmdName);

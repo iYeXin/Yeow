@@ -1,0 +1,148 @@
+# 更新日志
+
+> 从 2026-08-08 开始记录。一天内的多次更新合并为一节。
+
+---
+
+## 2026-08-13
+
+### API 覆盖扩充（Entity / WorldBorder / Tab / 批量任务 / Inventory 内容物）
+
+- **Entity 基础补齐**：`getVelocity`/`setVelocity`（速度向量）、`getFireTicks`/`setFireTicks`（着火）、`getTicksLived`/`setTicksLived`、`isOnGround`、`damage(amount, damager?)`；yeow-api 的 `Entity`/`LivingEntity` 类补齐对应属性与方法
+- **`entity.setTarget`**（AI 目标）：实体目标（`targetUuid` → `Mob.setTarget`）或位置目标（`world`+`x`+`y`+`z` → `Pathfinder.moveTo`，可带 `speed`）——**不保证必然生效**（取决于实体类型/寻路能力，可移植性取舍，不引入 attribute 任务族）
+- **玩家**：`setItemInMainHand`/`setItemInOffHand`（完整 ItemStack 含 meta）、`sendTabHeader`（Tab 栏 header/footer，MiniMessage）、`setPlayerListName`、`setBorder`（客户端世界边界，null 重置）
+- **世界**：`getSeed`/`getEnvironment`/`getWorldType`/`getGameRules` + **WorldBorder 全套**（`getBorder`/`setBorderCenter`/`setBorderSize`/`setBorderDamage`/`setBorderWarning`/`setBorderMoving`）
+- **Inventory**：`getContents`/`setContents`（全槽位快照读写）
+- **批量任务提交**（core 内部，无调度器改动）：task 通道支持 `tasks` 数组——`callBatch`（同步结果数组）/ `postBatch`（异步 Promise 结果数组），逐个独立执行无原子性，单个失败对应项为 `{err}`；协议见 specifications/message/task.md
+- 任务总量：Paper 224 / Folia 224
+
+### Folia：任务 / 事件 / 权限与 Paper 全对齐
+
+- **任务覆盖全对齐**：Folia 200 个任务 case 覆盖 Paper 全部 198 个——补全 inventory 家族、GUI / BossBar / Scoreboard / Recipe / Advancement 五大块、区块快照（`chunk.getSnapshot`）、世界音效/粒子等；修复 `chunk.` 前缀区块坐标路由（此前会被当作世界坐标 >>4 错路由）
+- **事件覆盖全对齐**：41 个 Bukkit 事件 + `permissionCheck` 生态钩子（补全 playerMove、blockPlace、entityDamage、serverPing 等 33 个）；javap 确认此 Folia build 的事件继承链差异并适配（PlayerTeleportEvent extends PlayerMoveEvent、ProjectileLaunchEvent extends EntitySpawnEvent、BlockSpreadEvent extends BlockFormEvent extends BlockGrowEvent、EntityExplodeEvent 与 BlockExplodeEvent 为独立类）
+- **权限系统对齐 Paper**：新增 `FoliaPermissionRegistry`（权限节点幂等注册 + default 记录）；`permissionCheck` 生态钩子接线（命令执行检查 + `player.hasPermission`），事件携带 `permission: {node, default}` 对象；修复 Paper 同款 `_eventId` 缺失隐藏 bug（此前 permissionCheck handler 的返回永远超时 5s 不生效）
+
+### Folia：实机验证修复（Yeow-Test/folia 双区域基准）
+
+- **实体解析修复**：Folia 的 `Bukkit.getEntity(uuid)` 不含在线玩家——实体/玩家目标解析回退 `getPlayer(UUID)`（此前玩家在线却报 "entity not found"）
+- **全局状态写入自动路由**：`world.setTime / setStorm / setThundering / setDifficulty / setSpawnLocation / setGameRule` 在 Folia 上只能在全局 region 线程修改（AsyncCatcher 拦截）——运行时自动将这些任务路由到全局线程，插件无感知
+- **Scoreboard 限制**：Folia 不支持创建计分板对象（`registerNewObjective`/`registerNewTeam` 全部重载抛 `UnsupportedOperationException`）——`createObjective`/`createTeam` 返回明确错误 `{err: "Folia does not support creating new objectives/teams"}`（已存在对象则更新 displayName）；仅支持读取与修改已存在对象（`setScore`、`setTeamPrefix` 等可用）
+
+### Folia：调度器 v1 打磨与看门狗（已提交）
+
+- **v1 打磨**（`195c51e`）：事件取件回归纯 L（只取本插件任务，天然分流）；`runCycleOn` 的 world 目标免全局线程跳转；GLOBAL 任务在全局线程就地执行（消除双跳）；预算尽重启改每 tick 定时任务（等待 ≈ 窗口剩余 ~30ms，毛刺从 ~50-80ms 降至 ~31-57ms）
+- **看门狗 + 投递超时**（`8c717ff`）：cycle 启动投递被 region 调度器静默丢弃时强制重启（1s 活性阈值 + 防重启风暴）；在途投递超时由每任务定时器合并为周期任务粗粒度扫描（5s 兜底补 err 并回收 in-flight，防区域停摆时调度器永久停摆）
+
+### PDC / ItemStack API 扩展
+
+- **PDC**：  - `pdcGet`/`pdcSet` 自动 JSON 序列化/反序列化——任意对象/数字/布尔直接存取，无需手写 `JSON.stringify`（`getRaw`/`setRaw` 保留底层字符串读写）
+  - 新增 `pdcGetAll`：一次取回本插件命名空间全部键值
+  - **裸 key 默认命名空间由 `yeow` 改为插件名**——不同插件的裸 key（如 `score`）互不冲突；历史数据需用 `yeow:key` 显式访问迁移
+  - `Player` / `Block`（需 location）新增实例方法：`setPdc` / `getPdc` / `hasPdc` / `removePdc` / `keysPdc` / `getAllPdc`
+- **ItemStack**：
+  - meta 扩展：`damage`（耐久损伤）、`color`（`#RRGGBB` 或 rgb——皮革盔甲染色/自定义药水颜色）、`potionEffects`（自定义药水效果）、`skullOwner`（玩家名 / UUID / base64 纹理头颅）、`attributeModifiers`（属性修饰符）；不支持的字段静默忽略（跨版本兼容）
+  - 新增工具：`ItemStack.create` / `clone` / `equals`
+  - `inventory.setItem` 现在接受**完整 ItemStack（含 meta）**（旧参数 `itemType`/`amount` 弃用；传 null 清空槽位）；`inventory.getItem` / `player.getItemInMainHand` 读回含 meta
+  - 
+### Inventory 统一重构
+
+- **统一 Inventory 容器抽象**：玩家物品栏（`player.inventory`）、**容器方块**（`block.getInventory()`——Chest / Furnace / Hopper / Barrel / Dispenser / Dropper / BrewingStand 等，新增能力）、自定义 Inventory（原 GUI，`Inventory.create`）三种持有者共用同一套方法（`getItem` / `setItem` / `setItems` / `addItem` / `removeItem` / `clear` / `fill` / `getSize` / `getType`）
+- **弃用 "GUI" 术语**：任务族统一为 `inventory.*`（原 `gui.*` 并入，三寻址：`uuid` / `world+x+y+z` / `id`）；事件字段 `guiId` → **`inventoryId`**；`GUI` 类 → `Inventory` 类（`GUI.create` → `Inventory.create`，方法名不变）；API 文档 `gui.md` 并入 `inventory.md`
+- `addItem` 返回**未放入数量**（玩家溢出掉落，返回 0）；`inventory.getType` 返回 `PLAYER` / `CUSTOM` / 方块实体类型名
+
+### 文档
+
+- **新增"事件重入死锁"专节**（advanced/events.md）：事件处理中同步操作（含属性读写）触发新事件 → 嵌套自旋死锁至 5s 超时，**Paper 与 Folia 均存在**；警告除非逻辑非常简单否则事件内用异步 API；getting-started 同步引用
+- 已知差异整理（folia.md）：Scoreboard 创建限制、全局状态路由、TPS 返回 null；文档站侧边栏补 "Folia 支持" 条目
+- 域名迁移：`docs.yexin.wiki` → `yexin.wiki`（含运行时告警框的 HELP_URL）
+- API / 规范文档全面同步（PDC / ItemStack / Inventory / 事件字段 / 任务规范）
+
+## 2026-08-12
+
+### Folia：调度器脚手架 + 运行时拆分收尾（`396e536`）
+
+- **Folia 平台运行时雏形**：非阻塞调度器 + 区域驻留（调度循环借宿 region 线程）、让出/抢占迁移（热点跟随）、空闲 park 阻塞等待、物理时间预算（50ms 窗口）、in-flight 上限（默认 100）+ 5s 投递超时兜底、严格 H→N→L 取件 + 提交时自动降级
+- **三函数契约**：调度器对任务类型零认知——`ownedHere` / `getScheduler` / `execute` 家族共享实现，目标 key 解析收敛于 `TargetKey`（新增任务类型只需实现对应分支）
+- 事件桥懒注册 + 多 handler eventId 精确匹配；SpinPump 统一事件/补全自旋样板
+- 关键修复：事件多 handler 越界与 latch 错位、finishCycle 丢失唤醒、迁移机制持续负载下失效、in-flight 泄漏（region 无 retired 回调）、过期驻留权不清理、runDelayed 毫秒/tick 单位错误（1.5s 停顿）、B 路径抢占缺失、config.yml 首次落盘失效
+- 配置分层：Folia 专用参数移入 `folia:` section；文档新增 advanced/folia.md（环境约束/调度模型/迁移机制）
+
+## 2026-08-11
+
+### 运行时架构：core / paper 双模块拆分（`c44f1f4`）
+
+- `yeow-runtime` 拆分为 `jvm/core`（平台无关引擎：QuickJS、消息桥、插件生命周期、权限、Service、Profile）+ `jvm/paper`（Paper 平台实现）——`PlatformHost` 平台桥接口成为唯一耦合面，为 Folia 等新平台铺路
+
+### 协议层：instance id 不透明句柄（`82d8cb0`）
+
+- JS 句柄（GUI/BossBar/Inventory）id 改为**不透明句柄**（每上下文随机种子，无业务前缀）——修复跨插件 id 冲突；版本 yeow-api 0.2.117 / create-yeow 0.2.127
+
+### 调度修复（`8b0fb44` 等）
+
+- 命令补全与 `permissionCheck` 自旋改用 `scheduler.drainAll()`——补全结果任务不再被 tick 预算饿死
+- `permissionCheck` 超时对齐事件配置（默认 5s）
+
+## 2026-08-10
+
+### 调度器：事件自旋无预算排空（`c3cbcdb` / `ab3071a`）
+
+- 事件派发等待期间排空调度器队列**不再受 tick 预算限制**——高负载下事件 `event.complete` 不再被饿死（此前会触发 5s 超时）
+- `drainAll` 重构为单循环一轮一任务（HIGH→NORMAL→LOW）——新鲜高优先级任务不被低优先级积压饿死
+
+## 2026-08-09
+
+### 权限系统
+
+- **`permissionCheck` 事件**（`4d3c5b3`）：`player.hasPermission` 任务与 Yeow 命令执行检查会触发该事件，handler 返回 `{allowed}` 决定结果——**覆盖 Bukkit 权限系统**，无处理时回退；仅限 Yeow 生态（不拦截其他 Java 插件）；多 handler 以最后返回者为准
+- **`registerPermission({node, default: 'all'|'op'|'none'})` API**（`c2bd859`）；命令注册接受权限对象，`permissionCheck` 事件携带 `permission: {node, default}`；节点仍注册进 Bukkit（permissions.yml / LuckPerms 可管理）
+- 命令权限默认值由 `none` 改为 **`op`**（`62e76ae`）
+
+### CommandSender 类型重构（`b8b68e5`）
+
+- **破坏性变更**：命令执行器的 `sender` 现在是**真正的 `Player` 对象**（`isPlayer: true` 时）或字符串 `'CONSOLE'`——`p.sender === 'CONSOLE'` 判断后即可直接用 `p.sender` 的 Player 方法（`sendMessage` 等）
+
+### Java 插件集成 API（`8cc848d`）
+
+- 其他 Java 插件可调用 Yeow 插件注册的服务：`requestService`（请求-响应）、`subscribeService`（订阅事件）——`depend: [Yeow]` + `Bukkit.getPluginManager().getPlugin("Yeow")` 即可；文档新增 `specifications/java-api.md`
+
+### dev-server AI / headless 模式（`34b3980` 等）
+
+- `--eula`（自动接受 EULA）/ `--timeout` / `--wait` / `--outfile` / `--keep`（PID 输出、加载检测、自动退出）——供 AI 代理自动化验证；`--eula` 自动接受修复、UTF-8 输出编码、退出流程加固
+
+### 文档与模板
+
+- `advanced.md` 拆分为 `advanced/`（7 篇：架构/调度器/事件/生命周期/通道/服务/运维）
+- about.md
+- 模板命令注册示例：`sender` 先判 CONSOLE 再收窄为 Player
+
+## 2026-08-08
+
+### 文本与 Message 对象
+
+- **Message 对象（可翻译组件）**（`ae9878f` 等）：`sendMessage` / `sendActionBar` / `broadcast` 支持 `{key, args}` 或 `{text}` 载荷——key 本地化 + text 纯文本兜底同时传递；`playerDeath.deathMessage` 直接为 Message 对象（跨版本读取修复：Paper `deathMessage()` Component 优先，回退 `getDeathMessage()`）；`playerAdvancementDone` 新增 `title` / `description` Message 字段
+- **文本转义规则**（`7352ac0` 等）：`\n` 等字面反斜杠序列在文本管线中保留（不再被误转成换行）——只有真实控制字符 / MiniMessage 标签才生效；`\\n` 保持字面量；文档新增 Text & MiniMessage 章节
+
+### Worker API（虚拟插件）（`1ea380c` 等）
+
+- `createWorker` 创建独立线程 + 独立 QuickJS 上下文的执行单元：`load` / `unload` / `reload`、双向 `postMessage`；共享主插件数据目录与权限；**不能销毁只能卸载**（句柄保留可重新 load）；禁嵌套 Worker
+- 接入全链路：调度器（独立队列统计/purge）、事件/命令/Service 以注册名登记、Profile 标记虚拟插件、`/yeow` 管理命令不覆盖
+- 构建：`yeow.config.json` 的 `dev.worker` 声明 Worker 打包（先打包 Worker 再打包主插件）；dev 热重载 + source-map 错误按 origin 定位
+
+### HTTP / yeow-utils
+
+- **http 响应支持 `bodyBase64`**（`a449efc`）：二进制响应（资源包等）无需 base64 中转
+- **createServer**（yeow-utils）：对象返回值自动 JSON 序列化（`738b1fa`）；洋葱模型中间件 `use`/`next` + 静态文件 `mount(dir, prefix)`（路径穿越防护 + MIME 推断）（`4336069`）；`mountAssets` 直接从 zip 服务打包资源（`dd1599c`）；类型化二进制响应（`8b380b9`）
+- **破坏性修复**：异步 fs/assets/http 回调现在投递**对象**而非 JSON 字符串（`8ad0958`）——与同步调用 `JSON.parse` 语义一致
+
+### 其他 API
+
+- `Player.performCommand`：以玩家身份执行命令（`ab39d73`）
+- `sendResourcePack` 的 `prompt` 接受 Message 对象（`eace762`）
+- **`env` 通道 + `getEnv()`**（`796b636` / `85b000a`）：cpus / memory / arch / minecraftVersion / Yeow 版本 / epoch 微秒时间戳（移除原 `now` 通道）
+
+### 文档站与 AI 工作流
+
+- **站点地图**（`sitemap.md`，AI / Vibe-Coding 友好：全部页面标题 + 摘要 + URL）（`7e638cd`）
+- **docs.zip**：构建时产出全量 Markdown 压缩包（`/v1/docs.zip`），模板内置 sitemap.md + AGENTS.md 供 AI 代理查阅（`b02c807`）
+- **AI 代理启动指南**（`/ai-agent`）+ 强烈推荐 TypeScript（AI 辅助编码场景）（`69264cf` / `a3307ea`）
+- ItemStack 文档章节（纯数据快照语义）+ 侧边栏分组（`f9e4d48`）

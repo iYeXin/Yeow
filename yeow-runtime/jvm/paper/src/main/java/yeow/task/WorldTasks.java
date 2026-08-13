@@ -25,6 +25,48 @@ public class WorldTasks {
     public static Object setGameRule(JsonObject p) { try { var r = (GameRule) GameRule.class.getField(p.get("rule").getAsString().toUpperCase()).get(null); world(p).setGameRule(r, p.get("value")); } catch(Exception e) { /* ignore */ } return true; }
     public static Object getBiome(JsonObject p) { return world(p).getBiome(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getKey().toString(); }
     public static Object getHighestBlockY(JsonObject p) { return world(p).getHighestBlockYAt(p.get("x").getAsInt(), p.get("z").getAsInt()); }
+    // ── 世界信息（2026-08-13） ──
+    public static Object getSeed(JsonObject p) { return world(p).getSeed(); }
+    public static Object getEnvironment(JsonObject p) { return world(p).getEnvironment().name(); }
+    public static Object getWorldType(JsonObject p) {
+        try { return world(p).getWorldType().name(); } catch (Exception e) { return null; }
+    }
+    public static Object getGameRules(JsonObject p) {
+        return java.util.Arrays.asList(world(p).getGameRules());
+    }
+    // ── WorldBorder（2026-08-13） ──
+    public static Object getBorder(JsonObject p) {
+        var b = world(p).getWorldBorder();
+        var m = new LinkedHashMap<String, Object>();
+        m.put("centerX", b.getCenter().getX());
+        m.put("centerZ", b.getCenter().getZ());
+        m.put("size", b.getSize());
+        m.put("damageAmount", b.getDamageAmount());
+        m.put("damageBuffer", b.getDamageBuffer());
+        m.put("warningDistance", b.getWarningDistance());
+        m.put("warningTime", b.getWarningTime());
+        return m;
+    }
+    public static Object setBorderCenter(JsonObject p) { world(p).getWorldBorder().setCenter(p.get("x").getAsDouble(), p.get("z").getAsDouble()); return true; }
+    public static Object setBorderSize(JsonObject p) { world(p).getWorldBorder().setSize(p.get("size").getAsDouble()); return true; }
+    public static Object setBorderDamage(JsonObject p) {
+        var b = world(p).getWorldBorder();
+        if (p.has("amount")) b.setDamageAmount(p.get("amount").getAsDouble());
+        if (p.has("buffer")) b.setDamageBuffer(p.get("buffer").getAsDouble());
+        return true;
+    }
+    public static Object setBorderWarning(JsonObject p) {
+        var b = world(p).getWorldBorder();
+        if (p.has("distance")) b.setWarningDistance(p.get("distance").getAsInt());
+        if (p.has("time")) b.setWarningTime(p.get("time").getAsInt());
+        return true;
+    }
+    public static Object setBorderMoving(JsonObject p) {
+        var b = world(p).getWorldBorder();
+        b.setSize(p.get("from").getAsDouble());
+        b.setSize(p.get("to").getAsDouble(), p.get("seconds").getAsLong());
+        return true;
+    }
     public static Object getChunkAt(JsonObject p) { var c = world(p).getChunkAt(p.get("x").getAsInt(), p.get("z").getAsInt()); return Map.of("x", c.getX(), "z", c.getZ(), "world", c.getWorld().getName()); }
     public static Object isChunkLoaded(JsonObject p) { return world(p).isChunkLoaded(p.get("x").getAsInt(), p.get("z").getAsInt()); }
     public static Object loadChunk(JsonObject p) { return world(p).loadChunk(p.get("x").getAsInt(), p.get("z").getAsInt(), true); }
@@ -83,7 +125,7 @@ public class WorldTasks {
     }
     public static Object spawnItem(JsonObject p) {
         var w = world(p);
-        var item = GuiTasks.buildItem(p.getAsJsonObject("item"));
+        var item = InventoryTasks.buildItem(p.getAsJsonObject("item"));
         var x = p.get("x").getAsDouble();
         var y = p.get("y").getAsDouble();
         var z = p.get("z").getAsDouble();

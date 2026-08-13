@@ -56,6 +56,11 @@ public class Tasks {
             case "player.isOnline"   -> PlayerTasks.isOnline(p);
             case "player.getItemInMainHand" -> PlayerTasks.getItemInMainHand(p);
             case "player.getItemInOffHand" -> PlayerTasks.getItemInOffHand(p);
+            case "player.setItemInMainHand" -> PlayerTasks.setItemInMainHand(p);
+            case "player.setItemInOffHand" -> PlayerTasks.setItemInOffHand(p);
+            case "player.sendTabHeader" -> PlayerTasks.sendTabHeader(p);
+            case "player.setPlayerListName" -> PlayerTasks.setPlayerListName(p);
+            case "player.setBorder" -> PlayerTasks.setBorder(p);
             // Command
             case "command.register"     -> CommandTasks.register(p);
             case "command.dispatch"     -> CommandTasks.dispatch(p);
@@ -88,6 +93,15 @@ public class Tasks {
             case "entity.isDead"       -> EntityTasks.isDead(p);
             case "entity.remove"       -> EntityTasks.remove(p);
             case "entity.teleport"     -> EntityTasks.teleport(p);
+            case "entity.getVelocity"  -> EntityTasks.getVelocity(p);
+            case "entity.setVelocity"  -> EntityTasks.setVelocity(p);
+            case "entity.getFireTicks" -> EntityTasks.getFireTicks(p);
+            case "entity.setFireTicks" -> EntityTasks.setFireTicks(p);
+            case "entity.getTicksLived" -> EntityTasks.getTicksLived(p);
+            case "entity.setTicksLived" -> EntityTasks.setTicksLived(p);
+            case "entity.isOnGround"   -> EntityTasks.isOnGround(p);
+            case "entity.damage"       -> EntityTasks.damage(p);
+            case "entity.setTarget"    -> EntityTasks.setTarget(p);
             // Potion
             case "entity.addPotionEffect" -> PotionTasks.addPotionEffect(p);
             case "entity.removePotionEffect" -> PotionTasks.removePotionEffect(p);
@@ -99,6 +113,7 @@ public class Tasks {
             case "pdc.has"           -> PdcTasks.has(p);
             case "pdc.remove"        -> PdcTasks.remove(p);
             case "pdc.keys"          -> PdcTasks.keys(p);
+            case "pdc.getAll"        -> PdcTasks.getAll(p);
             // World
             case "world.get"           -> WorldTasks.get(p);
             case "world.getAll"        -> WorldTasks.getAll();
@@ -116,6 +131,16 @@ public class Tasks {
             case "world.setGameRule"   -> WorldTasks.setGameRule(p);
             case "world.getBiome"      -> WorldTasks.getBiome(p);
             case "world.getHighestBlockY" -> WorldTasks.getHighestBlockY(p);
+            case "world.getSeed"       -> WorldTasks.getSeed(p);
+            case "world.getEnvironment" -> WorldTasks.getEnvironment(p);
+            case "world.getWorldType"  -> WorldTasks.getWorldType(p);
+            case "world.getGameRules"  -> WorldTasks.getGameRules(p);
+            case "world.getBorder"     -> WorldTasks.getBorder(p);
+            case "world.setBorderCenter" -> WorldTasks.setBorderCenter(p);
+            case "world.setBorderSize" -> WorldTasks.setBorderSize(p);
+            case "world.setBorderDamage" -> WorldTasks.setBorderDamage(p);
+            case "world.setBorderWarning" -> WorldTasks.setBorderWarning(p);
+            case "world.setBorderMoving" -> WorldTasks.setBorderMoving(p);
             case "world.getChunkAt"      -> WorldTasks.getChunkAt(p);
             case "world.isChunkLoaded"   -> WorldTasks.isChunkLoaded(p);
             case "world.loadChunk"       -> WorldTasks.loadChunk(p);
@@ -144,12 +169,24 @@ public class Tasks {
             case "material.isSolid"  -> MaterialTasks.isSolid(p);
             case "material.isLiquid" -> MaterialTasks.isLiquid(p);
             case "material.isAir"    -> MaterialTasks.isAir(p);
-            // Inventory
+            // Inventory（统一三寻址：uuid 玩家 / world+xyz 容器方块 / id 自定义）
+            case "inventory.create"    -> InventoryTasks.create(p);
+            case "inventory.destroy"   -> InventoryTasks.destroy(p);
+            case "inventory.open"      -> InventoryTasks.open(p);
+            case "inventory.close"     -> InventoryTasks.close(p);
+            case "inventory.closePlayer" -> InventoryTasks.closePlayer(p);
+            case "inventory.getViewers"  -> InventoryTasks.getViewers(p);
+            case "inventory.getSize"   -> InventoryTasks.getSize(p);
+            case "inventory.getType"   -> InventoryTasks.typeOf(p);
+            case "inventory.getContents" -> InventoryTasks.getContents(p);
+            case "inventory.setContents" -> InventoryTasks.setContents(p);
             case "inventory.getItem"   -> InventoryTasks.getItem(p);
             case "inventory.setItem"   -> InventoryTasks.setItem(p);
+            case "inventory.setItems"  -> InventoryTasks.setItems(p);
             case "inventory.addItem"   -> InventoryTasks.addItem(p);
             case "inventory.removeItem"-> InventoryTasks.removeItem(p);
             case "inventory.clear"     -> InventoryTasks.clear(p);
+            case "inventory.fill"      -> InventoryTasks.fill(p);
             // Event
             case "event.subscribe"   -> { var rt = YeowRuntime.inst(); var et = p.get("eventType").getAsString();
                 if ("permissionCheck".equals(et)) rt.getEventBridge().subscribePermissionCheck(p.get("pluginName").getAsString(), p.get("callbackId").getAsString());
@@ -163,14 +200,6 @@ public class Tasks {
                 var modsJson = p.has("mods") && !p.get("mods").isJsonNull() ? p.get("mods").toString() : "{}";
                 var mods = new com.google.gson.Gson().fromJson(modsJson, Object.class); yeow.channel.SyncCallbackHelper.complete(key, mods); yield true; }
             case "command.tabComplete" -> { var cb = p.get("callbackId").getAsString(); var compsJson = p.has("completions") && !p.get("completions").isJsonNull() ? p.get("completions").toString() : "[]"; var c = new com.google.gson.Gson().fromJson(compsJson, Object.class); yeow.channel.SyncCallbackHelper.complete(cb, c); yield true; }
-            // GUI
-            case "gui.create"        -> GuiTasks.createGUI(p);
-            case "gui.open"          -> GuiTasks.open(p);
-            case "gui.close"         -> GuiTasks.close(p);
-            case "gui.destroy"       -> GuiTasks.destroy(p);
-            case "gui.setItem"       -> GuiTasks.setItem(p);
-            case "gui.fill"          -> GuiTasks.fill(p);
-            case "gui.clear"         -> GuiTasks.clear(p);
             // BossBar
             case "bossbar.create"    -> BossBarTasks.create(p);
             case "bossbar.destroy"   -> BossBarTasks.destroy(p);

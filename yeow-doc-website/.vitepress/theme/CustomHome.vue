@@ -58,11 +58,12 @@ const lines = [
             <span class="overline">Yeow v1</span>
             <h1>
                 用 <span class="grad">TypeScript</span> 写<br />
-                Minecraft <span class="grad">Paper</span> 插件
+                Minecraft <span class="grad">跨平台</span> 插件
             </h1>
             <p class="subtitle">
-                Yeow 为 Paper 服务器提供 TypeScript / JavaScript 插件开发框架，
-                每个插件运行在独立的 QuickJS 线程中，与游戏主线程通过消息桥交互。
+                Yeow 为 Paper 与 <a href="https://papermc.io/software/folia/">Folia</a> 服务器提供
+                TypeScript / JavaScript 插件开发框架，每个插件运行在独立的 QuickJS 线程中，
+                与游戏线程通过消息桥交互。<b>同一份插件包，Paper 与 Folia 通用。</b>
             </p>
             <div class="cta">
                 <a class="btn primary" :href="withBase('/getting-started')">快速开始</a>
@@ -112,6 +113,7 @@ const lines = [
                 服务器管理员：安装 <a href="https://modrinth.com/plugin/yeow">Yeow 运行时</a> 后，
                 插件包放入 <code>plugins/Yeow/</code> 自动加载，或
                 <code>/yeow install &lt;your-plugin-url&gt;</code> 一键安装。
+                Folia 服务器请使用 Folia 版运行时——插件包与 Paper 完全通用。
             </p>
         </section>
 
@@ -296,6 +298,56 @@ const lines = [
 /* ── 文档入口 ── */
 .docs {
     margin-bottom: 56px;
+}
+
+/* ── 跨平台 ── */
+.features {
+    margin-bottom: 56px;
+}
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 14px;
+}
+.feature {
+    padding: 18px 20px;
+    border-radius: 12px;
+    border: 1px solid var(--vp-c-border);
+    background: var(--vp-c-bg-soft);
+    transition: border-color 0.18s ease, transform 0.18s ease;
+}
+.feature:hover {
+    border-color: var(--vp-c-brand-1);
+    transform: translateY(-2px);
+}
+.feature h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    color: var(--vp-c-text-1);
+}
+.feature p {
+    font-size: 13px;
+    line-height: 1.7;
+    margin: 0;
+    color: var(--vp-c-text-2);
+}
+.feature a {
+    color: var(--vp-c-brand-1);
+    text-decoration: none;
+    font-weight: 500;
+}
+.feature a:hover {
+    text-decoration: underline;
+}
+.feature code {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    color: var(--vp-c-brand-1);
+    background: var(--vp-code-bg, var(--vp-c-bg));
+    border: 1px solid var(--vp-c-border);
+    padding: 0 5px;
+    border-radius: 4px;
 }
 .docs-grid {
     display: grid;

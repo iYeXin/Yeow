@@ -33,8 +33,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [GUI](gui.md) | 容器界面：创建、开合、设物品 |
-| [Inventory](inventory.md) | 玩家物品栏：槽位、增减物品 |
+| [Inventory](inventory.md) | 统一容器：玩家物品栏 / 容器方块 / 自定义 Inventory（对象式 API，点击关闭事件携带 inventoryId） |
 | [BossBar](bossbar.md) | 血条：标题、进度、颜色 |
 | [Scoreboard](scoreboard.md) | 计分板：目标、队伍 |
 | [Advancement](advancement.md) | 进度：授予/撤销 |
@@ -51,7 +50,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| ⭐ [ItemStack](item.md) | 物品数据：类型、数量、meta（显示名/附魔/自定义模型等） |
+| ⭐ [ItemStack](item.md) | 物品数据：类型、数量、meta（显示名/附魔/耐久/染色/药水/头颅/属性修饰符）、构造工具 |
 
 ## 服务与网络
 
@@ -73,7 +72,7 @@
 |------|------|
 | ⭐ [FS](fs.md) | 文件系统读写（含 `path` 工具） |
 | ⭐ [Assets](assets.md) | 打包资源：`getAssetsPath`（`yeow-dev`）+ 读取/解压 |
-| [PDC](pdc.md) | 持久数据容器 |
+| [PDC](pdc.md) | 持久数据容器：JSON 自动序列化、全量读取、Player/Block 实例方法 |
 
 ## 日志
 

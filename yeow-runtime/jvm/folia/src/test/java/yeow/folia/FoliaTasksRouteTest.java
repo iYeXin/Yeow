@@ -57,11 +57,47 @@ class FoliaTasksRouteTest {
     void chunkCoordTasksUseCPrefix() {
         assertEquals("world:world:c3:c-5", marker("world.loadChunk", chunkParams(3, -5)));
         assertEquals("world:world:c3:c-5", marker("world.isChunkLoaded", chunkParams(3, -5)));
+        assertEquals("world:world:c3:c-5", marker("world.getChunkAt", chunkParams(3, -5)));
+        assertEquals("world:world:c3:c-5", marker("chunk.getSnapshot", chunkParams(3, -5)));
+        assertEquals("world:world:c3:c-5", marker("chunk.getTopSnapshot", chunkParams(3, -5)));
     }
 
     @Test
     void pdcByUuid() {
         assertEquals("uuid:abc-123", marker("pdc.get", p("uuid", "abc-123")));
+    }
+
+    @Test
+    void inventoryByPlayerUuid() {
+        assertEquals("uuid:abc-123", marker("inventory.getItem", p("uuid", "abc-123")));
+        assertEquals("uuid:abc-123", marker("inventory.addItem", p("uuid", "abc-123")));
+        assertEquals(TargetKey.GLOBAL, marker("inventory.clear", new JsonObject()));
+    }
+
+    @Test
+    void inventoryByContainerCoords() {
+        var o = new JsonObject();
+        o.addProperty("world", "world");
+        o.addProperty("x", 100);
+        o.addProperty("y", 65);
+        o.addProperty("z", 32);
+        assertEquals("world:world:100:32", marker("inventory.getItem", o));
+    }
+
+    @Test
+    void inventoryOpenRoutesToPlayer() {
+        var o = new JsonObject();
+        o.addProperty("id", "abc");
+        o.addProperty("uuid", "abc-123");
+        assertEquals("uuid:abc-123", marker("inventory.open", o));
+    }
+
+    @Test
+    void inventoryByIdGoesGlobal() {
+        assertEquals(TargetKey.GLOBAL, marker("inventory.create", p("id", "abc")));
+        assertEquals(TargetKey.GLOBAL, marker("inventory.setItem", p("id", "abc")));
+        assertEquals(TargetKey.GLOBAL, marker("inventory.getSize", p("id", "abc")));
+        assertEquals(TargetKey.GLOBAL, marker("inventory.destroy", p("id", "abc")));
     }
 
     @Test

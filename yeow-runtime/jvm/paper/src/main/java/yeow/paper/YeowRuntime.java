@@ -9,7 +9,7 @@ import yeow.PluginEntity;
 import yeow.PlatformHost;
 import yeow.RuntimeCore;
 import yeow.task.CommandTasks;
-import yeow.task.GuiTasks;
+import yeow.task.InventoryTasks;
 import yeow.task.BossBarTasks;
 import yeow.task.Tasks;
 
@@ -50,7 +50,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
     public void purgePlatformResources(String pluginName) {
         commandBridge.unregisterAll(pluginName);
         eventBridge.unsubscribeAll(pluginName);
-        GuiTasks.purgePlugin(pluginName);
+        InventoryTasks.purgePlugin(pluginName);
         BossBarTasks.purgePlugin(pluginName);
     }
 
@@ -79,7 +79,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
         // 调度器插桩装配（ProfileSink；BudgetScaler 已在 PaperScheduler 构造时装配）
         paperScheduler.setProfileSink(core.profiler().sink());
         // JS 句柄注册表装配：GUI/BossBar 创建时向 core 注册释放闭包（id 不携带业务信息）
-        GuiTasks.setInstances(core.instances());
+        InventoryTasks.setInstances(core.instances());
         BossBarTasks.setInstances(core.instances());
     }
 

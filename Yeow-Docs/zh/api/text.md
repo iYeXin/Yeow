@@ -1,6 +1,6 @@
 # 文本与 MiniMessage
 
-Yeow 的所有面向玩家的文本（聊天消息、广播、标题、ActionBar、MOTD、GUI 标题、物品名/lore 等）统一经 **MiniMessage** 解析——**MiniMessage 优先，回退 legacy § 格式**。
+Yeow 的所有面向玩家的文本（聊天消息、广播、标题、ActionBar、MOTD、自定义 Inventory 标题、物品名/lore 等）统一经 **MiniMessage** 解析——**MiniMessage 优先，回退 legacy § 格式**。
 
 > MiniMessage 是 Adventure（Paper 的文本库）的标记语言，支持颜色、装饰、点击/悬停事件等。语法参考：[Paper 官方 MiniMessage 文档](https://docs.papermc.io/adventure/minimessage/)。
 

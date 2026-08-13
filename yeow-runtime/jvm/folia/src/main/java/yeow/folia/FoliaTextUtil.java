@@ -43,6 +43,11 @@ public class FoliaTextUtil {
         return deserialize(el.getAsString());
     }
 
+    /** Component → legacy 字符串（setMotd 等 String 目标）。 */
+    public static String toLegacy(Component c) {
+        return LEGACY.serialize(c);
+    }
+
     /** MiniMessage 优先；输入含 § 且解析结果仍为纯文本时回退 legacy（对齐 Paper TextUtil）。 */
     private static Component deserialize(String t) {
         if (t == null || t.isEmpty()) return Component.empty();

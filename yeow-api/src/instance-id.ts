@@ -28,6 +28,5 @@ export class InstanceId {
   toString(): string { return this._raw; }
 }
 
-export class GUIHandle extends InstanceId {}
 export class BossBarHandle extends InstanceId {}
 export class InventoryHandle extends InstanceId {}

@@ -40,14 +40,19 @@ final class TargetKey {
     /**
      * uuid 目标解析实体（名称 fallback：非 UUID 的 identifier 按玩家名解析）。
      * 注意：必须在 owned/全局 region 线程调用——实体引用受 Folia AsyncCatcher 约束。
+     * Folia 的 {@code Bukkit.getEntity} 可能不含在线玩家（实体列表与玩家列表分离）——
+     * UUID 解析失败时**回退玩家表**（getPlayer(UUID)），实机验证的必要修复（2026-08-13）。
      */
     static Entity resolveEntity(String key) {
         if (key == null || !key.startsWith(UUID_PREFIX)) return null;
         var idStr = key.substring(UUID_PREFIX.length());
         if (idStr.contains("-") && idStr.length() == 36) {
             try {
-                var e = Bukkit.getEntity(UUID.fromString(idStr));
+                var uuid = UUID.fromString(idStr);
+                var e = Bukkit.getEntity(uuid);
                 if (e != null) return e;
+                var pl = Bukkit.getPlayer(uuid);
+                if (pl != null) return pl;
             } catch (IllegalArgumentException ignored) {}
         }
         return Bukkit.getPlayer(idStr);

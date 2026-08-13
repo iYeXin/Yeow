@@ -68,10 +68,12 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 ---
 
-## 平台无关
+## 跨平台
 
 - 插件包是标准 ZIP（`.yeow.zip`，含打包 JS、资源、元信息与权限声明），**不依赖 Java 环境**
-- 任何实现[平台规范](Yeow-Docs/zh/specifications/README.md)的运行时都能运行同一份插件
+- **Paper 与 [Folia](https://papermc.io/software/folia/) 双平台通用**：同一份 `.yeow.zip` / `.jar` 插件包可直接互换，API 使用方法完全一致；Folia 服务器只需安装 Folia 版 [Yeow 运行时](https://modrinth.com/plugin/yeow)（Modrinth 提供）
+- **Folia 深度适配**：`yeow-runtime-folia` 是独立实现——区域驻留调度器、热点迁移、预算控制、非阻塞投递，插件无需任何改动即可自动享受 Folia 的多线程并行优势（详见 [`Yeow-Docs/zh/advanced/folia.md`](Yeow-Docs/zh/advanced/folia.md)）
+- 任何实现[平台规范](Yeow-Docs/zh/specifications/README.md)的运行时都能运行同一份插件；Folia 只是 Yeow 跨平台性的第一个例子，未来还将支持 Fabric / NeoForge 等平台
 - Paper 系（Paper/Purpur/Leaf 等）的 `yeow-runtime` 是官方实现示例
 
 ## 文档索引

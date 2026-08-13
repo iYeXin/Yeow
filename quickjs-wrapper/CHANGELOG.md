@@ -1,5 +1,15 @@
 # Change Log
 
+## 3.9.0 *(2026-08-13)*
+
+### Features
+- **`QuickJSContext.interrupt()`** — safely force-abort JS execution from any thread. The QuickJS interpreter periodically checks an interrupt flag via `JS_SetInterruptHandler` **on the executing thread itself** and aborts the current `evaluate`/`call` with an "interrupted" exception (one-shot: the flag auto-clears when it fires). This gives embedders (e.g. the Yeow runtime) a safe way to kill plugin JS threads stuck in infinite loops: the executing thread aborts, unwinds to its message loop, and destroys its own context — no cross-thread context destruction, which would be use-after-free. Calling it while nothing is executing aborts the next execution.
+
+### Bug Fixes
+- None.
+
+---
+
 ## 3.8.0 *(2026-08-01)*
 
 ### Breaking Changes

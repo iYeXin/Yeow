@@ -32,6 +32,56 @@ public class EntityTasks {
     public static Object remove(JsonObject p) { entity(p).remove(); return true; }
     public static Object teleport(JsonObject p) { entity(p).teleport(new Location(Bukkit.getWorld(p.get("world").getAsString()),p.get("x").getAsDouble(),p.get("y").getAsDouble(),p.get("z").getAsDouble(),(float)p.get("yaw").getAsDouble(),(float)p.get("pitch").getAsDouble())); return true; }
 
+    // ── 基础补齐（2026-08-13） ──
+
+    public static Object getVelocity(JsonObject p) { var v = entity(p).getVelocity(); return Map.of("x", v.getX(), "y", v.getY(), "z", v.getZ()); }
+    public static Object setVelocity(JsonObject p) { entity(p).setVelocity(new org.bukkit.util.Vector(p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble())); return true; }
+    public static Object getFireTicks(JsonObject p) { return entity(p).getFireTicks(); }
+    public static Object setFireTicks(JsonObject p) { entity(p).setFireTicks(p.get("value").getAsInt()); return true; }
+    public static Object getTicksLived(JsonObject p) { return entity(p).getTicksLived(); }
+    public static Object setTicksLived(JsonObject p) { entity(p).setTicksLived(p.get("value").getAsInt()); return true; }
+    public static Object isOnGround(JsonObject p) { return entity(p).isOnGround(); }
+    public static Object damage(JsonObject p) {
+        var e = living(p);
+        var amount = p.get("amount").getAsDouble();
+        if (p.has("damager") && !p.get("damager").isJsonNull()) {
+            var d = Bukkit.getEntity(UUID.fromString(p.get("damager").getAsString()));
+            if (d != null) { e.damage(amount, d); return true; }
+        }
+        e.damage(amount);
+        return true;
+    }
+    /**
+     * 设置目标（AI 行为，**不保证必然生效**——取决于实体类型/寻路能力）。
+     * 操作实体 = `uuid`；目标 = `targetUuid`（实体目标，Mob.setTarget）或
+     * `world`+`x`+`y`+`z`（位置目标，Pathfinder.moveTo，可带 `speed`）。
+     */
+    public static Object setTarget(JsonObject p) {
+        var e = living(p);
+        if (p.has("targetUuid") && !p.get("targetUuid").isJsonNull()) {
+            var t = Bukkit.getEntity(UUID.fromString(p.get("targetUuid").getAsString()));
+            if (t instanceof LivingEntity le && e instanceof org.bukkit.entity.Mob mob) {
+                mob.setTarget(le);
+            }
+            return true;
+        }
+        if (p.has("world") && p.has("x") && p.has("y") && p.has("z") && e instanceof org.bukkit.entity.Mob mob) {
+            try {
+                mob.getPathfinder().moveTo(new Location(Bukkit.getWorld(p.get("world").getAsString()),
+                    p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble()),
+                    p.has("speed") ? p.get("speed").getAsDouble() : 1.0);
+            } catch (Exception ignored) {}
+            return true;
+        }
+        return false;
+    }
+
+    static LivingEntity living(JsonObject p) {
+        var e = entity(p);
+        if (!(e instanceof LivingEntity le)) throw new IllegalArgumentException("Not a living entity");
+        return le;
+    }
+
     static Entity entity(JsonObject p) {
         var e = Bukkit.getEntity(UUID.fromString(p.get("uuid").getAsString()));
         if (e == null) throw new IllegalArgumentException("Entity not found");

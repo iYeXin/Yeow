@@ -58,7 +58,7 @@ npm run build                  # 生产产物 → dist/<name>-<version>.jar + .y
 
 > **分发建议**：两种产物应同时上传（`.yeow.zip` 推荐、`.jar` 兼容），并提供 `/yeow install <url>` 一键安装。详见 [构建与分发](distribution.md)。
 
-> **平台无关**：`.yeow.zip` 本身不依赖 Java 或 Paper 系——任何实现 [平台规范](specifications/README.md) 的运行时（理解包结构、调度器、执行器、JS 桥）都能运行同一份插件。Paper 系（Paper/Purpur/Leaf 等）的 yeow-runtime 是官方实现示例。
+> **平台无关（Paper / Folia 双平台通用）**：`.yeow.zip` 本身不依赖 Java 或 Paper 系——任何实现 [平台规范](specifications/README.md) 的运行时（理解包结构、调度器、执行器、JS 桥）都能运行同一份插件。**同一份插件包可直接在 Paper 与 [Folia](https://papermc.io/software/folia/) 服务器间互换**：Folia 服务器只需安装 Folia 版 [Yeow 运行时](https://modrinth.com/plugin/yeow)（Modrinth 提供），插件自动享受 Folia 的多线程优势（详见 [进阶知识 · Folia](advanced/folia.md)）。Paper 系（Paper/Purpur/Leaf 等）的 yeow-runtime 是官方实现示例。
 
 ## 项目结构
 
@@ -142,6 +142,9 @@ const q = Player.getSync('Notch');
 属性访问（`player.ping`、`world.time`）始终同步。
 
 > 大量重复操作请用异步 API（`await` 循环），避免阻塞 JS 线程。详见 [进阶知识](advanced.md)。
+
+> [!WARNING]
+> **事件处理器中慎用同步操作**：事件处理期间同步调用（含属性读写）可能触发**事件重入死锁**（Paper/Folia 均存在，阻塞游戏线程至超时）——详见 [事件与回调 - 事件重入死锁](advanced/events.md#事件重入死锁)。
 
 ## 常用 API 速览
 

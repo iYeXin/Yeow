@@ -130,6 +130,31 @@ processChunk();
 
 需要大量操作时，优先异步 `await` 循环，或用 `setTimeout` 手动分片。
 
+### 批量任务（2026-08-13）
+
+需要**批量操作**（多个独立任务）时，可用批量 API 一次提交任务数组、一次取回结果——减少往返次数，适合依赖包封装自己的批量优化（如批量发物品、批量写方块、批量读取）：
+
+```ts
+import { callBatch, postBatch } from 'yeow-api';
+
+// 同步批量：阻塞直到全部完成，返回结果数组（顺序对应；单个失败对应项为 {err}）
+const [time, version, seed] = callBatch([
+    { type: 'world.getTime', params: { world: 'world' } },
+    { type: 'server.getVersion' },
+    { type: 'world.getSeed', params: { world: 'world' } },
+]);
+
+// 异步批量：全部完成后 resolve 结果数组
+await postBatch([
+    { type: 'player.sendMessage', params: { uuid, message: 'A' } },
+    { type: 'player.sendMessage', params: { uuid, message: 'B' } },
+]);
+```
+
+- 任务逐个独立执行，**无原子性**（中间失败不中断后续）；单个任务失败对应项为 `{err}` 对象
+- 每项可带 `priority`（`high`/`normal`/`low`）
+- 批量提交**不改变任务语义**——仍是逐个经调度器执行，只是减少 JS↔运行时往返
+
 ### 选择建议
 
 | 场景                                   | 推荐                                |

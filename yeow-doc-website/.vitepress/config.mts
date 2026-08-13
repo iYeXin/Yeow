@@ -1,4 +1,4 @@
-﻿import { defineConfig } from 'vitepress'
+import { defineConfig } from 'vitepress'
 
 // 文档源：docs/ 是 Yeow-Docs/zh 的目录联接（junction / symlink，见 scripts/setup-docs.mjs）。
 // 零复制、始终同步；preserveSymlinks 保证模块路径保持在项目根内，裸导入（vue 等）可正常解析。
@@ -8,15 +8,15 @@ const base = '/yeow/v1/'
 export default defineConfig({
     lang: 'zh-CN',
     title: 'Yeow',
-    description: '用 TypeScript 写 Minecraft Paper 插件 · QuickJS 引擎',
-    site: 'https://docs.yexin.wiki/yeow/v1/',
+    description: '用 TypeScript 写 Minecraft 跨平台插件（Paper / Folia）· QuickJS 引擎',
+    site: 'https://yexin.wiki/yeow/v1/',
     base,
     srcDir: 'docs',
     appearance: 'dark',
     cleanUrls: true,
     head: [
-        ['meta', { name: 'og:title', content: 'Yeow — 用 TypeScript 写 Minecraft Paper 插件' }],
-        ['meta', { name: 'og:description', content: 'QuickJS 引擎 · 每插件独立线程 · 热重载 · 平台无关插件包' }],
+        ['meta', { name: 'og:title', content: 'Yeow — 用 TypeScript 写 Minecraft 跨平台插件（Paper / Folia）' }],
+        ['meta', { name: 'og:description', content: 'QuickJS 引擎 · 每插件独立线程 · 热重载 · Paper/Folia 双平台通用插件包' }],
         ['meta', { name: 'og:url', content: 'https://github.com/iyexin/yeow' }],
         ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}favicon.svg` }],
     ],
@@ -48,6 +48,7 @@ export default defineConfig({
                     { text: 'CLI 参考', link: '/cli' },
                     { text: '构建与分发', link: '/distribution' },
                     { text: '运行时警告', link: '/runtime-warning' },
+                    { text: '更新日志', link: '/changelog' },
                     { text: '路线图', link: '/todo' },
                     { text: '站点地图', link: '/sitemap' },
                 ],
@@ -90,7 +91,6 @@ export default defineConfig({
                         text: '交互界面',
                         collapsed: true,
                         items: [
-                            { text: 'GUI', link: '/api/gui' },
                             { text: 'Inventory', link: '/api/inventory' },
                             { text: 'BossBar', link: '/api/bossbar' },
                             { text: 'Scoreboard', link: '/api/scoreboard' },
@@ -155,6 +155,7 @@ export default defineConfig({
                     { text: '进阶索引', link: '/advanced' },
                     { text: '架构与线程模型', link: '/advanced/architecture' },
                     { text: '调度器与任务', link: '/advanced/scheduler' },
+                    { text: 'Folia 支持', link: '/advanced/folia' },
                     { text: '事件与回调', link: '/advanced/events' },
                     { text: '生命周期与热重载', link: '/advanced/lifecycle' },
                     { text: '环境能力与通道', link: '/advanced/channels' },

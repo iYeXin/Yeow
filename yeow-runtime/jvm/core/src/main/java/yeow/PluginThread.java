@@ -31,6 +31,8 @@ public class PluginThread implements Runnable, PluginEntity {
     private final Map<String, String> nativeHashes; // 打包后路径(assets/<id>/...) → SHA-256（yeow.json native 声明）
     private volatile QuickJSContext ctx;
     private volatile boolean running = false;
+    /** 强杀标记：waitForExit 超时且 interrupt 无法退出时置位，调用方必须重建全新实体。 */
+    private volatile boolean forceKilled = false;
     private Thread thread;
     private ScheduledExecutorService timer;
     private ExecutorService ioExecutor;
@@ -42,7 +44,12 @@ public class PluginThread implements Runnable, PluginEntity {
     private volatile CompletableFuture<Long> pendingPing;
     private volatile long pendingPingSentAt;
 
-    record HttpConn(String serverId, com.sun.net.httpserver.HttpExchange exchange) {}
+    record HttpConn(String serverId, long createdAt, com.sun.net.httpserver.HttpExchange exchange) {}
+
+    /** HTTP 请求无响应超时：JS 侧从未 respond 时关闭连接并移除（防连接/内存泄漏）。 */
+    private static final long HTTP_PENDING_TIMEOUT_MS = 30_000;
+    private static final long HTTP_SWEEP_INTERVAL_MS = 10_000;
+    private final java.util.concurrent.atomic.AtomicBoolean httpSweepStarted = new java.util.concurrent.atomic.AtomicBoolean();
 
     public void setDevAssetsDir(String d) { devAssetsDir = d; }
     public String getDevAssetsDir() { return devAssetsDir; }
@@ -93,9 +100,34 @@ public class PluginThread implements Runnable, PluginEntity {
         this.nativeHashes = nativeHashes != null ? Map.copyOf(nativeHashes) : Map.of();
     }
 
+    /** 3.9.0+ 的 QuickJSContext.interrupt()（原生中断支持）；旧版本 wrapper 无此方法时为 null。 */
+    private static final java.lang.reflect.Method INTERRUPT_METHOD = findInterruptMethod();
+
+    private static java.lang.reflect.Method findInterruptMethod() {
+        try { return com.whl.quickjs.wrapper.QuickJSContext.class.getMethod("interrupt"); }
+        catch (NoSuchMethodException e) { return null; }
+    }
+
+    /**
+     * 请求 JS 线程原生中断（wrapper 3.9.0+，经 JS_SetInterruptHandler 在 JS 线程自身
+     * 执行流中中止死循环；旧 wrapper 为 no-op，强杀路径回退 forceKilled 重建兜底）。
+     * wrapper 升级为 3.9.0+ 后可直接改为 c.interrupt()。
+     */
+    static void requestInterrupt(com.whl.quickjs.wrapper.QuickJSContext c) {
+        var m = INTERRUPT_METHOD;
+        if (m == null || c == null) return;
+        try { m.invoke(c); } catch (Exception ignored) {}
+    }
+
     public RuntimeCore core() { return core; }
 
-    public void start() { running = true; thread = new Thread(this, "yeow-" + name); thread.start(); }
+    /** 权限快照（重建实体用，不可变）。 */
+    Set<String> permissions() { return permissions; }
+
+    /** 原生服务 SHA-256 声明（重建实体用，不可变）。 */
+    Map<String, String> nativeHashes() { return nativeHashes; }
+
+    public void start() { running = true; thread = new Thread(this, "yeow-" + name); thread.setDaemon(true); thread.start(); }
     public boolean isRunning() { return running; }
 
     /** Fire-and-forget: ask the JS thread to run onUnload and exit. */
@@ -113,15 +145,43 @@ public class PluginThread implements Runnable, PluginEntity {
         cleanupResources();
     }
 
-    public void reload(String newCode) {
+    /**
+     * 重载（适配器契约实现）。内部强杀场景的实体重建由 RuntimeCore 处理，
+     * 本方法忽略重建结果。
+     */
+    @Override public void reload(String newCode) { reloadInternal(newCode); }
+
+    /**
+     * 重载。返回 false 表示旧线程被强杀（interrupt 无法退出）——调用方**必须**经
+     * {@link RuntimeCore#rebuildPluginEntity} 重建全新实体（新线程/新队列/新上下文）：
+     * 旧实体仍被卡死的线程引用，若在本对象上 start() 新线程，旧线程恢复后可能从
+     * 共享队列偷取消息（双线程并发执行同一插件逻辑）。
+     */
+    public boolean reloadInternal(String newCode) {
         queue.sendJs(gson.toJson(Map.of("t","RELOAD")));
         waitForExit();
+        boolean killed = forceKilled;
+        forceKilled = false;
         cleanupResources();
+        if (killed) return false;
         queue.clear();
         this.userCode = newCode;
         start();
+        return true;
     }
 
+    /**
+     * 等待 JS 线程退出（最长 5s）。超时未退出 → 强杀路径：
+     * ① wrapper 3.9.0+：{@link #requestInterrupt} 原生中断——JS 线程在自身执行流中
+     * 中止（interrupt handler 周期性检查），随后正常退出并在 run() finally 自毁上下文；
+     * ② 旧 wrapper / 卡在 Java 调用无法回 JS 的线程：thread.interrupt() 唤醒阻塞点，
+     * 仍无法退出则置 forceKilled 标记，由调用方重建全新实体将其遗弃。
+     *
+     * **绝不在本线程调用 ctx.destroy()**：QuickJS wrapper 的 destroy() 要求创建线程调用
+     * （checkSameThread 守卫），跨线程调用必然抛异常（原实现 destroy 恒为空操作，上下文
+     * 从未被释放），若去掉守卫又会演变为 use-after-free。上下文一律由 JS 线程自身销毁；
+     * JS 线程为 daemon，不会阻塞 JVM 退出。
+     */
     private void waitForExit() {
         long deadline = System.currentTimeMillis() + 5000;
         while (running && System.currentTimeMillis() < deadline) {
@@ -131,14 +191,13 @@ public class PluginThread implements Runnable, PluginEntity {
         if (running) {
             log.warning("[" + name + "] JS thread unresponsive for 5s - forcing stop");
             running = false;
+            requestInterrupt(ctx); // 原生中断（3.9.0+）：JS 线程在自身执行流中止，随后自毁上下文
             thread.interrupt();
             try { thread.join(1000); } catch (InterruptedException ignored) {}
             if (thread.isAlive()) {
-                var c = ctx;
-                if (c != null) {
-                    ctx = null;
-                    try { c.destroy(); } catch (Exception ignored) {}
-                }
+                // 线程仍卡住（旧 wrapper 无中断支持，或卡在无法返回 JS 的 Java 调用）。
+                // 不跨线程 destroy（见方法注释）：标记强杀，让调用方重建实体。
+                forceKilled = true;
                 try { thread.join(1000); } catch (InterruptedException ignored) {}
             }
         } else if (thread != null) {
@@ -166,8 +225,8 @@ public class PluginThread implements Runnable, PluginEntity {
 
     @Override
     public void run() {
-        this.timer = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "timer-" + name));
-        this.ioExecutor = Executors.newCachedThreadPool(r -> new Thread(r, "io-" + name));
+        this.timer = Executors.newSingleThreadScheduledExecutor(r -> { var t = new Thread(r, "timer-" + name); t.setDaemon(true); return t; });
+        this.ioExecutor = Executors.newCachedThreadPool(r -> { var t = new Thread(r, "io-" + name); t.setDaemon(true); return t; });
         try {
             ctx = QuickJSContext.create();
         } catch (Exception e) {
@@ -418,12 +477,29 @@ public class PluginThread implements Runnable, PluginEntity {
                 }
                 case "reload" -> {
                     // 重载运行中的 Worker；未加载（未 load）时报错
-                    var w = workers.get(p.get("name").getAsString());
+                    var wname2 = p.get("name").getAsString();
+                    var w = workers.get(wname2);
                     if (w == null) { respond.accept("{\"err\":\"worker not registered\"}"); yield null; }
                     if (!w.isRunning()) { respond.accept("{\"err\":\"worker not loaded\"}"); yield null; }
                     var code = workerCode(p);
                     if (code == null) { respond.accept("{\"err\":\"worker entry not found\"}"); yield null; }
-                    w.reload(code);
+                    if (!w.reloadInternal(code)) {
+                        // 旧线程被强杀：重建全新 WorkerThread（新线程/新队列/新上下文），
+                        // 防止卡死的旧线程从共享队列偷取消息（双线程并发执行）。
+                        var oldMainCb = w.mainMessageCb();
+                        var nw = new WorkerThread(wname2, wname2, PluginThread.this, initCode, code);
+                        if (oldMainCb != null) nw.setMainMessageCb(oldMainCb);
+                        workers.put(wname2, nw);
+                        w = nw;
+                        var rt = core;
+                        if (rt != null) {
+                            rt.unregisterPluginEntity(w.name()); // 强杀路径旧实体未清理——先摘除再注册
+                            if (rt.getPlugin(w.name()) == null) rt.registerPluginEntity(w, false);
+                            else w.start();
+                        } else {
+                            w.start();
+                        }
+                    }
                     long deadline = System.currentTimeMillis() + 5000;
                     while (System.currentTimeMillis() < deadline && (w.messageCbId() == null || !w.isRunning())) {
                         try { Thread.sleep(10); } catch (InterruptedException e) { break; }
@@ -510,6 +586,19 @@ public class PluginThread implements Runnable, PluginEntity {
         try { return gson.fromJson(json, Object.class); } catch (Exception e) { return json; }
     }
 
+    /** 周期清理：JS 侧从未 respond 的请求（超时）→ 503 关闭，防止连接与内存泄漏。 */
+    private void sweepHttpPending() {
+        if (httpPending.isEmpty()) return;
+        long cutoff = System.currentTimeMillis() - HTTP_PENDING_TIMEOUT_MS;
+        httpPending.entrySet().removeIf(e -> {
+            var conn = e.getValue();
+            if (conn.createdAt() >= cutoff) return false;
+            try { conn.exchange().sendResponseHeaders(503, -1); } catch (Exception ignored) {}
+            try { conn.exchange().close(); } catch (Exception ignored) {}
+            return true;
+        });
+    }
+
     private String handleFs(String pld) {        try {
             var obj = gson.fromJson(pld, JsonObject.class); var task = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
             var dot = task.indexOf('.');
@@ -523,15 +612,15 @@ public class PluginThread implements Runnable, PluginEntity {
                 default -> Path.of("plugins", name).toAbsolutePath().normalize();
             };
             return switch (op) {
-                case "readFile" -> { var path = resolvePath(base, p.get("path").getAsString()); yield gson.toJson(Map.of("data", Files.readString(path))); }
+                case "readFile" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield gson.toJson(Map.of("data", Files.readString(path))); }
                 case "writeFile" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.writeString(path, p.get("data").getAsString()); yield "true"; }
                 case "appendFile" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.writeString(path, p.get("data").getAsString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND); yield "true"; }
-                case "exists" -> { var path = resolvePath(base, p.get("path").getAsString()); yield String.valueOf(Files.exists(path)); }
-                case "isDirectory" -> { var path = resolvePath(base, p.get("path").getAsString()); yield String.valueOf(Files.isDirectory(path)); }
-                case "delete" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); yield String.valueOf(Files.deleteIfExists(path)); }
-                case "mkdir" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.createDirectories(path); yield "true"; }
-                case "list" -> { var path = resolvePath(base, p.get("path").getAsString()); try (var s = Files.list(path)) { yield gson.toJson(s.map(Path::toString).toList()); } }
-                case "readBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(Files.readAllBytes(path)))); }
+                case "exists" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield String.valueOf(Files.exists(path)); }
+                case "isDirectory" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield String.valueOf(Files.isDirectory(path)); }
+                case "delete" -> { var path = resolvePath(base, p.get("path").getAsString(), false); assertNotRuntimeDir(path); yield String.valueOf(Files.deleteIfExists(path)); }
+                case "mkdir" -> { var path = resolvePath(base, p.get("path").getAsString(), false); assertNotRuntimeDir(path); Files.createDirectories(path); yield "true"; }
+                case "list" -> { var path = resolvePath(base, p.get("path").getAsString(), false); try (var s = Files.list(path)) { yield gson.toJson(s.map(Path::toString).toList()); } }
+                case "readBase64" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(Files.readAllBytes(path)))); }
                 case "writeBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.write(path, Base64.getDecoder().decode(p.get("data").getAsString())); yield "true"; }
                 case "systemPaths" -> {
                     // 仅 outer 级：返回常用系统路径（桌面/临时目录/用户主目录）
@@ -552,11 +641,20 @@ public class PluginThread implements Runnable, PluginEntity {
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
     }
 
-    /** base 为 null（outer 级）时不限制范围；相对路径基于服务器根（工作目录）解析。 */
+    /**
+     * 路径解析（写操作语义）：规范化 + 越界检查 + 创建父目录。
+     * 读操作请用 {@link #resolvePath(Path, String, boolean)} 传 false——
+     * 查询操作不得有创建目录的副作用（原实现 readFile/exists/list 会静默建目录）。
+     */
     private Path resolvePath(Path base, String userPath) throws IOException {
+        return resolvePath(base, userPath, true);
+    }
+
+    private Path resolvePath(Path base, String userPath, boolean createParent) throws IOException {
         var p = (base != null ? base.resolve(userPath) : Path.of(userPath)).normalize();
         if (base != null && !p.startsWith(base)) throw new SecurityException("Path traversal: " + userPath);
-        Files.createDirectories(p.getParent()); return p;
+        if (createParent) Files.createDirectories(p.getParent());
+        return p;
     }
 
     /** 递归复制目录（assetsExtractDir：dev 模式源目录 → 目标）。 */
@@ -592,12 +690,17 @@ public class PluginThread implements Runnable, PluginEntity {
                             var headers = new LinkedHashMap<String, String>();
                             exchange.getRequestHeaders().forEach((k,v) -> headers.put(k.toLowerCase(), String.join(", ", v)));
                             req.put("headers", headers);
-                            httpPending.put(connId, new HttpConn(id, exchange));
+                            httpPending.put(connId, new HttpConn(id, System.currentTimeMillis(), exchange));
                             queue.sendJs(gson.toJson(Map.of("t","cb","p",callbackId,"r",req)));
                         } catch (Exception ignored) {}
                     });
                     server.setExecutor(ioExecutor); server.start();
                     httpServers.put(id, server);
+                    // 周期清扫：JS 侧从不 respond 的请求超时后 503 关闭（首次 listen 时启动一次）
+                    if (httpSweepStarted.compareAndSet(false, true)) {
+                        timerFutures.add(timer.scheduleAtFixedRate(this::sweepHttpPending,
+                            HTTP_SWEEP_INTERVAL_MS, HTTP_SWEEP_INTERVAL_MS, TimeUnit.MILLISECONDS));
+                    }
                     yield gson.toJson(Map.of("serverId", id, "port", server.getAddress().getPort()));
                 }
                 case "respond" -> {
@@ -691,19 +794,24 @@ public class PluginThread implements Runnable, PluginEntity {
             var dest = p.has("dest") ? p.get("dest").getAsString() : (rawPath.startsWith("assets/") ? rawPath : "assets/" + rawPath);
             if (devAssetsDir != null) {
                 var stripped = rawPath.startsWith("assets/") ? rawPath.substring("assets/".length()) : rawPath;
-                var fp = Path.of(devAssetsDir, stripped);
+                // dev 资产路径防护：规范化后必须仍在 devAssetsDir 内（../ 逃逸检查）
+                var devBase = Path.of(devAssetsDir).toAbsolutePath().normalize();
+                var fp = devBase.resolve(stripped).normalize();
+                if (!fp.startsWith(devBase)) return gson.toJson(Map.of("err", "Invalid asset path: " + rawPath));
                 return switch (task) {
                     case "read" -> { if (!Files.exists(fp)) yield "null"; yield gson.toJson(Map.of("data", Files.readString(fp))); }
                     case "readBase64" -> { if (!Files.exists(fp)) yield "null"; yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(Files.readAllBytes(fp)))); }
                     case "extract" -> {
                         if (!Files.exists(fp)) yield gson.toJson(Map.of("err", "Asset not found: " + rawPath));
-                        var target = resolvePath(Path.of("plugins", name), dest);
+                        var target = resolvePath(Path.of("plugins", name).toAbsolutePath().normalize(), dest);
+                        assertNotRuntimeDir(target);
                         Files.copy(fp, target, StandardCopyOption.REPLACE_EXISTING);
                         yield gson.toJson(Map.of("path", target.toString()));
                     }
                     case "extractDir" -> {
                         if (!Files.isDirectory(fp)) yield gson.toJson(Map.of("err", "Asset directory not found: " + rawPath));
-                        var target = resolvePath(Path.of("plugins", name), dest);
+                        var target = resolvePath(Path.of("plugins", name).toAbsolutePath().normalize(), dest);
+                        assertNotRuntimeDir(target);
                         copyDirRecursive(fp, target);
                         yield gson.toJson(Map.of("path", target.toString()));
                     }
@@ -717,13 +825,16 @@ public class PluginThread implements Runnable, PluginEntity {
                     case "extract" -> {
                         var entry = zip.getEntry(rawPath);
                         if (entry == null || entry.isDirectory()) yield gson.toJson(Map.of("err", "Asset not found: " + rawPath));
-                        var target = resolvePath(Path.of("plugins", name), dest);
+                        var target = resolvePath(Path.of("plugins", name).toAbsolutePath().normalize(), dest);
+                        assertNotRuntimeDir(target);
                         Files.copy(zip.getInputStream(entry), target, StandardCopyOption.REPLACE_EXISTING);
                         yield gson.toJson(Map.of("path", target.toString()));
                     }
                     case "extractDir" -> {
                         var prefix = rawPath.endsWith("/") ? rawPath : rawPath + "/";
-                        var target = resolvePath(Path.of("plugins", name), dest);
+                        var base = Path.of("plugins", name).toAbsolutePath().normalize();
+                        var target = resolvePath(base, dest);
+                        assertNotRuntimeDir(target);
                         var found = false;
                         var entries = zip.entries();
                         while (entries.hasMoreElements()) {
@@ -732,7 +843,10 @@ public class PluginThread implements Runnable, PluginEntity {
                             if (!zn.startsWith(prefix) || ze.isDirectory()) continue;
                             found = true;
                             var rel = zn.substring(prefix.length());
-                            var dst = target.resolve(rel);
+                            var dst = target.resolve(rel).normalize();
+                            // zip-slip 防护：entry 相对路径含 ../ 时不得逃逸目标目录
+                            if (!dst.startsWith(target)) throw new SecurityException("Zip entry escapes target dir: " + zn);
+                            assertNotRuntimeDir(dst);
                             Files.createDirectories(dst.getParent());
                             Files.copy(zip.getInputStream(ze), dst, StandardCopyOption.REPLACE_EXISTING);
                         }

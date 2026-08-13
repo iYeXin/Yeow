@@ -96,6 +96,31 @@ entity.getMaxHealth()        // Promise<number>
 entity.isDeadAsync()         // Promise<boolean>
 ```
 
+## 基础操作（2026-08-13）
+
+所有 `Entity`（velocity/fireTicks/ticksLived/isOnGround）与 `LivingEntity`（damage/setTarget）：
+
+```js
+// 速度向量（方块/秒）
+entity.velocity = { x: 0, y: 1, z: 0 };      // 读/写
+await entity.setVelocity({ x: 0, y: 1, z: 0 });
+
+// 着火 / 存活刻数 / 地面
+entity.fireTicks = 20;                        // 读/写（0 = 未着火）
+entity.ticksLived;                            // 只读
+entity.isOnGround;                            // 只读
+
+// 伤害
+await entity.damage(5);                       // 施加 5 点伤害
+await entity.damage(5, 'damager-uuid');       // 带伤害来源
+
+// AI 目标（不保证必然生效——取决于实体类型/寻路能力）
+await entity.setTarget({ targetUuid: 'target-entity-uuid' });                    // 实体目标
+await entity.setTarget({ world: 'world', x: 100, y: 64, z: 100, speed: 1.0 });   // 位置目标（Pathfinder）
+```
+
+> **setTarget 语义**：需要生物实体（Mob）才生效；非生物/无法寻路的实体静默忽略。位置目标经 Pathfinder 寻路，带 `speed`（默认 1.0）控制移动速度。
+
 ## 示例
 
 ```js

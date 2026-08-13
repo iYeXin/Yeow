@@ -38,6 +38,8 @@ public class WorkerThread implements PluginEntity, Runnable {
     private final Logger log;
     private volatile QuickJSContext ctx;
     private volatile boolean running = false;
+    /** 强杀标记：waitForExit 超时且 interrupt 无法退出时置位，调用方必须重建全新实体。 */
+    private volatile boolean forceKilled = false;
     private Thread thread;
     private ScheduledExecutorService timer;
     private ExecutorService ioExecutor;
@@ -101,7 +103,7 @@ public class WorkerThread implements PluginEntity, Runnable {
         if (fut != null) fut.complete(System.nanoTime() - sentAt);
     }
 
-    @Override public void start() { running = true; thread = new Thread(this, "yeow-worker-" + entityName); thread.start(); }
+    @Override public void start() { running = true; thread = new Thread(this, "yeow-worker-" + entityName); thread.setDaemon(true); thread.start(); }
     public void stop() { if (ctx != null) queue.sendJs(gson.toJson(Map.of("t","DISABLE"))); }
 
     @Override
@@ -111,16 +113,37 @@ public class WorkerThread implements PluginEntity, Runnable {
         cleanupResources();
     }
 
-    @Override
-    public void reload(String newCode) {
+    /** 适配器契约实现：忽略重建结果（内部强杀场景由主插件 handleWorker 处理）。 */
+    @Override public void reload(String newCode) { reloadInternal(newCode); }
+
+    /**
+     * 重载。返回 false 表示旧线程被强杀（interrupt 无法退出）——调用方**必须**重建
+     * 全新 WorkerThread（新线程/新队列/新上下文）：旧实体仍被卡死的线程引用，若在本
+     * 对象上 start() 新线程，旧线程恢复后可能从共享队列偷取消息（双线程并发执行）。
+     */
+    public boolean reloadInternal(String newCode) {
         queue.sendJs(gson.toJson(Map.of("t","RELOAD")));
         waitForExit();
+        boolean killed = forceKilled;
+        forceKilled = false;
         cleanupResources();
+        if (killed) return false;
         queue.clear();
         this.userCode = newCode;
         start();
+        return true;
     }
 
+    /**
+     * 等待 JS 线程退出（最长 5s）。超时未退出 → 强杀路径：
+     * ① wrapper 3.9.0+：原生中断（PluginThread.requestInterrupt）——JS 线程在自身
+     * 执行流中止，随后正常退出并在 run() finally 自毁上下文；
+     * ② 旧 wrapper / 卡在 Java 调用无法回 JS 的线程：thread.interrupt() 唤醒阻塞点，
+     * 仍无法退出则置 forceKilled 标记，由调用方重建全新实体将其遗弃。
+     * **绝不在本线程调用 ctx.destroy()**（QuickJS wrapper 的 destroy 要求创建线程调用，
+     * 跨线程调用必然抛异常、上下文从未释放；去掉守卫则演变为 use-after-free）。
+     * 上下文一律由 JS 线程自身销毁；JS 线程为 daemon，不阻塞 JVM 退出。
+     */
     private void waitForExit() {
         long deadline = System.currentTimeMillis() + 5000;
         while (running && System.currentTimeMillis() < deadline) {
@@ -129,14 +152,13 @@ public class WorkerThread implements PluginEntity, Runnable {
         if (running) {
             log.warning("[" + entityName + "] worker unresponsive 5s - forcing stop");
             running = false;
+            PluginThread.requestInterrupt(ctx); // 原生中断（3.9.0+）：JS 线程在自身执行流中止
             thread.interrupt();
             try { thread.join(1000); } catch (InterruptedException ignored) {}
             if (thread.isAlive()) {
-                var c = ctx;
-                if (c != null) {
-                    ctx = null;
-                    try { c.destroy(); } catch (Exception ignored) {}
-                }
+                // 线程仍卡住（旧 wrapper 无中断支持，或卡在无法返回 JS 的 Java 调用）。
+                // 不跨线程 destroy（见方法注释）：标记强杀，让调用方重建实体。
+                forceKilled = true;
                 try { thread.join(1000); } catch (InterruptedException ignored) {}
             }
         } else if (thread != null) {
@@ -156,8 +178,8 @@ public class WorkerThread implements PluginEntity, Runnable {
 
     @Override
     public void run() {
-        this.timer = Executors.newSingleThreadScheduledExecutor(r -> new Thread(r, "worker-timer-" + entityName));
-        this.ioExecutor = Executors.newCachedThreadPool(r -> new Thread(r, "worker-io-" + entityName));
+        this.timer = Executors.newSingleThreadScheduledExecutor(r -> { var t = new Thread(r, "worker-timer-" + entityName); t.setDaemon(true); return t; });
+        this.ioExecutor = Executors.newCachedThreadPool(r -> { var t = new Thread(r, "worker-io-" + entityName); t.setDaemon(true); return t; });
         try {
             ctx = QuickJSContext.create();
         } catch (Exception e) {

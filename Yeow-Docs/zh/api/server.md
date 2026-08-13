@@ -61,7 +61,14 @@ await getTps()           // Promise<{ tps1m, tps5m, tps15m }>
 getTpsSync()             // { tps1m, tps5m, tps15m } — 同步
 ```
 
-> ⚠ **跨平台不保证可用**：TPS 是宿主平台的运行指标（Paper 平台基于 `Bukkit.getTPS`）——其他平台运行时不保证支持，且未来 TPS 这一概念可能发生变化。调用前请自行降级处理（如捕获异常或按平台判断）。
+> ⚠ **跨平台不保证可用**：TPS 是宿主平台的运行指标（Paper 平台基于 `Bukkit.getTPS`）——其他平台运行时不保证支持，且未来 TPS 这一概念可能发生变化。调用前请自行判断返回值有效性。
+
+> **Folia 平台行为**：Folia 采用区域化多线程，**不存在全局 TPS 概念**——`getTps`（及 `getTpsSync`）的 `tps1m` / `tps5m` / `tps15m` 三个值均返回 `null`（不抛错，不 reject）。插件应据此判断 TPS 不可用并降级，例如：
+
+```js
+const tps = await getTps();
+if (tps.tps1m == null) { /* */ }
+```
 
 ## 最大玩家数
 

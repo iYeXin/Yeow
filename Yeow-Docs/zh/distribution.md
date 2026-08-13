@@ -25,7 +25,7 @@ npm run build
 
 ## 方式二：.yeow.zip（推荐）
 
-- **平台无关**：纯 ZIP（JS 代码 + 资源 + 元信息），不依赖 Java / Paper 系——任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件，未来的跨平台兼容性更优
+- **平台无关**：纯 ZIP（JS 代码 + 资源 + 元信息），不依赖 Java / Paper 系——任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件。**现已支持 Paper 与 [Folia](https://papermc.io/software/folia/) 双平台**（Folia 服务器使用 Folia 版 Yeow 运行时即可，插件包与 Paper 完全通用，详见[进阶知识 · Folia](advanced/folia.md)），未来跨平台兼容性更优
 - 部署方式：
   - 放入 `plugins/Yeow/`，服务器启动时**自动扫描加载**
   - 或管理员执行 `/yeow install <url>` 一键安装
@@ -40,8 +40,9 @@ npm run build
 
 1. 上传 **`.yeow.zip`** 作为首选文件（标注推荐）
 2. 上传 **`.jar`** 作为兼容文件
-3. 在项目描述中注明前置要求：**需要安装 Yeow 插件作为前置**（https://modrinth.com/plugin/yeow）
-4. 建议同时上传 `yeow.config.json` 或 README 中说明插件声明的[权限](getting-started.md#权限声明)，便于用户评估
+3. 标记 `Folia Support`
+4. 在项目描述中注明前置要求：**需要安装 Yeow 插件作为前置**（https://modrinth.com/plugin/yeow）
+5. 建议同时上传 `yeow.config.json` 或 README 中说明插件声明的[权限](getting-started.md#权限声明)，便于用户评估
 
 用户根据自身服务器情况二选一：装了 Yeow 运行时 → 用 `.yeow.zip`；纯兼容场景 → 用 `.jar`。
 

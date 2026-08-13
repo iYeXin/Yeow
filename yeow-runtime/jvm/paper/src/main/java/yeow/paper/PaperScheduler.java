@@ -75,6 +75,15 @@ public class PaperScheduler implements TaskScheduler {
     /** 注入 Profile 插桩接口（null 表示关闭，零开销）。 */
     public void setProfileSink(ProfileSink s) { this.sink = s; }
 
+    /**
+     * 当前生效的 tick 预算：BudgetScaler 动态扩容时返回扩容后的预算
+     * （原先 drainRound/mainTickPump 直接读 config，scaler 计算出的扩容从未生效）。
+     */
+    private long effectiveBudgetNs() {
+        BudgetScaler sc = budgetScaler;
+        return sc != null ? sc.currentBudgetNs() : config.tickBudgetNs();
+    }
+
     public TaskFrequencyTracker freqTracker() { return freqTracker; }
 
     @Override public void start() {
@@ -141,7 +150,7 @@ public class PaperScheduler implements TaskScheduler {
 
     private void drainRound() {
         long t0 = System.nanoTime();
-        long budget = config.tickBudgetNs();
+        long budget = effectiveBudgetNs();
         long deadline = System.nanoTime() + budget;
         var ratios = config.priorityRatios();
         long highBud = (long)(budget * ratios[0]);
@@ -201,8 +210,15 @@ public class PaperScheduler implements TaskScheduler {
             } else {
                 var fut = new CompletableFuture<Object>();
                 var pluginName = t.pluginName();
-                mainQueue.add(new Pending(t.taskType(), t.params(), fut, pluginName));
+                var pending = new Pending(t.taskType(), t.params(), fut, pluginName);
+                mainQueue.add(pending);
                 result = waitMain(fut, t.taskType());
+                // 幽灵执行防护：同步等待超时（future 未被主线程 pump 完成）时，任务
+                // 仍留在 mainQueue 中，主线程恢复后照常执行——调用方已收到超时错误，
+                // 副作用却仍会发生（重复/错位副作用）。超时后按引用移除未执行的任务。
+                // 竞态窗口（pump 恰在超时与移除之间取走并执行）仅存在于主线程停滞
+                // >taskSyncTimeoutMs 后恢复的瞬间，且副作用已不可避免，属可接受。
+                if (!fut.isDone()) mainQueue.removeIf(p -> p == pending);
             }
             var elapsed = System.nanoTime() - startNs;
             ProfileSink s = sink;
@@ -248,7 +264,7 @@ public class PaperScheduler implements TaskScheduler {
 
     /** 主线程每 tick 调用（runTaskTimer）：预算内执行队列任务；预算有剩余时空闲自旋。 */
     public void mainTickPump() {
-        long deadline = System.nanoTime() + config.tickBudgetNs();
+        long deadline = System.nanoTime() + effectiveBudgetNs();
         drain(deadline);
         idleSpin(deadline);
     }

@@ -112,7 +112,24 @@ public class FoliaScheduler implements TaskScheduler {
     /** 在途投递超时扫描计数（每 SWEEP_INTERVAL_TICKS tick 扫一次）。 */
     private int sweepTickCounter = 0;
 
-    record InflightEntry(long dispatchedAtNs, String taskType, String marker, java.util.function.Consumer<Object> finish) {}
+    /**
+     * 在途投递条目。cancel 在投递后填入（FoliaTasks 各投递函数返回的取消动作）——
+     * 超时回收时先取消目标任务（防幽灵执行：调用方已收到超时错误，任务不得再执行），
+     * 再补 err + 回收 in-flight。
+     */
+    static final class InflightEntry {
+        final long dispatchedAtNs;
+        final String taskType;
+        final String marker;
+        final java.util.function.Consumer<Object> finish;
+        volatile Runnable cancel;
+        InflightEntry(long dispatchedAtNs, String taskType, String marker, java.util.function.Consumer<Object> finish) {
+            this.dispatchedAtNs = dispatchedAtNs;
+            this.taskType = taskType;
+            this.marker = marker;
+            this.finish = finish;
+        }
+    }
 
     private volatile ProfileSink sink;
     private long lastLowQueueWarnMs;
@@ -456,18 +473,26 @@ public class FoliaScheduler implements TaskScheduler {
             try { onTaskResult(t, startNs, result); } catch (Exception ignored) {}
             wake(dt.marker());
         };
-        inflights.put(seq, new InflightEntry(System.nanoTime(), t.taskType(), dt.marker(), finish));
-        dt.run().accept(finish); // 闭包内部：解析目标 → 目标线程调度 → finish(执行结果) / finish(err)
+        var entry = new InflightEntry(System.nanoTime(), t.taskType(), dt.marker(), finish);
+        inflights.put(seq, entry);
+        // 闭包返回取消动作（各投递函数捕获其 ScheduledTask）；先入注册表再投递，
+        // 避免任务同步完成时 finish 先于 put 执行导致 in-flight 计数泄漏。
+        entry.cancel = dt.run().apply(finish);
     }
 
-    /** 粗粒度扫描在途投递：超过超时阈值的补错误并回收 in-flight（条件移除防与正常完成竞态）。 */
+    /** 粗粒度扫描在途投递：超过超时阈值的取消目标任务 + 补错误并回收 in-flight（条件移除防与正常完成竞态）。 */
     private void sweepInflights() {
         long now = System.nanoTime();
         for (var e : inflights.entrySet()) {
-            if (now - e.getValue().dispatchedAtNs() >= DISPATCH_TIMEOUT_NS) {
+            if (now - e.getValue().dispatchedAtNs >= DISPATCH_TIMEOUT_NS) {
                 if (inflights.remove(e.getKey(), e.getValue())) {
-                    e.getValue().finish().accept(Map.of(
-                        "err", "task dispatch timed out: " + e.getValue().taskType() + " (target " + e.getValue().marker() + ")"));
+                    var v = e.getValue();
+                    // 幽灵执行防护：先取消尚未执行的目标任务（Folia ScheduledTask.cancel 线程安全；
+                    // 已完成/已执行的 cancel 为 no-op），再向调用方补超时错误。
+                    var c = v.cancel;
+                    if (c != null) { try { c.run(); } catch (Exception ignored) {} }
+                    v.finish.accept(Map.of(
+                        "err", "task dispatch timed out: " + v.taskType + " (target " + v.marker + ")"));
                 }
             }
         }

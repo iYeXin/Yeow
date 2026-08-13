@@ -1,7 +1,7 @@
 ---
 layout: custom-home
 title: Yeow
-description: 用 TypeScript 写 Minecraft Paper 插件
+description: 用 TypeScript 写 Minecraft 跨平台插件（Paper / Folia）
 sidebar: false
 ---
 

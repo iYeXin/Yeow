@@ -10,7 +10,7 @@ public class BlockTasks {
     public static Object breakNaturally(JsonObject p) {
         var b = block(p);
         if (p.has("item")) {
-            var tool = GuiTasks.buildItem(p.getAsJsonObject("item"));
+            var tool = InventoryTasks.buildItem(p.getAsJsonObject("item"));
             return b.breakNaturally(tool);
         }
         return b.breakNaturally();

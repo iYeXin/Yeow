@@ -40,6 +40,27 @@ world.setGameRuleSync(rule, value)
 ```
 规则名使用大写下划线格式，如 `DO_DAYLIGHT_CYCLE`、`KEEP_INVENTORY`。
 
+### 世界信息与 WorldBorder（2026-08-13）
+
+```js
+// 世界信息
+world.seed                        // number — 世界种子
+world.environment                 // string — NORMAL / NETHER / THE_END
+world.worldType                   // string | null
+world.gameRules                   // string[] — 全部游戏规则名
+await world.getSeed(); await world.getEnvironment(); ...
+
+// WorldBorder（服务端世界边界）
+const border = await world.getBorder();  // { centerX, centerZ, size, damageAmount, damageBuffer, warningDistance, warningTime }
+await world.setBorderCenter(x, z);
+await world.setBorderSize(size);
+await world.setBorderDamage(amount?, buffer?);
+await world.setBorderWarning(distance?, time?);
+await world.setBorderMoving(from, to, seconds);   // 平滑移动
+```
+
+玩家侧客户端边界：`player.setBorder(size)`（见 [Player](player.md)）。
+
 ### 方块
 
 ```js

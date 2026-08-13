@@ -128,6 +128,16 @@
 |------|------|------|------|
 | `player.getItemInMainHand` | `{ "uuid": "<uuid>" }` | `ItemStack` \| `null` | 读取主手物品，空手返回 `null` |
 | `player.getItemInOffHand` | `{ "uuid": "<uuid>" }` | `ItemStack` \| `null` | 读取副手物品，空手返回 `null` |
+| `player.setItemInMainHand` | `{ "uuid": "<uuid>", "item": <ItemStack \| null> }` | `true` | 设置主手物品（完整 ItemStack 含 meta；null 清空） |
+| `player.setItemInOffHand` | `{ "uuid": "<uuid>", "item": <ItemStack \| null> }` | `true` | 设置副手物品（同左） |
+
+### Tab 列表 / 边界（2026-08-13）
+
+| 任务 | 请求 | 返回 | 说明 |
+|------|------|------|------|
+| `player.sendTabHeader` | `{ "uuid": "<uuid>", "header": "<text>"?, "footer": "<text>"? }` | `true` | Tab 列表 header/footer（MiniMessage；null 清空对应栏） |
+| `player.setPlayerListName` | `{ "uuid": "<uuid>", "name": "<text>"? }` | `true` | Tab 列表显示名（null 恢复默认） |
+| `player.setBorder` | `{ "uuid": "<uuid>", "size": <double>?, "centerX": <double>?, "centerZ": <double>? }` | `true` | 客户端世界边界（null 重置为服务端边界） |
 
 `ItemStack` 返回格式（**纯数据**，值为读取时刻的快照）：
 

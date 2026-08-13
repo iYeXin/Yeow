@@ -123,8 +123,10 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 | 类型 | 字段 | 可取消 |
 |------|------|:------:|
 | `inventoryOpen` | player, inventoryType, title | |
-| `inventoryClose` | player, inventoryType | |
-| `inventoryClick` | player, slot, hotbarKey, action, inventoryType, isLeftClick, isRightClick, isShiftClick, clickedItem, cursorItem | ✔ |
+| `inventoryClose` | player, inventoryType, **inventoryId?** | |
+| `inventoryClick` | player, slot, hotbarKey, action, inventoryType, isLeftClick, isRightClick, isShiftClick, clickedItem, cursorItem, **inventoryId?** | ✔ |
+
+> **inventoryId**（2026-08-13）：当事件发生在 Yeow 自定义 Inventory（`Inventory.create` 创建）上时携带该 Inventory 的句柄 id（`inventory.toString()`）——多自定义 Inventory 场景用 `e.inventoryId === inventory.toString()` 识别点击/关闭归属。非自定义 Inventory（背包、箱子等）时缺省。
 
 ### 服务器事件
 

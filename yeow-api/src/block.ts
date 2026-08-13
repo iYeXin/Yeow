@@ -3,6 +3,11 @@ import type { TaskOptions } from './task.js';
 import { Location } from './location.js';
 import type { ItemStack } from './item.js';
 import { Material } from './material.js';
+import { Inventory } from './inventory.js';
+import {
+  getBlock as pdcGet, setBlock as pdcSet, hasBlock as pdcHas, removeBlock as pdcRemove,
+  keysBlock as pdcKeys, getAllBlock as pdcGetAll,
+} from './pdc.js';
 
 /** 方块状态（Minecraft 原版键值对枚举，值统一为字符串）。 */
 export interface BlockState {
@@ -80,5 +85,55 @@ export class Block {
     const p: Record<string, unknown> = { ...pos };
     if (tool) p.item = tool;
     return call<boolean>('block.breakNaturally', p, options);
+  }
+
+  // ── PDC（方块持久数据；需要 location） ──
+
+  private requirePos(): { world: string; x: number; y: number; z: number } {
+    const pos = this.pos;
+    if (!pos) throw new Error('block has no location (create with world.getBlock)');
+    return pos;
+  }
+
+  /** 容器方块的内容物（Chest / Furnace / Hopper / Barrel 等 Container；需要 location；非容器方块抛错）。 */
+  getInventory(): Inventory {
+    const { world, x, y, z } = this.requirePos();
+    return Inventory.ofBlock(world, x, y, z);
+  }
+
+  /** 读取并 JSON 反序列化（无值返回 null；旧数据非 JSON 时原样返回字符串）。 */
+  getPdc<T = unknown>(key: string, options?: TaskOptions): Promise<T | null> {
+    const { world, x, y, z } = this.requirePos();
+    return pdcGet(world, x, y, z, key, options);
+  }
+
+  /** 任意可 JSON 序列化的值自动序列化后写入。 */
+  setPdc(key: string, value: unknown, options?: TaskOptions): Promise<boolean> {
+    const { world, x, y, z } = this.requirePos();
+    return pdcSet(world, x, y, z, key, value, options);
+  }
+
+  /** 键是否存在。 */
+  hasPdc(key: string, options?: TaskOptions): Promise<boolean> {
+    const { world, x, y, z } = this.requirePos();
+    return pdcHas(world, x, y, z, key, options);
+  }
+
+  /** 移除键。 */
+  removePdc(key: string, options?: TaskOptions): Promise<boolean> {
+    const { world, x, y, z } = this.requirePos();
+    return pdcRemove(world, x, y, z, key, options);
+  }
+
+  /** 全部键（完整 key 格式，含命名空间）。 */
+  keysPdc(options?: TaskOptions): Promise<string[]> {
+    const { world, x, y, z } = this.requirePos();
+    return pdcKeys(world, x, y, z, options);
+  }
+
+  /** 全量读取本插件命名空间的键值（每个值 JSON 反序列化）。 */
+  getAllPdc(options?: TaskOptions): Promise<Record<string, unknown>> {
+    const { world, x, y, z } = this.requirePos();
+    return pdcGetAll(world, x, y, z, options);
   }
 }

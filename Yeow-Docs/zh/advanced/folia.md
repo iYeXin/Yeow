@@ -1,24 +1,25 @@
 # Folia 支持（实验性）
 
-> **状态：实验性。** 核心链路（事件/任务/命令/定时器/PDC/文本）已在 Folia 1.21 实机验证，任务覆盖与命令桥为骨架实现。完整的 Yeow 规范实现亟待补充。Paper 系（Paper/Purpur/Leaf 等）的官方实现仍是 `yeow-runtime`。
+> **状态：实验性。** 核心链路（调度器/任务/事件/命令/定时器/PDC/文本/权限）已在 Folia 1.21 实机验证。**任务与事件已与 Paper 全对齐**（任务与 Paper 全部 224 个 case 严格一致；事件 41 个 Bukkit 事件 + permissionCheck 生态钩子，2026-08-13）。Paper 系（Paper/Purpur/Leaf 等）的官方实现仍是 `yeow-runtime`。
 
 ## 实验性说明
 
 Folia 是 Paper 的分支，核心差异是**区域化多线程**（regionized multithreading）：没有全局主线程，世界按区块划分区域（region），每个 region 由独立线程并行 tick。这直接冲击了 Yeow 原本建立在"单主线程"上的同步桥模型，因此 Folia 支持是一个**独立的运行时实现**，而非对 Paper 运行的适配。
 
-当前支持范围：
+当前支持范围（与 Paper 任务/事件全对齐，2026-08-13）：
 
 | 类别   | 覆盖                                                                                                      |
 | ------ | --------------------------------------------------------------------------------------------------------- |
-| 世界   | 方块读写（含 BlockData 状态）、时间/天气/难度/规则、生成点、生物群系、光照、实体查询、掉落/闪电/爆炸/生成 |
-| 玩家   | 属性/位置/传送/消息（MiniMessage）/Title/ActionBar/音效/物品/权限等 30+ 操作                              |
-| 实体   | 属性/自定义名/生命值/发光/无敌/静默/乘客/载具/药水效果                                                    |
-| 数据   | PDC（实体/方块/世界）、Material 注册表查询与静态判断                                                      |
-| 事件   | playerJoin/Quit/Chat/Death/Interact/Teleport、entityDeath、blockBreak、inventoryOpen/Click                |
-| 命令   | 注册/注销/执行/Tab 补全                                                                                   |
+| 世界   | 方块读写（含 BlockData 状态）、时间/天气/难度/规则（全局状态写入自动路由全局线程）、生成点、生物群系、光照、实体查询/生成、掉落/闪电/爆炸/音效/粒子/区块快照 |
+| 玩家   | 属性/位置/传送/消息（MiniMessage）/Title/ActionBar/音效/物品/资源包/权限（含 permissionCheck 生态钩子）等 40+ 操作 |
+| 实体   | 属性/自定义名/生命值/发光/无敌/静默/重力/边界盒/乘客/载具/药水效果                                         |
+| 数据   | PDC（实体/方块/世界）、Material 注册表查询与静态判断                                                       |
+| 事件   | 41 个 Bukkit 事件全对齐（玩家/实体/方块/库存/服务器类）+ `permissionCheck` 生态钩子                       |
+| 命令   | 注册/注销/执行/Tab 补全（权限节点注册 PermissionDefault）                                                  |
+| Inventory/杂项 | 统一 Inventory（玩家物品栏 / 容器方块 / 自定义箱子界面）、BossBar、Scoreboard（创建受限，见下）、Recipe、Advancement |
 | 运行时 | 热重载（dev WS）、定时器、fs/http/assets/service 通道（core 自带）                                        |
 
-未覆盖（骨架阶段）：GUI / BossBar / Scoreboard / Recipe / Advancement（调用返回 `Not implemented on folia`）。
+已知差异见文末[架构推论](#架构推论)。
 
 ## Folia 下 Yeow 的架构
 
@@ -151,8 +152,12 @@ Folia 没有"主线程"可供自旋，Yeow 的同步桥（JS 同步调用要等�
 6. **全局任务（`server.*` 等）事件期间不受影响**：经 Folia 投递到全局 region 执行（全局 region 不参与事件自旋与调度器驻留）
 7. **异步任务跨 region 顺序不保证**：Paper 上异步任务在主线程 FIFO 串行（`post(a); post(b)` 顺序保证）；Folia 上跨 region 的异步任务并行执行、完成顺序不定——**有依赖关系的连续操作请用 `await` 串行化**
 8. **预算尽重启有 ≤30ms 抖动**：持续负载下同步调用可能遇到单次 ≤30ms 停顿（等待下一个 tick 边界 = 窗口剩余时间），属预算模型固有语义，非异常
+9. **事件重入死锁**：事件线程排空队列执行同步任务时，若该任务触发新事件（如 `performCommandSync` → `playerCommand`），嵌套自旋等待 JS 而 JS 正被同步调用阻塞 → 死锁至事件超时（默认 5s，有界兜底，Paper/Folia 均存在）。**事件 handler 内除非逻辑非常简单，否则不要使用同步操作（含属性读写）**——详见 [事件与回调 - 事件重入死锁](events.md#事件重入死锁)
 
-> **已知差异**：`server.getTps` 三个值返回 `null`（Folia 无全局 TPS 概念，插件需自行判断不可用）；GUI/BossBar/Scoreboard/Recipe/Advancement 任务类型未实现（返回 `Not implemented on folia`）。
+> **已知差异**：
+> - `server.getTps` 三个值返回 `null`（Folia 无全局 TPS 概念，插件需自行判断不可用）
+> - **Scoreboard 创建受限**：`createObjective` / `createTeam` 返回明确错误（Folia 仅支持读取/修改已存在的 objective/team，`registerNewObjective`/`registerNewTeam` 全部重载抛 `UnsupportedOperationException`）——详见 [Scoreboard API](../api/scoreboard.md)
+> - **全局状态写入自动路由**：`world.setTime` / `setStorm` / `setThundering` / `setDifficulty` / `setSpawnLocation` / `setGameRule` 在 Folia 上只能在**全局 region 线程**修改（AsyncCatcher 拦截）——Yeow 运行时已将这些任务自动路由到全局线程，插件无感知差异
 
 ## 平台透明
 

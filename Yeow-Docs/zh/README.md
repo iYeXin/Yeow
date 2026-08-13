@@ -1,4 +1,4 @@
-# Yeow v0
+﻿# Yeow v0
 
 **用 JavaScript / TypeScript 编写 Minecraft Paper 插件。QuickJS 引擎。**
 
@@ -31,11 +31,13 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 - **三级优先级调度器**（HIGH/NORMAL/LOW）— 时间片预算 + 自动降级 + 空闲自旋，防止单个插件挤占全局 tick
 - **异步优先 API** — `Promise` 默认，同步操作加 `Sync` 后缀，按需选择
 
-### 平台无关
+### 跨平台
 
 - 插件包是标准 ZIP（`.yeow.zip`，内含打包 JS、资源、元信息与权限声明），**不依赖 Java 环境**
 - 放入 `plugins/Yeow/` 自动扫描加载，或 `/yeow load` 动态加载
-- 任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件
+- **Paper 与 [Folia](https://papermc.io/software/folia/) 双平台通用**：同一份 `.yeow.zip` / `.jar` 插件包可直接互换，API 使用方法完全一致；Folia 服务器只需安装 Folia 版 [Yeow 运行时](https://modrinth.com/plugin/yeow)（Modrinth 提供）
+- **Folia 深度适配**：Yeow 为 Folia 实现了独立的区域化调度器（区域驻留、热点迁移、预算控制、非阻塞投递），插件无需任何改动即可自动享受 Folia 的多线程并行优势——详见[进阶知识 · Folia](advanced/folia.md)
+- 任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件；Folia 只是 Yeow 跨平台性的一个例子，未来还可能支持 Fabric / NeoForge 等平台
 - Paper 系（Paper/Purpur/Leaf 等）的 `yeow-runtime` 是官方实现示例
 
 ### 原生能力扩展
@@ -45,28 +47,28 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 
 ## 与其他方案对比
 
-|              | Yeow                | 传统 Java 插件 | Skript      | 脚本引擎插件（Nashorn/Rhino） |
-| ------------ | ------------------- | -------------- | ----------- | ----------------------------- |
-| 开发语言     | TypeScript/JS       | Java           | Skript DSL  | JS（受限）                    |
-| 类型安全     | ✅ 完整类型推断      | ✅              | ❌           | ❌                             |
-| npm 依赖复用 | ✅                   | 部分           | ❌           | ❌                             |
-| 热重载       | ✅ 秒级              | ❌ 需重启       | 部分        | 部分                          |
-| 线程隔离     | ✅ 每插件独立线程    | 主线程         | 主线程      | 主线程                        |
-| 性能         | QuickJS（接近原生） | 原生           | 解释执行    | 解释执行                      |
+|              | Yeow                | 传统 Java 插件 | Skript        | 脚本引擎插件（Nashorn/Rhino） |
+| ------------ | ------------------- | -------------- | ------------- | ----------------------------- |
+| 开发语言     | TypeScript/JS       | Java           | Skript DSL    | JS（受限）                    |
+| 类型安全     | ✅ 完整类型推断      | ✅              | ❌             | ❌                             |
+| npm 依赖复用 | ✅                   | 部分           | ❌             | ❌                             |
+| 热重载       | ✅ 秒级              | ❌ 需重启       | 部分          | 部分                          |
+| 线程隔离     | ✅ 每插件独立线程    | 主线程         | 主线程        | 主线程                        |
+| 性能         | QuickJS（接近原生） | 原生           | 解释执行      | 解释执行                      |
 | 平台可移植   | ✅ 插件包平台无关    | ❌ 仅 JVM       | ❌ 仅 Paper 系 | ❌ 仅 JVM                      |
 
 ---
 
 ## 文档与工具链
 
-| 文档 | 说明 |
-| ---- | ---- |
-| [快速开始](getting-started.md) | 创建项目 → 开发 → 构建 → 部署 |
-| [构建与分发](distribution.md) | JAR / `.yeow.zip` 两种格式与一键安装 |
-| [API 参考](api/README.md) | 按模块分组的完整索引 |
-| [编写依赖包](package-author.md) | 封装资源与 Service（SDK / JS 服务 / 原生服务） |
-| [进阶知识](advanced.md) | 架构、线程模型、调度器 |
-| [平台规范](specifications/README.md) | 协议层（其他运行时实现者参考） |
+| 文档                                 | 说明                                           |
+| ------------------------------------ | ---------------------------------------------- |
+| [快速开始](getting-started.md)       | 创建项目 → 开发 → 构建 → 部署                  |
+| [构建与分发](distribution.md)        | JAR / `.yeow.zip` 两种格式与一键安装           |
+| [API 参考](api/README.md)            | 按模块分组的完整索引                           |
+| [编写依赖包](package-author.md)      | 封装资源与 Service（SDK / JS 服务 / 原生服务） |
+| [进阶知识](advanced.md)              | 架构、线程模型、调度器                         |
+| [平台规范](specifications/README.md) | 协议层（其他运行时实现者参考）                 |
 
 **工具链**：`create-yeow` 脚手架、dev-server、构建 —— 见 [CLI 参考](cli.md)。要求：Node.js 18+ · Java 21+（可选，开发服务器必需）。
 

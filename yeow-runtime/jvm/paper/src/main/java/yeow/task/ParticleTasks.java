@@ -39,7 +39,7 @@ public class ParticleTasks {
             var mat = Material.matchMaterial(p.get("blockType").getAsString());
             if (mat != null) world.spawnParticle(particle, loc, count, ox, oy, oz, speed, mat.createBlockData(), force);
         } else if (p.has("item")) {
-            var item = GuiTasks.buildItem(p.getAsJsonObject("item"));
+            var item = InventoryTasks.buildItem(p.getAsJsonObject("item"));
             world.spawnParticle(particle, loc, count, ox, oy, oz, speed, item, force);
         } else {
             world.spawnParticle(particle, loc, count, ox, oy, oz, speed, null, force);

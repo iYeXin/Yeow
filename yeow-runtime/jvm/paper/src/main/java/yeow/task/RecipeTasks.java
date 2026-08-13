@@ -35,7 +35,7 @@ public class RecipeTasks {
     }
 
     static boolean addShaped(NamespacedKey nk, JsonObject p) {
-        var result = GuiTasks.buildItem(p.getAsJsonObject("result"));
+        var result = InventoryTasks.buildItem(p.getAsJsonObject("result"));
         var shape = new ArrayList<String>();
         for (var el : p.getAsJsonArray("shape")) shape.add(el.getAsString());
         var recipe = new ShapedRecipe(nk, result);
@@ -51,7 +51,7 @@ public class RecipeTasks {
     }
 
     static boolean addShapeless(NamespacedKey nk, JsonObject p) {
-        var result = GuiTasks.buildItem(p.getAsJsonObject("result"));
+        var result = InventoryTasks.buildItem(p.getAsJsonObject("result"));
         var recipe = new ShapelessRecipe(nk, result);
         var ings = p.getAsJsonArray("ingredients");
         for (var el : ings) {
@@ -72,7 +72,7 @@ public class RecipeTasks {
 
     static Recipe addFurnace(NamespacedKey nk, String type, JsonObject p) {
         var input = Material.matchMaterial(p.get("input").getAsString());
-        var result = GuiTasks.buildItem(p.getAsJsonObject("result"));
+        var result = InventoryTasks.buildItem(p.getAsJsonObject("result"));
         var exp = p.has("experience") ? (float)p.get("experience").getAsDouble() : 0.0f;
         var time = p.has("cookingTime") ? p.get("cookingTime").getAsInt() : 200;
         var recipe = new FurnaceRecipe(nk, result, input, exp, time);
@@ -82,7 +82,7 @@ public class RecipeTasks {
 
     static Recipe addCampfire(NamespacedKey nk, JsonObject p) {
         var input = Material.matchMaterial(p.get("input").getAsString());
-        var result = GuiTasks.buildItem(p.getAsJsonObject("result"));
+        var result = InventoryTasks.buildItem(p.getAsJsonObject("result"));
         var exp = p.has("experience") ? (float)p.get("experience").getAsDouble() : 0.0f;
         var time = p.has("cookingTime") ? p.get("cookingTime").getAsInt() : 600;
         return new CampfireRecipe(nk, result, input, exp, time);
@@ -94,7 +94,7 @@ public class RecipeTasks {
     }
 
     public static Object getRecipesFor(JsonObject p) {
-        var item = GuiTasks.buildItem(p.getAsJsonObject("item"));
+        var item = InventoryTasks.buildItem(p.getAsJsonObject("item"));
         var results = new ArrayList<String>();
         var recipes = Bukkit.getRecipesFor(item);
         for (int i = 0; i < recipes.size(); i++) {

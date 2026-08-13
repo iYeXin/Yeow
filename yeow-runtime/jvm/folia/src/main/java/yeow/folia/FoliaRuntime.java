@@ -36,7 +36,8 @@ public class FoliaRuntime extends JavaPlugin implements PlatformHost {
     public void purgePlatformResources(String pluginName) {
         FoliaCommandBridge.unregisterAll(pluginName);
         FoliaEventBridge.unsubscribeAll(pluginName);
-        // GUI/BossBar/Scoreboard/Recipe/Advancement 骨架阶段未实现，无平台侧资源
+        // GUI/BossBar 实例清理（Scoreboard 无归属，同 Paper 不清理）
+        FoliaTasks.purgePlugin(pluginName);
     }
 
     @Override public void syncCommands() { FoliaCommandBridge.syncCommands(); }

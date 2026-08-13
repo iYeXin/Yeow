@@ -110,9 +110,25 @@ player.getItemInMainHand()          // Promise<ItemStack | null>
 player.getItemInMainHandSync()      // ItemStack | null
 player.getItemInOffHand()           // Promise<ItemStack | null>
 player.getItemInOffHandSync()       // ItemStack | null
+
+player.setItemInMainHand(item)      // Promise — 设置主手（完整 ItemStack 含 meta；null 清空）
+player.setItemInMainHandSync(item)
+player.setItemInOffHand(item)       // Promise — 设置副手（同左）
+player.setItemInOffHandSync(item)
 ```
 
 返回完整 `ItemStack`（含 meta），手心为空时返回 `null`。`ItemStack` 为纯数据（快照），详见 [ItemStack](item.md)。
+
+### Tab 列表与客户端边界（2026-08-13）
+
+```js
+player.sendTabHeader(header, footer)    // Promise — Tab 列表 header/footer（MiniMessage；null 清空对应栏）
+player.sendTabHeaderSync(header, footer)
+player.setPlayerListName(name)          // Promise — Tab 列表显示名（null 恢复默认）
+player.setPlayerListNameSync(name)
+player.setBorder(size)                  // Promise — 客户端世界边界（null 重置为服务端边界）
+player.setBorderSync(size)
+```
 
 ### ActionBar 与资源包
 

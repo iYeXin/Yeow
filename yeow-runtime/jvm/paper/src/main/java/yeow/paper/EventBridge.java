@@ -178,7 +178,16 @@ public class EventBridge implements Listener {
                 var eventId = "perm#" + permSeq.incrementAndGet();
                 cbToEvent.put(entry.getKey() + "\u0000" + cb, eventId);
                 SyncCallbackHelper.register(eventId, latch::countDown);
-                pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",data,"eventId",eventId)));
+                // 事件数据携带 _eventId（_eventId 契约）：JS 侧 event.complete 原样回传精确匹配
+                var r = new java.util.HashMap<>(data);
+                r.put("_eventId", eventId);
+                try {
+                    pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",r,"eventId",eventId)));
+                } catch (Exception ex) {
+                    // 投递失败：完成 latch 并移除 pend，防止注册表泄漏
+                    latch.countDown();
+                    SyncCallbackHelper.remove(eventId);
+                }
             }
         }
         var deadline = System.nanoTime() + timeoutMs * 1_000_000;
@@ -276,9 +285,10 @@ public class EventBridge implements Listener {
             var pn = entry.getKey();
             var pt = runtime.getPlugin(pn); if (pt == null) continue;
             for (var cb : entry.getValue()) {
+                String eventId = null;
                 try {
                     long t0 = System.nanoTime();
-                    var eventId = newEventId(et);
+                    eventId = newEventId(et);
                     var pend = SyncCallbackHelper.register(eventId);
                     pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",withEventId(data, eventId),"eventId",eventId)));
                     long timeout = timeoutMs;
@@ -299,8 +309,8 @@ public class EventBridge implements Listener {
                     if (s != null) s.onEvent(new EventMetric(pn, et, elapsedNs, timedOut));
                     if (pend.isDone() && pend.getResult() instanceof Map<?,?> m)
                         applyMods(ev, m);
-                    SyncCallbackHelper.remove(eventId);
                 } catch (Exception e) { LOG.warning("Event: " + e.getMessage()); }
+                finally { if (eventId != null) SyncCallbackHelper.remove(eventId); }
             }
         }
     }
@@ -325,7 +335,13 @@ public class EventBridge implements Listener {
                 cbToDispatch.put(pn + "\u0000" + cb, eventId);
                 startNs.put(eventId, System.nanoTime());
                 SyncCallbackHelper.register(eventId, latch::countDown);
-                pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",withEventId(data, eventId),"eventId",eventId)));
+                try {
+                    pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",withEventId(data, eventId),"eventId",eventId)));
+                } catch (Exception ex) {
+                    // 投递失败：完成 latch 并移除 pend，防止注册表泄漏
+                    latch.countDown();
+                    SyncCallbackHelper.remove(eventId);
+                }
             }
         }
         long timeout = timeoutMs;
@@ -467,7 +483,9 @@ public class EventBridge implements Listener {
             case "inventoryOpen":{ var e=(InventoryOpenEvent)ev; putP(m,(org.bukkit.entity.Player)e.getPlayer());
                 m.put("inventoryType",e.getInventory().getType().name()); m.put("title",e.getView().getTitle()); break; }
             case "inventoryClose":{ var e=(InventoryCloseEvent)ev; putP(m,(org.bukkit.entity.Player)e.getPlayer());
-                m.put("inventoryType",e.getInventory().getType().name()); break; }
+                m.put("inventoryType",e.getInventory().getType().name());
+                var gid = yeow.task.InventoryTasks.byInv.get(e.getInventory());
+                if (gid != null) m.put("inventoryId", gid); break; }
             case "serverPing":{ var e=(ServerListPingEvent)ev; m.put("address",e.getAddress().toString());
                 m.put("numPlayers",e.getNumPlayers()); m.put("maxPlayers",e.getMaxPlayers()); m.put("motd",e.getMotd()); break; }
             case "playerTeleport":{ var e=(PlayerTeleportEvent)ev; putP(m,e.getPlayer());
@@ -504,6 +522,8 @@ public class EventBridge implements Listener {
                 m.put("isLeftClick",e.isLeftClick());
                 m.put("isRightClick",e.isRightClick());
                 m.put("isShiftClick",e.isShiftClick());
+                var gid = yeow.task.InventoryTasks.byInv.get(e.getInventory());
+                if (gid != null) m.put("inventoryId", gid);
                 m.put("clickedItem",e.getCurrentItem() != null && e.getCurrentItem().getType() != Material.AIR
                     ? Map.of("type",e.getCurrentItem().getType().getKey().toString(),"amount",e.getCurrentItem().getAmount()) : null);
                 m.put("cursorItem",e.getCursor() != null && e.getCursor().getType() != Material.AIR

@@ -17,9 +17,9 @@
 - 运行时调试器（断点 / 单步 / 变量查看）——开发模式下使用 Node.js（V8）执行 JS，获得完整的调试器能力
 - 可视化工具：调度器任务队列 / 消息队列的实时视图
 
-### Folia 支持
+### Folia 支持（已实现，实验性）
 
-Yeow 运行时尝试适配 [Folia](https://github.com/PaperMC/Folia)
+Yeow 运行时已深度适配 [Folia](https://github.com/PaperMC/Folia)（区域化多线程分支）：任务/事件/命令/权限与 Paper 全对齐，同一份插件包双平台通用。详见 [进阶知识 · Folia](advanced/folia.md)。
 
 ### 优化：任务调度器与事件分发机制
 

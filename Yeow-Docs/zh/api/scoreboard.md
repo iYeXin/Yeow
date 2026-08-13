@@ -2,6 +2,19 @@
 
 计分板 Objective、Score、Team 操作。
 
+> [!WARNING]
+> **Folia 平台限制（2026-08-13）**：Folia 的 Scoreboard 实现**不支持创建**计分板对象——
+> `createObjective` / `createTeam` 在 Folia 上返回错误（`{err: "Folia does not support creating new objectives/teams"}`）。
+> 原因：Folia（1.21）的 `registerNewObjective` / `registerNewTeam` 全部重载直接抛
+> `UnsupportedOperationException`，仅实现了**读取与修改已存在对象**的能力（世界保存或服务器命令
+> 创建的 objective/team；`setScore`、`setTeamPrefix`、`setObjectiveDisplay` 等修改操作可用）。
+> **Paper 上无此限制。**
+>
+> **错误语义**：与所有 Yeow 错误一致——运行时（Java）不抛异常，返回 `{err}` 错误对象；
+> 但 JS 侧按标准 `err` 语义处理：**同步调用（`xxxSync`）`throw`，异步调用（`await xxx`）Promise `reject`**。
+> 调用方用 `try/catch`（或 `.catch`）捕获并降级（如仅操作主计分板上已存在的 objective），
+> 或用 `getEnv().platform` 提前判断。
+
 ```js
 import {
     createScoreboard, deleteScoreboard,

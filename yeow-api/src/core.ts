@@ -1,12 +1,14 @@
 /// <reference path="global.d.ts" />
 /// <reference path="yeow-dev.d.ts" />
 
-export { call } from './task.js';
+export { call, callBatch, postBatch } from './task.js';
+export type { BatchTask } from './task.js';
 export { Location } from './location.js';
 export { Player } from './player.js';
 export { World } from './world.js';
 export { Chunk, ChunkSnapshot, ChunkTopSnapshot } from './chunk.js';
 export type { ChunkData } from './chunk.js';
+export type { WorldBorderInfo } from './world.js';
 export { Entity, LivingEntity } from './entity.js';
 export type { BoundingBox } from './entity.js';
 export { Block } from './block.js';
@@ -55,15 +57,18 @@ export { path } from './path.js';
 export { listen, respond, close, request, requestSync } from './http.js';
 export type { RespondOptions } from './http.js';
 export { logError } from './log-error.js';
-export { InstanceId, GUIHandle, BossBarHandle, InventoryHandle } from './instance-id.js';
-export type { ItemStack } from './item.js';
+export { InstanceId, BossBarHandle, InventoryHandle } from './instance-id.js';
+export { ItemStack } from './item.js';
+export type { ItemMeta, PotionEffectData, AttributeModifierData } from './item.js';
 export type { PotionEffect } from './potion.js';
 export { addPotionEffect, removePotionEffect, clearPotionEffects, getActivePotionEffects } from './potion.js';
 export { playSound, stopSound, stopAllSounds } from './sound.js';
 export type { ParticleOptions } from './particle.js';
 export { spawnParticle } from './particle.js';
-export { get as pdcGet, set as pdcSet, has as pdcHas, remove as pdcRemove, keys as pdcKeys,
-    getBlock as pdcGetBlock, setBlock as pdcSetBlock, hasBlock as pdcHasBlock, removeBlock as pdcRemoveBlock } from './pdc.js';
+export { get as pdcGet, set as pdcSet, has as pdcHas, remove as pdcRemove, keys as pdcKeys, getAll as pdcGetAll,
+    getRaw as pdcGetRaw, setRaw as pdcSetRaw, getAllRaw as pdcGetAllRaw,
+    getBlock as pdcGetBlock, setBlock as pdcSetBlock, hasBlock as pdcHasBlock, removeBlock as pdcRemoveBlock,
+    keysBlock as pdcKeysBlock, getAllBlock as pdcGetAllBlock, getBlockRaw as pdcGetBlockRaw, setBlockRaw as pdcSetBlockRaw, getAllBlockRaw as pdcGetAllBlockRaw } from './pdc.js';
 export { createBossBar, destroy as destroyBossBar,
     setTitle as setBossBarTitle, setProgress as setBossBarProgress,
     setColor as setBossBarColor, setStyle as setBossBarStyle,
@@ -71,8 +76,6 @@ export { createBossBar, destroy as destroyBossBar,
     removePlayer as removeBossBarPlayer, removeAll as removeAllBossBarPlayers,
     addFlag as addBossBarFlag, removeFlag as removeBossBarFlag } from './bossbar.js';
 export type { BossBarOptions } from './bossbar.js';
-export { createGUI, destroy as destroyGUI, open as openGUI,
-    close as closeGUI, setItem as setGUIItem, fill as fillGUI, clear as clearGUI } from './gui.js';
 export type { AdvancementProgress } from './advancement.js';
 export { grant as grantAdvancement, revoke as revokeAdvancement,
     getProgress as getAdvancementProgress, awardCriteria, revokeCriteria } from './advancement.js';

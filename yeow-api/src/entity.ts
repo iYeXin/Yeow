@@ -86,6 +86,30 @@ export class Entity {
   removeSync(options?: TaskOptions): void { call('entity.remove', { uuid: this.uuid }, options); }
   teleport(loc: Location, options?: TaskOptions): Promise<void> { return post('entity.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
   teleportSync(loc: Location, options?: TaskOptions): void { call('entity.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
+
+  // ── 基础补齐（2026-08-13） ──
+
+  /** 速度向量 { x, y, z }（方块/秒）。 */
+  get velocity(): { x: number; y: number; z: number } { return call<{ x: number; y: number; z: number }>('entity.getVelocity', { uuid: this.uuid }); }
+  set velocity(v: { x: number; y: number; z: number }) { call('entity.setVelocity', { uuid: this.uuid, x: v.x, y: v.y, z: v.z }); }
+  getVelocity(options?: TaskOptions): Promise<{ x: number; y: number; z: number }> { return post('entity.getVelocity', { uuid: this.uuid }, options); }
+  setVelocity(v: { x: number; y: number; z: number }, options?: TaskOptions): Promise<void> { return post('entity.setVelocity', { uuid: this.uuid, x: v.x, y: v.y, z: v.z }, options); }
+
+  /** 着火刻数（0 = 未着火）。 */
+  get fireTicks(): number { return call<number>('entity.getFireTicks', { uuid: this.uuid }); }
+  set fireTicks(v: number) { call('entity.setFireTicks', { uuid: this.uuid, value: v }); }
+  getFireTicks(options?: TaskOptions): Promise<number> { return post<number>('entity.getFireTicks', { uuid: this.uuid }, options); }
+  setFireTicks(v: number, options?: TaskOptions): Promise<void> { return post('entity.setFireTicks', { uuid: this.uuid, value: v }, options); }
+
+  /** 已存活刻数。 */
+  get ticksLived(): number { return call<number>('entity.getTicksLived', { uuid: this.uuid }); }
+  set ticksLived(v: number) { call('entity.setTicksLived', { uuid: this.uuid, value: v }); }
+  getTicksLived(options?: TaskOptions): Promise<number> { return post<number>('entity.getTicksLived', { uuid: this.uuid }, options); }
+  setTicksLived(v: number, options?: TaskOptions): Promise<void> { return post('entity.setTicksLived', { uuid: this.uuid, value: v }, options); }
+
+  /** 是否在地面上。 */
+  get isOnGround(): boolean { return call<boolean>('entity.isOnGround', { uuid: this.uuid }); }
+  isOnGroundAsync(options?: TaskOptions): Promise<boolean> { return post<boolean>('entity.isOnGround', { uuid: this.uuid }, options); }
 }
 
 export class LivingEntity extends Entity {
@@ -99,4 +123,23 @@ export class LivingEntity extends Entity {
 
   get isDead(): boolean { return call<boolean>('entity.isDead', { uuid: this.uuid }); }
   isDeadAsync(options?: TaskOptions): Promise<boolean> { return post<boolean>('entity.isDead', { uuid: this.uuid }, options); }
+
+  /** 施加伤害（可带伤害来源实体 uuid）。 */
+  damage(amount: number, damager?: string, options?: TaskOptions): Promise<void> {
+    return post('entity.damage', { uuid: this.uuid, amount, damager }, options);
+  }
+  damageSync(amount: number, damager?: string, options?: TaskOptions): void {
+    call('entity.damage', { uuid: this.uuid, amount, damager }, options);
+  }
+
+  /**
+   * 设置 AI 目标（**不保证必然生效**——取决于实体类型/寻路能力）。
+   * 目标为实体（targetUuid）或位置（world+x+y+z，可带 speed）。
+   */
+  setTarget(target: { targetUuid: string } | { world: string; x: number; y: number; z: number; speed?: number }, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('entity.setTarget', { uuid: this.uuid, ...target }, options);
+  }
+  setTargetSync(target: { targetUuid: string } | { world: string; x: number; y: number; z: number; speed?: number }, options?: TaskOptions): boolean {
+    return call<boolean>('entity.setTarget', { uuid: this.uuid, ...target }, options);
+  }
 }

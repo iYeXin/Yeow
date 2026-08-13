@@ -183,3 +183,29 @@
 | `world.strikeLightning` | `{ "world": "<name>", "x": <double>, "y": <double>, "z": <double> }` | `true` |
 | `world.strikeLightningEffect` | `{ "world": "<name>", "x": <double>, "y": <double>, "z": <double> }` | `true` |
 | `world.createExplosion` | `{ "world": "<name>", "x": <double>, "y": <double>, "z": <double>, "power": <float>, "setFire": <bool>, "breakBlocks": <bool> }` | `true` |
+
+---
+
+## 世界信息与 WorldBorder（2026-08-13）
+
+### 世界信息
+
+| 任务 | 请求 | 返回 |
+|------|------|------|
+| `world.getSeed` | `{ "world": "<name>" }` | `long`（世界种子） |
+| `world.getEnvironment` | `{ "world": "<name>" }` | `string`（`NORMAL` / `NETHER` / `THE_END`） |
+| `world.getWorldType` | `{ "world": "<name>" }` | `string` \| `null`（平台不支持时 null） |
+| `world.getGameRules` | `{ "world": "<name>" }` | `string[]`（全部游戏规则名） |
+
+### WorldBorder
+
+| 任务 | 请求 | 返回 |
+|------|------|------|
+| `world.getBorder` | `{ "world": "<name>" }` | `{ "centerX", "centerZ", "size", "damageAmount", "damageBuffer", "warningDistance", "warningTime" }` |
+| `world.setBorderCenter` | `{ "world": "<name>", "x": <double>, "z": <double> }` | `true` |
+| `world.setBorderSize` | `{ "world": "<name>", "size": <double> }` | `true`（边界半径） |
+| `world.setBorderDamage` | `{ "world": "<name>", "amount": <double>?, "buffer": <double>? }` | `true`（每秒伤害 / 无伤缓冲距离） |
+| `world.setBorderWarning` | `{ "world": "<name>", "distance": <int>?, "time": <int>? }` | `true`（警告距离 / 时间） |
+| `world.setBorderMoving` | `{ "world": "<name>", "from": <double>, "to": <double>, "seconds": <long> }` | `true`（平滑移动） |
+
+玩家侧客户端边界：`player.setBorder`（见 [player 任务](player.md)）。

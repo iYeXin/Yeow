@@ -1,8 +1,8 @@
 # 概览
 
-Yeow 是一个面向 Minecraft Paper 服务器的插件开发框架：用 **TypeScript / JavaScript** 编写插件，运行时（QuickJS 引擎）为每个插件启动**独立的 JS 线程**，通过消息桥与游戏主线程交互。
+Yeow 是一个面向 Minecraft 服务端的插件开发框架（**Paper 与 [Folia](https://papermc.io/software/folia/) 双平台通用**）：用 **TypeScript / JavaScript** 编写插件，运行时（QuickJS 引擎）为每个插件启动**独立的 JS 线程**，通过消息桥与游戏线程交互。
 
-插件代码不阻塞服务器主线程，一个插件崩溃不影响其他插件；构建产出平台无关的 `.yeow.zip` 插件包，任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件。
+插件代码不阻塞服务器主线程，一个插件崩溃不影响其他插件；构建产出平台无关的 `.yeow.zip` 插件包，任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件。**同一份插件包在 Paper 与 Folia 间可直接互换**（Folia 服务器使用 Folia 版运行时即可，插件自动享受其多线程优势，详见[进阶知识 · Folia](advanced/folia.md)）。
 
 > Yeow 暂未正式发布。Yeow 在正式发布前不保证 API 的稳定性。
 

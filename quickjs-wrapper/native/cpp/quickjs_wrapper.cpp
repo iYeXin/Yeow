@@ -573,6 +573,21 @@ static void promiseRejectionTracker(JSContext *ctx, JSValueConst promise,
     }
 }
 
+/**
+ * QuickJS interrupt handler: invoked periodically by the interpreter ON the
+ * executing thread. Returns 1 to abort the current evaluate/call with an
+ * "interrupted" exception. One-shot: the flag auto-clears when it fires, so
+ * subsequent executions are unaffected.
+ */
+int QuickJSWrapper::interruptHandler(JSRuntime *rt, void *opaque)
+{
+    auto *wrapper = static_cast<QuickJSWrapper *>(opaque);
+    if (wrapper->interrupted.exchange(false)) {
+        return 1;
+    }
+    return 0;
+}
+
 QuickJSWrapper::QuickJSWrapper(JNIEnv *env, jobject thiz, JSRuntime *rt)
 {
     jniEnv = env;
@@ -583,6 +598,11 @@ QuickJSWrapper::QuickJSWrapper(JNIEnv *env, jobject thiz, JSRuntime *rt)
     JS_SetModuleLoaderFunc(runtime, jsModuleNormalizeFunc, jsModuleLoaderFunc, nullptr);
 
     JS_SetHostPromiseRejectionTracker(runtime, promiseRejectionTracker, &unhandledRejections);
+
+    // Interrupt support (QuickJSContext.interrupt): the handler runs on the
+    // executing thread itself, so aborting is safe — no cross-thread context
+    // access, which would be use-after-free.
+    JS_SetInterruptHandler(runtime, interruptHandler, this);
 
         context = JS_NewContext(runtime);
 

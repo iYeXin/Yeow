@@ -9,6 +9,17 @@ interface WorldData {
   name: string;
 }
 
+/** 世界边界快照。 */
+export interface WorldBorderInfo {
+  centerX: number;
+  centerZ: number;
+  size: number;
+  damageAmount: number;
+  damageBuffer: number;
+  warningDistance: number;
+  warningTime: number;
+}
+
 export class World {
   static get(name: string, options?: TaskOptions): Promise<World | null> {
     return post<WorldData>('world.get', { name }, options).then((d) => (d ? new World(d.name) : null));
@@ -45,6 +56,60 @@ export class World {
   }
   getHighestBlockYSync(x: number, z: number, options?: TaskOptions): number {
     return call<number>('world.getHighestBlockY', { world: this.name, x, z }, options);
+  }
+
+  // ── 世界信息（2026-08-13） ──
+
+  /** 世界种子。 */
+  get seed(): number { return call<number>('world.getSeed', { world: this.name }); }
+  getSeed(options?: TaskOptions): Promise<number> { return post<number>('world.getSeed', { world: this.name }, options); }
+
+  /** 环境：NORMAL / NETHER / THE_END。 */
+  get environment(): string { return call<string>('world.getEnvironment', { world: this.name }); }
+  getEnvironment(options?: TaskOptions): Promise<string> { return post<string>('world.getEnvironment', { world: this.name }, options); }
+
+  /** 世界类型（可能返回 null——平台不支持时）。 */
+  get worldType(): string | null { return call<string | null>('world.getWorldType', { world: this.name }); }
+  getWorldType(options?: TaskOptions): Promise<string | null> { return post<string | null>('world.getWorldType', { world: this.name }, options); }
+
+  /** 全部游戏规则名。 */
+  get gameRules(): string[] { return call<string[]>('world.getGameRules', { world: this.name }); }
+  getGameRules(options?: TaskOptions): Promise<string[]> { return post<string[]>('world.getGameRules', { world: this.name }, options); }
+
+  // ── WorldBorder（2026-08-13） ──
+
+  /** 世界边界快照。 */
+  get border(): WorldBorderInfo {
+    return call<WorldBorderInfo>('world.getBorder', { world: this.name });
+  }
+  getBorder(options?: TaskOptions): Promise<WorldBorderInfo> {
+    return post<WorldBorderInfo>('world.getBorder', { world: this.name }, options);
+  }
+  /** 边界中心。 */
+  setBorderCenter(x: number, z: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.setBorderCenter', { world: this.name, x, z }, options);
+  }
+  setBorderCenterSync(x: number, z: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.setBorderCenter', { world: this.name, x, z }, options);
+  }
+  /** 边界半径（方块）。 */
+  setBorderSize(size: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.setBorderSize', { world: this.name, size }, options);
+  }
+  setBorderSizeSync(size: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.setBorderSize', { world: this.name, size }, options);
+  }
+  /** 边界伤害（amount 每秒伤害；buffer 无伤缓冲距离）。 */
+  setBorderDamage(amount?: number, buffer?: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.setBorderDamage', { world: this.name, amount, buffer }, options);
+  }
+  /** 边界警告（distance 方块距离；time 秒）。 */
+  setBorderWarning(distance?: number, time?: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.setBorderWarning', { world: this.name, distance, time }, options);
+  }
+  /** 边界平滑移动（from → to，seconds 秒）。 */
+  setBorderMoving(from: number, to: number, seconds: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.setBorderMoving', { world: this.name, from, to, seconds }, options);
   }
   getChunkAt(x: number, z: number, options?: TaskOptions): Promise<Chunk> {
     return post<ChunkData>('world.getChunkAt', { world: this.name, x, z }, options).then((d) => Chunk.from(d));

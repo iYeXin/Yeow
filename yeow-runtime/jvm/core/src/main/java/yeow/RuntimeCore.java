@@ -1,6 +1,7 @@
 package yeow;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 
 import java.io.File;
@@ -99,6 +100,31 @@ public class RuntimeCore {
     /** 取出并移除因原生服务未批准而被拒加载的插件包路径（批准后自动重载用）。 */
     public String pendingLoadFor(String plugin) {
         return pendingLoads.remove(plugin);
+    }
+
+    /**
+     * 热重载强杀后的实体重建：全新 PluginThread（新线程/新队列/新上下文），
+     * 保留权限与原生哈希声明、dev 资产目录与 dev 模式。
+     * 旧实体被遗弃——其卡死的 JS 线程无法在进程内回收（需原生中断支持），
+     * 但已从注册表移除、不再被投递消息，且线程为 daemon。
+     */
+    public boolean rebuildPluginEntity(String name, String newCode) {
+        var old = plugins.remove(name);
+        if (old == null) return false;
+        if (!(old instanceof PluginThread pt)) { old.stopAndWait(); return false; }
+        host.purgePlatformResources(name);
+        if (serviceManager != null) serviceManager.purgePluginServices(name);
+        if (profiler != null) profiler.unregisterPlugin(name);
+        var fresh = new PluginThread(name, pt.source(), initCode, newCode, this, pt.permissions(), pt.nativeHashes());
+        fresh.setDevAssetsDir(pt.getDevAssetsDir());
+        fresh.setDevMode(pt.isDevMode());
+        return registerPluginEntity(fresh, false);
+    }
+
+    /** 仅从注册表移除（不等待/不清理——调用方已处理；用于强杀后的实体重建）。 */
+    public void unregisterPluginEntity(String name) {
+        var pt = plugins.remove(name);
+        if (pt != null && profiler != null) profiler.unregisterPlugin(name);
     }
 
     /** 非虚拟插件名列表（/yeow 管理命令不覆盖虚拟插件/Worker）。 */
@@ -297,6 +323,10 @@ public class RuntimeCore {
      * {@link PluginEntity#postMessage} 回投 `{"t":"cb","p":"<cbId>","r":<data>}`；
      * 无 `cb` 时同步阻塞返回结果 JSON。`cbId` 由适配器自行生成与管理。
      *
+     * **批量扩展**：payload 含 `tasks` 数组（`[{type, params, priority?}, ...]`）时执行批处理——
+     * 按顺序向调度器提交全部任务、收集结果数组一次返回（同步阻塞 / 异步回调
+     * `r` 为结果数组）。任务逐个独立执行，无原子性。
+     *
      * @param entity  提交方实体（注册表中的插件）
      * @param message 任务消息：JSON 字符串，或 POJO（**直接使用**，避免序列化开销--
      *               gson `JsonObject` 零转换直接执行；一般 POJO 由运行时一次转换）
@@ -312,6 +342,9 @@ public class RuntimeCore {
                 obj = jo; // 直接使用，零序列化
             } else {
                 obj = gson.toJsonTree(message).getAsJsonObject(); // 一般 POJO 一次转换
+            }
+            if (obj.has("tasks") && obj.get("tasks").isJsonArray()) {
+                return submitTasks(entity, obj); // 批量：tasks 数组
             }
             var taskType = obj.get("type").getAsString();
             var params = obj.has("params") ? obj.getAsJsonObject("params") : new JsonObject();
@@ -331,6 +364,70 @@ public class RuntimeCore {
             catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
         } catch (Exception e) {
             return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
+    }
+
+    /**
+     * 批量任务：按顺序提交 `tasks` 数组，结果按原顺序收集（同步阻塞返回结果数组 JSON；
+     * 含非空 `cb` 时异步——全部完成后一次回调结果数组）。任务逐个独立执行，无原子性。
+     */
+    private String submitTasks(PluginEntity entity, JsonObject obj) {
+        var tasks = obj.getAsJsonArray("tasks");
+        var hasCb = obj.has("cb") && !obj.get("cb").getAsString().isEmpty();
+        if (hasCb) {
+            var cbId = obj.get("cb").getAsString();
+            submitTasksAsync(entity, tasks, cbId);
+            return null;
+        }
+        var out = new java.util.ArrayList<Object>();
+        for (var el : tasks) {
+            try {
+                var t = el.getAsJsonObject();
+                var taskType = t.get("type").getAsString();
+                var params = t.has("params") ? t.getAsJsonObject("params") : new JsonObject();
+                params.addProperty("_plugin", entity.name());
+                var priority = parsePriority(t.has("priority") ? t.get("priority").getAsString() : null);
+                var future = new java.util.concurrent.CompletableFuture<String>();
+                scheduler.submitGameSync(taskType, params, future, priority, entity.name());
+                try {
+                    var r = future.get(config.taskSyncTimeoutMs(), TimeUnit.MILLISECONDS);
+                    out.add(gson.fromJson(r.isEmpty() ? "null" : r, Object.class));
+                } catch (Exception e) {
+                    out.add(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
+                }
+            } catch (Exception e) {
+                out.add(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
+            }
+        }
+        return gson.toJson(out);
+    }
+
+    /** 批量异步：全部任务完成后一次回调结果数组（按提交顺序）。 */
+    private void submitTasksAsync(PluginEntity entity, JsonArray tasks, String cbId) {
+        int n = tasks.size();
+        if (n == 0) { entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, java.util.List.of())); return; }
+        var results = new Object[n];
+        var pending = new java.util.concurrent.atomic.AtomicInteger(n);
+        for (int i = 0; i < n; i++) {
+            final int idx = i;
+            try {
+                var t = tasks.get(i).getAsJsonObject();
+                var taskType = t.get("type").getAsString();
+                var params = t.has("params") ? t.getAsJsonObject("params") : new JsonObject();
+                params.addProperty("_plugin", entity.name());
+                var priority = parsePriority(t.has("priority") ? t.get("priority").getAsString() : null);
+                scheduler.submitGameAsync(taskType, params, r -> {
+                    results[idx] = r;
+                    if (pending.decrementAndGet() == 0) {
+                        entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, java.util.Arrays.asList(results)));
+                    }
+                }, priority, entity.name());
+            } catch (Exception e) {
+                results[idx] = Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString());
+                if (pending.decrementAndGet() == 0) {
+                    entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, java.util.Arrays.asList(results)));
+                }
+            }
         }
     }
 
@@ -540,13 +637,24 @@ public class RuntimeCore {
         var code = Files.readString(java.nio.file.Path.of(codeFile));
         var pt = plugins.get(pname);
         if (pt == null) { LOG.warning("Unknown plugin for hot reload: " + pname); return; }
-        // 命令注销/事件退订/平台资源清理由 pt.reload → cleanupResources → host.purgePlatformResources 完成
+        // 命令注销/事件退订/平台资源清理由 reload → cleanupResources → host.purgePlatformResources 完成
         if (serviceManager != null) serviceManager.purgePluginServices(pname);
         if (obj.has("assetsDir") && !obj.get("assetsDir").isJsonNull()) {
             if (pt instanceof PluginThread t) t.setDevAssetsDir(obj.get("assetsDir").getAsString());
         }
-        pt.reload(code);
-        pt.postMessage(gson.toJson(Map.of("t", "LOAD")));
+        if (pt instanceof PluginThread t) {
+            if (!t.reloadInternal(code)) {
+                // 旧线程被强杀：重建全新实体（新线程/新队列/新上下文），
+                // 防止卡死的旧线程从共享队列偷取消息（双线程并发执行同一插件逻辑）。
+                if (rebuildPluginEntity(pname, code)) {
+                    LOG.warning("Force-killed JS thread for " + pname + " - plugin entity rebuilt fresh");
+                }
+            }
+        } else {
+            pt.reload(code);
+        }
+        var current = plugins.get(pname);
+        if (current != null) current.postMessage(gson.toJson(Map.of("t", "LOAD")));
         host.syncCommands();
         LOG.info("Hot reload complete for " + pname);
     }

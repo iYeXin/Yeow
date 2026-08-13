@@ -18,7 +18,7 @@ import yeow.profile.collector.WindowMetrics;
 public final class WarningEngine {
 
     private static final Logger LOG = Logger.getLogger("Yeow");
-    private static final String HELP_URL = "https://docs.yexin.wiki/yeow/v1/runtime-warning";
+    private static final String HELP_URL = "https://yexin.wiki/yeow/v1/runtime-warning";
 
     private static final String RED    = "\u001b[31m";
     private static final String YELLOW = "\u001b[33m";

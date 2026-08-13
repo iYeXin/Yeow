@@ -325,6 +325,27 @@ public class QuickJSContext implements Closeable {
         destroyed = true;
     }
 
+    /**
+     * Request an interrupt of the currently executing JS code.
+     *
+     * <p>Thread-safe: may be called from any thread. The QuickJS interpreter
+     * periodically checks an interrupt flag <b>on the executing thread itself</b>
+     * (via {@code JS_SetInterruptHandler}) and aborts the current {@code evaluate}/
+     * {@code call} with an "interrupted" exception. One-shot semantics — the flag
+     * auto-clears when it fires, so subsequent executions are unaffected.
+     *
+     * <p>Use this to force-kill JS stuck in an infinite loop: the executing thread
+     * aborts and unwinds normally, so it can then destroy its own context — unlike
+     * {@link #destroy()}, which must not be called from a different thread
+     * (cross-thread context destruction is use-after-free).
+     *
+     * <p>Calling it while nothing is executing aborts the next execution.
+     */
+    public void interrupt() {
+        checkDestroyed();
+        interruptContext(context);
+    }
+
     public void releaseObjectRecords() {
         releaseObjectRecords(true);
     }
@@ -659,4 +680,5 @@ public class QuickJSContext implements Closeable {
 
     // destroy context and runtime
     private native void destroyContext(long context);
+    private native void interruptContext(long context);
 }

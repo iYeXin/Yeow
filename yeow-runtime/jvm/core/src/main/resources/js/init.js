@@ -283,10 +283,12 @@ function _hm(msg) {
             // await continuation) run after it returns, and their .then() calls
             // still need this context to reconstruct the user call chain.
             if (globalThis.$dev) _currentCbStack = e.stack;
+            // 一次性回调先注销再调用：handler 同步抛错时（$cb 包装会重新抛出）
+            // 不能因 delete 在调用之后而泄漏注册表项。
+            if (!e.persistent) delete _cbs[p];
             try {
                 e.h(r);
             } catch (ex) { _enhanceStack(ex, e.stack); throw ex; }
-            if (!e.persistent) delete _cbs[p];
         }
         return;
     }

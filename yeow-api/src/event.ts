@@ -149,6 +149,8 @@ export interface InventoryOpenEvent {
 export interface InventoryCloseEvent {
   player: Player;
   inventoryType: string;
+  /** 若关闭的是 Yeow 自定义 Inventory（Inventory.create 创建）：该 Inventory 的句柄 id（inventory.toString()）；否则缺省。 */
+  inventoryId?: string;
   cancelled?: boolean;
 }
 export interface ServerPingEvent {
@@ -286,6 +288,8 @@ export interface InventoryClickEvent {
   isShiftClick: boolean;
   clickedItem: ItemData | null;
   cursorItem: ItemData | null;
+  /** 若点击发生在 Yeow 自定义 Inventory（Inventory.create 创建）：该 Inventory 的句柄 id（inventory.toString()）；否则缺省。 */
+  inventoryId?: string;
   cancelled?: boolean;
 }
 interface ItemData {

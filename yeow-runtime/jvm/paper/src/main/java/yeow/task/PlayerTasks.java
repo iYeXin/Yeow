@@ -96,6 +96,43 @@ public class PlayerTasks {
         if (item.getType() == Material.AIR) return null;
         return serializeItem(item);
     }
+    // ── 手持设置 / Tab / 列表名 / 客户端边界（2026-08-13） ──
+    public static Object setItemInMainHand(JsonObject p) {
+        var pl = player(p);
+        pl.getInventory().setItemInMainHand(p.has("item") && !p.get("item").isJsonNull() ? InventoryTasks.buildItem(p.getAsJsonObject("item")) : new org.bukkit.inventory.ItemStack(Material.AIR));
+        return true;
+    }
+    public static Object setItemInOffHand(JsonObject p) {
+        var pl = player(p);
+        pl.getInventory().setItemInOffHand(p.has("item") && !p.get("item").isJsonNull() ? InventoryTasks.buildItem(p.getAsJsonObject("item")) : new org.bukkit.inventory.ItemStack(Material.AIR));
+        return true;
+    }
+    public static Object sendTabHeader(JsonObject p) {
+        var pl = player(p);
+        var header = p.has("header") && !p.get("header").isJsonNull() ? TextUtil.toLegacy(TextUtil.parse(p.get("header").getAsString())) : "";
+        var footer = p.has("footer") && !p.get("footer").isJsonNull() ? TextUtil.toLegacy(TextUtil.parse(p.get("footer").getAsString())) : "";
+        pl.setPlayerListHeaderFooter(header, footer);
+        return true;
+    }
+    public static Object setPlayerListName(JsonObject p) {
+        player(p).setPlayerListName(p.has("name") && !p.get("name").isJsonNull() ? p.get("name").getAsString() : null);
+        return true;
+    }
+    public static Object setBorder(JsonObject p) {
+        var pl = player(p);
+        try {
+            if (p.has("size") && !p.get("size").isJsonNull()) {
+                var border = Bukkit.createWorldBorder();
+                border.setCenter(0, 0);
+                border.setSize(p.get("size").getAsDouble());
+                if (p.has("centerX")) border.setCenter(p.get("centerX").getAsDouble(), p.has("centerZ") ? p.get("centerZ").getAsDouble() : 0);
+                pl.setWorldBorder(border);
+            } else {
+                pl.setWorldBorder(null); // 重置为服务端边界
+            }
+        } catch (Exception ignored) {}
+        return true;
+    }
     private static Object serializeItem(org.bukkit.inventory.ItemStack item) {
         var m = new LinkedHashMap<String, Object>();
         m.put("type", item.getType().getKey().toString());

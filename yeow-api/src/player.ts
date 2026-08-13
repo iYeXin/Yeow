@@ -4,6 +4,11 @@ import { Location, LocationData } from './location.js';
 import type { ItemStack } from './item.js';
 import type { Message } from './message.js';
 import type { Permission } from './permission.js';
+import { Inventory } from './inventory.js';
+import {
+  get as pdcGet, set as pdcSet, has as pdcHas, remove as pdcRemove,
+  keys as pdcKeys, getAll as pdcGetAll,
+} from './pdc.js';
 
 interface PlayerData {
   uuid: string;
@@ -28,6 +33,11 @@ export class Player {
   constructor(public readonly uuid: string, private _name?: string) {}
 
   get name(): string { return this._name ?? ''; }
+
+  /** 玩家物品栏（统一 Inventory 容器抽象）。 */
+  get inventory(): Inventory {
+    return Inventory.ofPlayer(this.uuid);
+  }
 
   get ping(): number { return call<number>('player.getPing', { uuid: this.uuid }); }
   getPing(options?: TaskOptions): Promise<number> { return post<number>('player.getPing', { uuid: this.uuid }, options); }
@@ -164,4 +174,75 @@ export class Player {
   getItemInMainHandSync(options?: TaskOptions): ItemStack | null { return call<ItemStack | null>('player.getItemInMainHand', { uuid: this.uuid }, options); }
   getItemInOffHand(options?: TaskOptions): Promise<ItemStack | null> { return post<ItemStack | null>('player.getItemInOffHand', { uuid: this.uuid }, options); }
   getItemInOffHandSync(options?: TaskOptions): ItemStack | null { return call<ItemStack | null>('player.getItemInOffHand', { uuid: this.uuid }, options); }
+
+  /** 设置主手物品（完整 ItemStack 含 meta；传 null 清空）。 */
+  setItemInMainHand(item: ItemStack | null, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('player.setItemInMainHand', { uuid: this.uuid, item }, options);
+  }
+  setItemInMainHandSync(item: ItemStack | null, options?: TaskOptions): boolean {
+    return call<boolean>('player.setItemInMainHand', { uuid: this.uuid, item }, options);
+  }
+  /** 设置副手物品（完整 ItemStack 含 meta；传 null 清空）。 */
+  setItemInOffHand(item: ItemStack | null, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('player.setItemInOffHand', { uuid: this.uuid, item }, options);
+  }
+  setItemInOffHandSync(item: ItemStack | null, options?: TaskOptions): boolean {
+    return call<boolean>('player.setItemInOffHand', { uuid: this.uuid, item }, options);
+  }
+
+  /** 设置 Tab 列表 header/footer（MiniMessage；传 null 清空对应栏）。 */
+  sendTabHeader(header: string | null, footer: string | null, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('player.sendTabHeader', { uuid: this.uuid, header, footer }, options);
+  }
+  sendTabHeaderSync(header: string | null, footer: string | null, options?: TaskOptions): boolean {
+    return call<boolean>('player.sendTabHeader', { uuid: this.uuid, header, footer }, options);
+  }
+
+  /** 设置 Tab 列表显示名（传 null 恢复默认）。 */
+  setPlayerListName(name: string | null, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('player.setPlayerListName', { uuid: this.uuid, name }, options);
+  }
+  setPlayerListNameSync(name: string | null, options?: TaskOptions): boolean {
+    return call<boolean>('player.setPlayerListName', { uuid: this.uuid, name }, options);
+  }
+
+  /** 设置客户端世界边界（传 null 重置为服务端边界；可带 centerX/centerZ）。 */
+  setBorder(size: number | null, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('player.setBorder', { uuid: this.uuid, size }, options);
+  }
+  setBorderSync(size: number | null, options?: TaskOptions): boolean {
+    return call<boolean>('player.setBorder', { uuid: this.uuid, size }, options);
+  }
+
+  // ── PDC（玩家持久数据） ──
+
+  /** 读取并 JSON 反序列化（无值返回 null；旧数据非 JSON 时原样返回字符串）。 */
+  getPdc<T = unknown>(key: string, options?: TaskOptions): Promise<T | null> {
+    return pdcGet(this.uuid, key, options);
+  }
+
+  /** 任意可 JSON 序列化的值自动序列化后写入。 */
+  setPdc(key: string, value: unknown, options?: TaskOptions): Promise<boolean> {
+    return pdcSet(this.uuid, key, value, options);
+  }
+
+  /** 键是否存在。 */
+  hasPdc(key: string, options?: TaskOptions): Promise<boolean> {
+    return pdcHas(this.uuid, key, options);
+  }
+
+  /** 移除键。 */
+  removePdc(key: string, options?: TaskOptions): Promise<boolean> {
+    return pdcRemove(this.uuid, key, options);
+  }
+
+  /** 全部键（完整 key 格式，含命名空间）。 */
+  keysPdc(options?: TaskOptions): Promise<string[]> {
+    return pdcKeys(this.uuid, options);
+  }
+
+  /** 全量读取本插件命名空间的键值（每个值 JSON 反序列化）。 */
+  getAllPdc(options?: TaskOptions): Promise<Record<string, unknown>> {
+    return pdcGetAll(this.uuid, options);
+  }
 }

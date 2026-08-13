@@ -9,6 +9,7 @@
 #include <set>
 #include <vector>
 #include <queue>
+#include <atomic>
 using namespace std;
 
 #include "../quickjs/quickjs.h"
@@ -32,6 +33,14 @@ private:
     jstring toJavaString(JNIEnv *env, JSValue value) const;
     JSValue toJSValue(JNIEnv *env, jobject thiz, jobject value) const;
 
+    /**
+     * QuickJS interrupt handler (registered via JS_SetInterruptHandler in the
+     * constructor). The interpreter calls it periodically ON the executing
+     * thread; returning non-zero aborts the current evaluate/call with an
+     * "interrupted" exception. One-shot: clears the flag when it fires.
+     */
+    static int interruptHandler(JSRuntime *rt, void *opaque);
+
 public:
     static std::string getJSErrorStr(JSContext *ctx);
     static std::string getJSErrorStr(JSContext *ctx, JSValueConst error);
@@ -43,6 +52,9 @@ public:
     jobject jniThiz;
     JSRuntime *runtime;
     JSContext *context;
+
+    /** Interrupt flag: set from any thread (QuickJSContext.interrupt), checked by the executing thread. */
+    std::atomic<bool> interrupted{false};
 
     queue<RejectionEntry> unhandledRejections;
 

@@ -10,6 +10,20 @@ Java_com_whl_quickjs_wrapper_QuickJSContext_destroyContext(JNIEnv *env, jobject 
     delete reinterpret_cast<QuickJSWrapper *>(context);
 }
 
+/**
+ * Request an interrupt of the currently executing JS code.
+ * Thread-safe: any thread may call; the interpreter checks the flag on the
+ * executing thread itself (see QuickJSWrapper::interruptHandler) and aborts
+ * the current evaluate/call with an "interrupted" exception.
+ */
+extern "C" JNIEXPORT void JNICALL
+Java_com_whl_quickjs_wrapper_QuickJSContext_interruptContext(JNIEnv *env, jobject thiz,
+                                                             jlong context)
+{
+    auto wrapper = reinterpret_cast<QuickJSWrapper *>(context);
+    wrapper->interrupted.store(true);
+}
+
 extern "C" JNIEXPORT jobject JNICALL
 Java_com_whl_quickjs_wrapper_QuickJSContext_evaluate(JNIEnv *env, jobject thiz, jlong context, jstring script,
                                                      jstring file_name)

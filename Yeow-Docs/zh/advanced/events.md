@@ -75,6 +75,31 @@ eventOn('blockBreak', { manualRelease: true }, (e, complete) => {
 });
 ```
 
+### 事件重入死锁
+
+事件派发期间，**事件线程自旋等待 JS handler 完成**，同时**排空调度器队列**——这会执行事件插件的**同步任务**（`call` 提交的）。若某个同步任务在事件线程上执行时**触发了新的事件**，且插件监听了它，就会发生**事件重入**：
+
+```
+blockBreak 事件 → 事件线程自旋
+  → 排空队列取到 performCommandSync 同步任务 → 就地执行
+  → 玩家执行命令 → 触发 playerCommand 事件
+  → 等待 JS 处理 playerCommand 回调
+  → 但 JS 线程正阻塞在 performCommandSync 的同步调用（future.get）
+  → 死锁直到事件超时（默认 5s）
+```
+
+**这在 Paper 与 Folia 上都会出现**（Paper 的主线程自旋排空 `drainDuringWait` 同样会执行触发事件的同步任务）。超时兜底保证服务器不真正卡死，但代价是：游戏线程被阻塞 5s（Paper 主线程 / Folia 事件所在 region）、Folia 上触发 watchdog 告警、事件 handler 的实际结果延迟。
+
+**哪些同步操作会触发新事件？** 同步执行命令（`player.performCommandSync(...)` → `playerCommand`、`dispatchCommandSync(...)` → `serverCommand`）、同步传送（`player.teleportSync(...)` → `playerTeleport`）等修改型操作。**异步 API不会造成重入死锁**——危险的是同步变体（`xxxSync`）与同步属性写入。
+
+> [!WARNING]
+> **除非逻辑非常简单（纯读取、不触发事件），否则不要在事件处理器中使用同步操作**——包括：
+> - `call(...)` / `xxxSync()` 同步调用
+> - **属性读写**（`e.player.ping`、`player.health = x`、`world.time` 等——它们是同步调用糖。改用 `await player.setHealth()` 等异步方法）
+> - `requestSync` 等阻塞式服务调用
+>
+> 事件内请使用**异步 API**（`await xxx()`）。异步操作不阻塞 JS 线程，事件可正常完成。
+
 ### 事件处理模式选择
 
 自动模式下，事件处理器返回 Promise 时立即释放事件。这意味着 async handler 中的 `await` 之后设置 `event.cancelled` 无效。
