@@ -12,6 +12,7 @@ import yeow.profile.instrumentation.TaskPriority;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -58,6 +59,11 @@ public class FoliaScheduler implements TaskScheduler {
     private static final int SPIN_DRAIN_BUDGET = 64;
     /** 投递超时兜底：100 ticks = 5s（低于 JS 侧 task-sync-timeout 10s，兜底错误先于调用方超时浮出）。 */
     private static final long DISPATCH_TIMEOUT_TICKS = 100;
+    private static final long DISPATCH_TIMEOUT_NS = DISPATCH_TIMEOUT_TICKS * 50_000_000L;
+    /** 在途投递超时扫描间隔：每 20 tick（1s）扫一次 → 超时实际触发于 5-6s。 */
+    private static final int SWEEP_INTERVAL_TICKS = 20;
+    /** 看门狗阈值：1s。正常 cycle 活动间隔远小于此（park ≤2ms、预算 20ms）；长任务误触发无害（恢复投递与在跑 cycle 同一线程串行）。 */
+    private static final long CYCLE_STALE_NS = 1_000_000_000L;
     private static final long LOW_QUEUE_WARN_INTERVAL_MS = 60_000;
     private static final long LOW_QUEUE_WARN_THRESHOLD = 100_000;
     /** 调试日志开关（-Dyeow.debug.sched=true）：cycle 启停/迁移/锚定序列，用于定位调度退化。 */
@@ -96,6 +102,17 @@ public class FoliaScheduler implements TaskScheduler {
     private volatile boolean pendingRestart = false;
     /** 每 tick 重启定时任务句柄（start 注册，shutdown 取消）。 */
     private volatile io.papermc.paper.threadedregions.scheduler.ScheduledTask restartTickTask;
+    /** 在途投递注册表（seq → 投递时刻/任务信息/完成回调；周期任务粗粒度扫描超时，替代每投递一个定时器）。 */
+    private final ConcurrentHashMap<Long, InflightEntry> inflights = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicLong inflightSeq = new java.util.concurrent.atomic.AtomicLong();
+    /** cycle 最近一次活跃时刻（循环顶每轮更新；看门狗判定 cycle 意外消失）。 */
+    private volatile long cycleLastActiveNs = System.nanoTime();
+    /** 看门狗上次恢复动作时刻（防重复重启风暴）。 */
+    private volatile long lastCycleRecoveryNs = 0;
+    /** 在途投递超时扫描计数（每 SWEEP_INTERVAL_TICKS tick 扫一次）。 */
+    private int sweepTickCounter = 0;
+
+    record InflightEntry(long dispatchedAtNs, String taskType, String marker, java.util.function.Consumer<Object> finish) {}
 
     private volatile ProfileSink sink;
     private long lastLowQueueWarnMs;
@@ -123,9 +140,10 @@ public class FoliaScheduler implements TaskScheduler {
 
     @Override public void start() {
         running = true;
-        // 每 tick 定时任务（全局 region）：预算尽 pending 的 cycle 在**下一个 tick 边界**重启——
-        // 等待 ≈ 窗口剩余时间（预算 20ms 用尽后典型 ~30ms），优于 runDelayed 的"从调度时刻起整 tick"。
-        // 无独立线程原则不变（借用 Folia 调度器任务，非自建线程）。
+        // 每 tick 定时任务（全局 region），职责三合一（均借用 Folia 调度器任务，无独立线程）：
+        //   ① 预算尽 pending 的 cycle 在**下一个 tick 边界**重启（等待 ≈ 窗口剩余，典型 ~30ms）
+        //   ② 看门狗：cycleRunning=true 但超阈值无活动（启动投递丢失/意外消失）→ 强制重启
+        //   ③ 粗粒度扫描在途投递超时（替代每投递一个 runDelayed 定时器）
         // **重叠安全性（不变量链）**：pendingRestart 仅在 finishCycle（cycle 循环 finally）置位，
         // 而循环绝不在任务执行中途退出——长任务（如 50ms）期间 pendingRestart 恒 false，定时任务必然
         // no-op；重启经 runCycleOn 投递到下一个 task phase，旧 cycle 线程早已回到区域 tick 循环。
@@ -133,6 +151,19 @@ public class FoliaScheduler implements TaskScheduler {
             if (pendingRestart && running) {
                 pendingRestart = false;
                 runCycleOn(schedRegion);
+            } else if (running && cycleRunning && !queueEmpty()
+                    && System.nanoTime() - cycleLastActiveNs > CYCLE_STALE_NS
+                    && System.nanoTime() - lastCycleRecoveryNs > CYCLE_STALE_NS) {
+                // 看门狗：cycle 应运行但超阈值无活动（region 调度器投递被静默丢弃等）→ 强制重启。
+                // 长任务误触发无害：恢复投递与在跑 cycle 在同一 region 线程上串行执行，收敛。
+                lastCycleRecoveryNs = System.nanoTime();
+                if (DBG) LOG.warning("[sched] cycle stalled, force restart region=" + schedRegion);
+                runCycleOn(schedRegion);
+            }
+            // ③ 在途投递超时粗粒度扫描（每 SWEEP_INTERVAL_TICKS tick 一次）
+            if (++sweepTickCounter >= SWEEP_INTERVAL_TICKS) {
+                sweepTickCounter = 0;
+                sweepInflights();
             }
         }, 1, 1);
     }
@@ -144,6 +175,7 @@ public class FoliaScheduler implements TaskScheduler {
             try { restartTickTask.cancel(); } catch (Exception ignored) {}
             restartTickTask = null;
         }
+        inflights.clear();
         synchronized (cycleLock) {
             cycleRunning = false;
             schedRegion = null;
@@ -268,6 +300,7 @@ public class FoliaScheduler implements TaskScheduler {
             long idleSince = 0; // 空闲等待起点（0 = 队列非空状态）
             int foreignCount = 0;
             while (running) {
+                cycleLastActiveNs = System.nanoTime(); // 看门狗活性信号（每轮更新）
                 if (!running || eventModeCount.get() > 0) return;
                 if (inflight.get() >= maxInflight) return;
                 long now = System.nanoTime();
@@ -405,24 +438,39 @@ public class FoliaScheduler implements TaskScheduler {
 
     /**
      * B 路径：非阻塞投递（in-flight++），经任务类型的 {@code getScheduler().run} 调度到
-     * 目标线程执行。**超时兜底**：{@link #DISPATCH_TIMEOUT_TICKS} 内未完成则补 err +
-     * 回收 in-flight——region 调度器没有 retired 回调（entity 才有），世界卸载/区域停摆时
-     * 任务可能永不执行；无兜底则 in-flight 永久泄漏 → 达 max-inflight 后调度器停摆，
-     * 且队列继续入队 → 内存无界增长。兜底只触发一次（done 原子开关）。
+     * 目标线程执行。**超时兜底（粗粒度）**：投递时刻记入 {@link #inflights} 注册表，
+     * 由每 tick 周期任务每 {@link #SWEEP_INTERVAL_TICKS} tick 扫描一次——超过
+     * {@link #DISPATCH_TIMEOUT_TICKS}（5s，实际 5-6s）未完成则补 err + 回收 in-flight。
+     * region 调度器没有 retired 回调（entity 才有），世界卸载/区域停摆时任务可能永不执行；
+     * 无兜底则 in-flight 永久泄漏 → 达 max-inflight 后调度器停摆，且队列继续入队 →
+     * 内存无界增长。兜底只触发一次（done 原子开关 + 注册表条件移除）。
      */
     private void dispatch(PendingTask t, FoliaTasks.DispatchTarget dt, long startNs) {
         inflight.incrementAndGet();
         var done = new java.util.concurrent.atomic.AtomicBoolean(false);
+        var seq = inflightSeq.incrementAndGet();
         java.util.function.Consumer<Object> finish = result -> {
             if (!done.compareAndSet(false, true)) return; // 兜底与正常完成互斥，只生效一次
+            inflights.remove(seq);
             inflight.decrementAndGet();
             try { onTaskResult(t, startNs, result); } catch (Exception ignored) {}
             wake(dt.marker());
         };
-        Bukkit.getGlobalRegionScheduler().runDelayed(runtime, tt ->
-            finish.accept(Map.of("err", "task dispatch timed out: " + t.taskType() + " (target " + dt.marker() + ")")),
-            DISPATCH_TIMEOUT_TICKS);
+        inflights.put(seq, new InflightEntry(System.nanoTime(), t.taskType(), dt.marker(), finish));
         dt.run().accept(finish); // 闭包内部：解析目标 → 目标线程调度 → finish(执行结果) / finish(err)
+    }
+
+    /** 粗粒度扫描在途投递：超过超时阈值的补错误并回收 in-flight（条件移除防与正常完成竞态）。 */
+    private void sweepInflights() {
+        long now = System.nanoTime();
+        for (var e : inflights.entrySet()) {
+            if (now - e.getValue().dispatchedAtNs() >= DISPATCH_TIMEOUT_NS) {
+                if (inflights.remove(e.getKey(), e.getValue())) {
+                    e.getValue().finish().accept(Map.of(
+                        "err", "task dispatch timed out: " + e.getValue().taskType() + " (target " + e.getValue().marker() + ")"));
+                }
+            }
+        }
     }
 
     /** 任务结果收尾：Profile 插桩 + 完成 future/回调（就地与投递两条路径共用）。 */
