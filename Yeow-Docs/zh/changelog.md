@@ -6,6 +6,11 @@
 
 ## 2026-08-13
 
+### yeow-utils Command API 支持 Permission 对象（0.1.24）
+
+- `Command.create(name, { permission })` 的 `permission` 从 `string` 扩展为 `string | Permission | PermissionOptions`（`{ node, default? }` 对象 / `registerPermission` 返回值）——与 yeow-api `registerCommand` 语义一致，声明权限节点 + 默认值（如 `{ node: 'myplugin.home', default: 'all' }`）
+- 透传至 `registerCommand`（内部经 `permissionPayload` 归一化），执行时检查逻辑不变（`permissionCheck` 优先，回退 Bukkit）
+
 ### 版本升级（0.3.2 / 0.1.23）
 
 - **yeow-api 0.3.1 → 0.3.2** / **yeow-utils 0.1.22 → 0.1.23** / **create-yeow 0.3.1 → 0.3.2**

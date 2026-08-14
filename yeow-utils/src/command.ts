@@ -1,4 +1,4 @@
-﻿import type { CommandSender } from 'yeow-api';
+import type { CommandSender, Permission, PermissionOptions } from 'yeow-api';
 import { Player, registerCommand } from 'yeow-api';
 
 type NodeType = 'enum' | 'number' | 'player' | 'world' | 'string' | 'pos' | 'angel' | 'bool';
@@ -197,7 +197,8 @@ function buildHandlers(nodes: SchemaNode[], options?: CompleterOptions) {
 
 export interface CommandOptions {
   description?: string;
-  permission?: string;
+  /** 权限节点：字符串（兼容）或权限节点对象 `{ node, default? }` / `registerPermission` 返回值——与 yeow-api `registerCommand` 语义一致 */
+  permission?: string | Permission | PermissionOptions;
   aliases?: string[];
   usage?: string;
   default?: (p: { sender: CommandSender; args: string[]; label: string }) => void;

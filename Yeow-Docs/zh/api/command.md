@@ -118,7 +118,7 @@ new CommandSchema().player('p').number('p1', false).number('p2', false)
 ```ts
 interface CommandOptions {
   description?: string;   // 命令描述
-  permission?: string;    // 权限节点
+  permission?: string | Permission | PermissionOptions;  // 权限节点：字符串或 { node, default? } 对象 / registerPermission 返回值（同 registerCommand）
   aliases?: string[];     // 别名
   usage?: string;         // 用法提示
   default?: (p) => void;  // 默认执行器（无重载匹配时调用）
