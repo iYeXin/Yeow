@@ -23,6 +23,7 @@
 | `dir`       | 获取插件数据目录路径    | 见下方                            |
 | `debug`     | 调试 / 错误上报 / Ping  | [debug 通道](debug.md)            |
 | `service`   | 服务注册/请求/订阅/发布 | [service 通道](service.md)        |
+| `util`      | gzip + UTF-8 ↔ 字节转换 | [util 通道](util.md)              |
 
 ---
 

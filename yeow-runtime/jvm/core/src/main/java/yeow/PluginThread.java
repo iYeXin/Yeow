@@ -27,6 +27,10 @@ public class PluginThread implements Runnable, PluginEntity {
     private final Logger log;
     /** 依附于本插件的 Worker（虚拟插件）：key = worker 名；主插件卸载时连带卸载。 */
     private final ConcurrentHashMap<String, WorkerThread> workers = new ConcurrentHashMap<>();
+    /** util 通道输入上限（base64 字符数 ≈ 48 MiB 原始字节）：防内存炸弹。 */
+    private static final int MAX_UTIL_INPUT_B64 = 64 * 1024 * 1024;
+    /** gzip 解压输出上限（原始字节）：防压缩炸弹。 */
+    private static final int MAX_UTIL_OUTPUT_BYTES = 256 * 1024 * 1024;
     private final Set<String> permissions;
     private final Map<String, String> nativeHashes; // 打包后路径(assets/<id>/...) → SHA-256（yeow.json native 声明）
     private volatile QuickJSContext ctx;
@@ -361,6 +365,17 @@ public class PluginThread implements Runnable, PluginEntity {
                         return null;
                     }
                     return handleAssets(pld);
+                } else if ("util".equals(channel)) {
+                    // util 通道（纯计算，无权限检查）：gzip 压缩/解压 + UTF-8 ↔ 字节转换。
+                    // 字节数据以 base64 字符串承载（JS 侧引擎原生 Uint8Array.toBase64/fromBase64）；
+                    // encode/decode 语义 = buffer ↔ 字符串，base64 只是承载形式。
+                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
+                    if (obj.has("cb")) {
+                        var cbId = obj.get("cb").getAsString();
+                        ioExecutor.submit(() -> { var result = handleUtil(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(result))); });
+                        return null;
+                    }
+                    return handleUtil(pld);
                 } else if ("debug".equals(channel)) {
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var dt = obj.get("t").getAsString();
@@ -902,6 +917,45 @@ public class PluginThread implements Runnable, PluginEntity {
             }
             log.warning(sb);
         } catch (Exception ex) { log.warning("[" + name + "] JS Error: " + pld); }
+    }
+
+    /**
+     * util 通道：gzip.compress / gzip.decompress / encode.utf8 / decode.utf8。
+     * 字节数据一律以 base64 字符串承载（encode/decode 语义 = buffer ↔ UTF-8 字符串，
+     * base64 只是承载形式）；无流式接口，一次性整体处理。
+     */
+    private String handleUtil(String pld) {
+        try {
+            var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
+            var t = obj.get("t").getAsString();
+            var p = obj.has("p") ? obj.getAsJsonObject("p") : new JsonObject();
+            var data = p.get("data").getAsString();
+            // 输入上限（base64 字符数，≈48 MiB 原始字节）：防内存炸弹
+            if (data.length() > MAX_UTIL_INPUT_B64)
+                throw new IllegalArgumentException("util input exceeds " + MAX_UTIL_INPUT_B64 + " b64 chars");
+            return switch (t) {
+                case "gzip.compress" -> {
+                    var level = p.has("level") ? p.get("level").getAsInt() : -1;
+                    if (level < 0 || level > 9) throw new IllegalArgumentException("level must be 0-9");
+                    var raw = Base64.getDecoder().decode(data);
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.gzip(raw, level))));
+                }
+                case "gzip.decompress" -> {
+                    var raw = Base64.getDecoder().decode(data);
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.gunzip(raw, MAX_UTIL_OUTPUT_BYTES))));
+                }
+                // 字符串 → 字节（b64 承载）
+                case "encode.utf8" -> gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.utf8(data))));
+                // 字节（b64 承载）→ 字符串（非法 UTF-8 序列替换为 U+FFFD）
+                case "decode.utf8" -> {
+                    var raw = Base64.getDecoder().decode(data);
+                    yield gson.toJson(Map.of("data", yeow.util.UtilCodec.utf8(raw)));
+                }
+                default -> throw new IllegalArgumentException("Unknown util op: " + t);
+            };
+        } catch (Exception e) {
+            return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
     }
 
     private String handleService(String pld) {

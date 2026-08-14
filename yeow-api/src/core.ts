@@ -103,3 +103,9 @@ export { registerPermission } from './permission.js';
 export type { Permission, PermissionOptions, PermissionDefault } from './permission.js';
 export { createWorker, Worker, onMessage, postMessage } from './worker.js';
 export type { WorkerOptions } from './worker.js';
+export {
+    stringToBytes, stringToBytesAsync,
+    bytesToString, bytesToStringAsync,
+    gzipCompress, gzipCompressSync,
+    gzipDecompress, gzipDecompressSync,
+} from './util.js';

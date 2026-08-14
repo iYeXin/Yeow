@@ -44,6 +44,16 @@
   - 顺带消除"任务内触发事件"死锁的整个类别：主线程是唯一消费方，事件自旋（`drainDuringWait`）与每 tick 都直接排空池——`event.complete` 不再依赖任何中间泵
   - 指标（TickMetric/预算缩放/LOW 积压告警）移入 `mainTickPump`
 
+### 新增 util 通道（gzip + UTF-8 ↔ 字节转换，0.3.4）
+
+- **协议**（`$_send('util', ...)`，纯计算无权限检查，无流式接口）：
+  - `gzip.compress`（`level` 0-9）/ `gzip.decompress`——字节经 **base64 承载**（QuickJS 引擎原生 `Uint8Array.toBase64/fromBase64`，ES2023+）
+  - `encode.utf8`（字符串 → 字节）/ `decode.utf8`（字节 → 字符串）——**encode/decode 语义 = buffer ↔ 字符串**，base64 只是承载形式
+- **API**（`yeow-api/src/util.ts`，**不暴露 base64**）：`gzipCompress(Sync)` / `gzipDecompress(Sync)`（输入 `Uint8Array | string`，输出 `Uint8Array`）、`stringToBytes(Async)` / `bytesToString(Async)`
+- **安全**：输入上限 64 MiB（base64 字符数）；解压输出上限 256 MiB（防压缩炸弹）
+- 实现：core `yeow/util/UtilCodec.java`（纯静态可单测）+ `PluginThread.handleUtil`（同步/异步双模式，照 fs 通道骨架）；`UtilCodecTest` 7 用例（往返/级别/空/坏魔数/输出上限/UTF-8 边界）
+- 文档：api/util.md、specifications/message/util.md；版本 **yeow-api 0.3.3 → 0.3.4** / **create-yeow 0.3.3 → 0.3.4**（模板依赖 `^0.3.0` caret 覆盖）
+
 ---
 
 ## 2026-08-13
