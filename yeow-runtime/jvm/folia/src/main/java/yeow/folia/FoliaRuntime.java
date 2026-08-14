@@ -24,7 +24,8 @@ public class FoliaRuntime extends JavaPlugin implements PlatformHost {
 
     // ── PlatformHost ────────────────────────────────────────────────
 
-    @Override public Logger logger() { return getLogger(); }
+    // 根 logger（非插件 getLogger()）：控制台输出不带 [Yeow] 前缀，与拆分前一致
+    @Override public Logger logger() { return Bukkit.getLogger(); }
     @Override public String minecraftVersion() { return Bukkit.getMinecraftVersion(); }
     @Override public String runtimeVersion() { return getDescription() != null ? getDescription().getVersion() : null; }
     @Override public String platformName() { return "folia"; }

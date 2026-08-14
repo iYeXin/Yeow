@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-08-14
+
+### 三项修复：dev-server 中文乱码 / 事件 player 零往返构造 / 日志前缀对齐拆分前
+
+- **dev-server 中文乱码**：`a63e07a` 给主路径（stdio inherit）强加 `-Dstdout.encoding=UTF-8`——JVM 向 GBK 控制台（中文 Windows）写入 UTF-8 字节导致乱码。修复：主路径移除该参数（不设时 JVM 自动匹配控制台编码，`-Dfile.encoding=UTF-8` 保留、仅影响文件 I/O）；headless 路径（管道 + readline 按 UTF-8 解码）保留 UTF-8 强制不变
+- **事件 player 零往返**：`adaptEvent` 不再 `Player.getSync(uuid)`（同步调度往返）——直接 `new Player(uuid)` 构造；`name` 首次访问时惰性同步获取并缓存（仅一次往返；不读 `name` 的 handler 完全零开销）
+- **日志前缀对齐拆分前**：console.log / JS 警告经 `host.logger()` 输出——拆分后该 logger 为插件 logger，多出 `[Yeow]` 前缀。改回根 logger（`Bukkit.getLogger()`，paper + folia 一致）：输出恢复 `[12:42:00 INFO]: [yeow-tools] xxx`
+- 产物：模板内置 `yeow-runtime-0.2.0.jar` 更新；**yeow-api 0.3.2 → 0.3.3** / **create-yeow 0.3.2 → 0.3.3**（模板依赖 `^0.3.0` caret 自动覆盖）
+
+---
+
 ## 2026-08-13
 
 ### 回调系统跨代串扰修复（PlayerDeath 幽灵触发的根因）

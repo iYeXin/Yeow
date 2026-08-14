@@ -376,7 +376,8 @@ function adaptEvent<K extends keyof EventMap>(type: K, data: RawEvent): { event:
     'playerAdvancementDone', 'playerToggleSneak', 'playerToggleFlight',
     'inventoryClick', 'playerResourcePackStatus',
   ] as K[];
-  if (hasPlayer.includes(type) && data.player) initial.player = Player.getSync(data.player as string);
+  // 直接以 uuid 构造 Player（零往返）；name 在首次访问时惰性获取（见 Player.name）
+  if (hasPlayer.includes(type) && data.player) initial.player = new Player(data.player as string);
   if (data.from) initial.from = loc(data.from as Record<string, unknown>);
   if (data.to) initial.to = loc(data.to as Record<string, unknown>);
   if (data.respawnLocation) initial.respawnLocation = loc(data.respawnLocation as Record<string, unknown>);

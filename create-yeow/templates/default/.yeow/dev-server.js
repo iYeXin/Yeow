@@ -434,7 +434,10 @@ async function printFormattedError(err) {
 }
 
 function startServer() {
-    const jvmArgs = ['-Xmx4G', '-Xms4G', '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-Dyeow.dev=true', '-Dyeow.ws.port=' + WS_PORT];
+    // 注意：不设 -Dstdout.encoding=UTF-8——主路径 stdout 直接继承控制台（stdio: inherit），
+    // 强制 UTF-8 会在 GBK 控制台（中文 Windows）产生中文乱码；不设时 JVM 自动匹配控制台编码。
+    // headless 路径（管道 + readline 解码）才需要 UTF-8 强制。
+    const jvmArgs = ['-Xmx4G', '-Xms4G', '-Dfile.encoding=UTF-8', '-Dyeow.dev=true', '-Dyeow.ws.port=' + WS_PORT];
     info(`\nStarting Paper ${PAPER_VERSION} server...`);
     proc = spawn('java', [...jvmArgs, '-jar', resolve(SERVER, PAPER_JAR), '--nogui'], { cwd: SERVER, stdio: ['pipe', 'inherit', 'inherit'] });
     proc.on('exit', code => { warn(`Server exited (${code})`); if (wss) wss.close(); process.exit(0); });

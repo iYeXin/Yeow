@@ -154,7 +154,7 @@ eventOn('permissionCheck', (e) => {
 });
 ```
 
-> `player` 字段在 JS 侧自动转为 `Player.get(uuid)`。`block` 为命名空间 ID（如 `minecraft:stone`）。
+> `player` 字段在 JS 侧自动转为 `new Player(uuid)`（直接构造，零往返；`name` 首次访问时惰性获取并缓存）。`block` 为命名空间 ID（如 `minecraft:stone`）。
 
 ## 事件回写
 

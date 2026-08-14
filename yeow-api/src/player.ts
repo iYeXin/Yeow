@@ -32,7 +32,15 @@ export class Player {
 
   constructor(public readonly uuid: string, private _name?: string) {}
 
-  get name(): string { return this._name ?? ''; }
+  /** 玩家名。未提供时首次访问惰性同步获取并缓存（仅一次往返）。 */
+  get name(): string {
+    if (this._name === undefined) {
+      let n = '';
+      try { n = call<PlayerData>('player.get', { identifier: this.uuid })?.name ?? ''; } catch { /* 离线/异常 → '' */ }
+      this._name = n;
+    }
+    return this._name;
+  }
 
   /** 玩家物品栏（统一 Inventory 容器抽象）。 */
   get inventory(): Inventory {

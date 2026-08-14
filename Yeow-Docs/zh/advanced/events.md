@@ -41,7 +41,7 @@ Paper 系事件触发
 ## 事件数据
 
 所有事件字段是基本类型（string/number/boolean/object），JS 端 yeow-api 的 `adaptEvent()` 自动包装：
-- `player` UUID → `Player.getSync(uuid)` 对象（同步转换，不影响事件处理）
+- `player` UUID → `new Player(uuid)` 直接构造（**零往返**；`name` 首次访问时惰性同步获取并缓存）
 - `from`/`to`/`respawnLocation` → `Location` 对象
 - 全部字段经 getter/setter 包装——handler **直接赋值**（`e.deathMessage = ...` 等）即记录为回写 mods（与返回值合并，直接赋值优先）；`cancelled` 仅可取消事件暴露
 
@@ -50,8 +50,9 @@ Paper 系事件触发
 ```js
 // 自动模式（默认）
 eventOn('blockBreak', (e) => {
-    // ✅ 同步 call — 自旋循环会处理
-    const p = Player.getSync(e.player);
+    // ✅ e.player 已是 Player 对象（uuid 直接构造，零往返；name 首次访问惰性获取）
+    const p = e.player;
+    p.sendMessageSync('已破坏方块');
 
     // ✅ 取消事件 — 即时生效
     e.cancelled = true;
