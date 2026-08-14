@@ -24,7 +24,7 @@ Paper 系事件触发
         handler(e, complete) → 用户调用 complete(mods)
   → Scheduler → Tasks.execute('event.complete')
   → SyncCallbackHelper.complete(cbId, mods)
-  → applyMods(): 应用回写字段（cancelled / deathMessage / serverPing motd 等）
+  → applyMods(): 应用回写字段（cancelled / joinMessage / quitMessage / message / format / to / respawnLocation / deathMessage / newFoodLevel / damage / amount / target / clickedItem / cursorItem / serverPing 的 motd 等——完整清单见 api/event.md 事件回写）
 ```
 
 ## 并发事件处理

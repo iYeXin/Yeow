@@ -5,30 +5,30 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 加入的玩家 |
-| `joinMessage` | string | 加入消息 |
+| `joinMessage` | string | 加入消息（**可回写**：`mods.joinMessage`） |
 
 ## `playerQuit`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 退出的玩家 |
-| `quitMessage` | string | 退出消息 |
+| `quitMessage` | string | 退出消息（**可回写**：`mods.quitMessage`） |
 
 ## `playerChat`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 发送消息的玩家 |
-| `message` | string | 消息内容 |
-| `format` | string | 消息格式 |
+| `message` | string | 消息内容（**可回写**：`mods.message`） |
+| `format` | string | 消息格式（**可回写**：`mods.format`） |
 
 ## `playerMove`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 移动的玩家 |
-| `from` | Location | 移动起始位置 |
-| `to` | Location | 移动目标位置 |
+| `from` | Location | 移动起始位置（只读） |
+| `to` | Location | 移动目标位置（**可回写**：`mods.to` 为 `{x,y,z,yaw?,pitch?,world?}`，world 缺省用当前世界） |
 
 ## `playerInteract`
 
@@ -44,14 +44,14 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 执行命令的玩家 |
-| `message` | string | 完整命令字符串（含 `/`） |
+| `message` | string | 完整命令字符串（含 `/`）（**可回写**：`mods.message` 改写命令） |
 
 ## `playerDeath`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 死亡的玩家 |
-| `deathMessage` | [Message 对象](../task/player.md#message-对象可翻译组件) | 死亡消息：`{ "key": "<翻译键>", "args": [...], "text": "<纯文本>" }`——`key`/`args` 可翻译组件（原始消息为可翻译组件时）与 `text` 纯文本兜底**同时传递** |
+| `deathMessage` | [Message 对象](../task/player.md#message-对象可翻译组件) | 死亡消息：`{ "key": "<翻译键>", "args": [...], "text": "<纯文本>" }`——`key`/`args` 可翻译组件（原始消息为可翻译组件时）与 `text` 纯文本兜底**同时传递**。**可回写**：`mods.deathMessage` 为 Message 对象或字符串 |
 | `deathType` | string | 伤害类型 key |
 
 > 插件可直接把 `deathMessage` 转发给发送消息 API（`broadcast`、`player.sendMessage` 等）——Message 对象天然兼容。
@@ -61,16 +61,16 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 重生的玩家 |
-| `respawnLocation` | Location | 重生位置 |
+| `respawnLocation` | Location | 重生位置（**可回写**：`mods.respawnLocation` 为 `{x,y,z,yaw?,pitch?,world?}`） |
 
 ## `playerTeleport`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `player` | string (UUID) | 传送的玩家 |
-| `from` | Location | 传送起始位置 |
-| `to` | Location | 传送目标位置 |
-| `cause` | string | 传送原因（`PLUGIN`、`COMMAND`、`SPECTATE` 等） |
+| `from` | Location | 传送起始位置（只读） |
+| `to` | Location | 传送目标位置（**可回写**：`mods.to`，同 `playerMove`） |
+| `cause` | string | 传送原因（`PLUGIN`、`COMMAND`、`SPECTATE` 等）（只读） |
 
 ## `playerItemConsume`
 
@@ -160,4 +160,4 @@
 |------|------|------|
 | `player` | string (UUID) | 玩家 |
 | `oldFoodLevel` | number | 旧饥饿值 |
-| `newFoodLevel` | number | 新饥饿值 |
+| `newFoodLevel` | number | 新饥饿值（**可回写**：`mods.newFoodLevel`） |

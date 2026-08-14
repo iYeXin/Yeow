@@ -3,6 +3,7 @@ package yeow.paper;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.event.*;
 import org.bukkit.event.block.*;
@@ -11,6 +12,7 @@ import org.bukkit.event.inventory.*;
 import org.bukkit.event.player.*;
 import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.event.server.ServerListPingEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.CachedServerIcon;
 import com.destroystokyo.paper.event.server.PaperServerListPingEvent;
 import yeow.channel.SyncCallbackHelper;
@@ -395,11 +397,56 @@ public class EventBridge implements Listener {
     void applyMods(Event ev, Map<?,?> m) {
         if (m.containsKey("cancelled") && ev instanceof Cancellable c)
             c.setCancelled(Boolean.TRUE.equals(m.get("cancelled")));
+        // 玩家事件（常用稳定字段；偏门/无 setter 的字段不回写）
+        if (m.containsKey("joinMessage") && ev instanceof PlayerJoinEvent e)
+            e.setJoinMessage(str(m.get("joinMessage")));
+        if (m.containsKey("quitMessage") && ev instanceof PlayerQuitEvent e)
+            e.setQuitMessage(str(m.get("quitMessage")));
+        if (m.containsKey("message") && ev instanceof AsyncPlayerChatEvent e)
+            e.setMessage(str(m.get("message")));
+        if (m.containsKey("format") && ev instanceof AsyncPlayerChatEvent e)
+            e.setFormat(str(m.get("format")));
+        if (m.containsKey("message") && ev instanceof PlayerCommandPreprocessEvent e)
+            e.setMessage(str(m.get("message")));
+        // playerTeleport 继承 PlayerMoveEvent——同一分支覆盖两事件的 `to`（from/cause 只读）
+        if (m.containsKey("to") && ev instanceof PlayerMoveEvent e) {
+            var l = loc(m.get("to"), e.getTo());
+            if (l != null) e.setTo(l);
+        }
+        if (m.containsKey("respawnLocation") && ev instanceof PlayerRespawnEvent e) {
+            var l = loc(m.get("respawnLocation"), e.getRespawnLocation());
+            if (l != null) e.setRespawnLocation(l);
+        }
         // playerDeath 死亡消息回写：Message 对象（{key,args}/{text}）或字符串
         if (m.containsKey("deathMessage") && ev instanceof PlayerDeathEvent d) {
             var dm = m.get("deathMessage");
             if (dm instanceof Map<?, ?> mm) d.deathMessage(TextUtil.parseMessage(gson.toJsonTree(mm)));
             else if (dm != null) d.deathMessage(TextUtil.parse(String.valueOf(dm)));
+        }
+        if (m.containsKey("newFoodLevel") && ev instanceof FoodLevelChangeEvent e)
+            e.setFoodLevel(((Number) m.get("newFoodLevel")).intValue());
+        // 实体事件
+        if (m.containsKey("damage") && ev instanceof EntityDamageEvent e)
+            e.setDamage(((Number) m.get("damage")).doubleValue());
+        if (m.containsKey("amount") && ev instanceof EntityRegainHealthEvent e)
+            e.setAmount(((Number) m.get("amount")).doubleValue());
+        if (m.containsKey("target") && ev instanceof EntityTargetEvent e) {
+            var t = m.get("target");
+            if (t instanceof String s && !s.isEmpty()) {
+                try { e.setTarget(Bukkit.getEntity(java.util.UUID.fromString(s))); }
+                catch (Exception ignored) {}
+            } else {
+                e.setTarget(null); // 清除目标
+            }
+        }
+        // 背包点击（物品锁定/替换）
+        if (m.containsKey("clickedItem") && ev instanceof InventoryClickEvent e) {
+            var it = item(m.get("clickedItem"), 1);
+            if (it != null) e.setCurrentItem(it);
+        }
+        if (m.containsKey("cursorItem") && ev instanceof InventoryClickEvent e) {
+            var it = item(m.get("cursorItem"), 0);
+            if (it != null) e.setCursor(it);
         }
         if (ev instanceof PaperServerListPingEvent p) {
             if (m.containsKey("motd"))
@@ -413,6 +460,40 @@ public class EventBridge implements Listener {
                 if (icon != null) p.setServerIcon(icon);
             }
         }
+    }
+
+    private static String str(Object v) { return v == null ? null : String.valueOf(v); }
+
+    /** 回写 Location：{x,y,z,yaw?,pitch?,world?}；world 缺失时回退事件当前世界。 */
+    private static Location loc(Object v, Location fallback) {
+        if (!(v instanceof Map<?, ?> mm)) return null;
+        try {
+            var world = mm.containsKey("world") && mm.get("world") != null
+                ? Bukkit.getWorld(String.valueOf(mm.get("world")))
+                : (fallback != null ? fallback.getWorld() : null);
+            if (world == null) return null;
+            double x = ((Number) mm.get("x")).doubleValue();
+            double y = ((Number) mm.get("y")).doubleValue();
+            double z = ((Number) mm.get("z")).doubleValue();
+            float yaw = mm.containsKey("yaw") && mm.get("yaw") != null
+                ? ((Number) mm.get("yaw")).floatValue() : (fallback != null ? fallback.getYaw() : 0f);
+            float pitch = mm.containsKey("pitch") && mm.get("pitch") != null
+                ? ((Number) mm.get("pitch")).floatValue() : (fallback != null ? fallback.getPitch() : 0f);
+            return new Location(world, x, y, z, yaw, pitch);
+        } catch (Exception e) { return null; }
+    }
+
+    /** 回写物品：{type, amount?}（inventoryClick 的 clickedItem/cursorItem 数据形状）。 */
+    private static ItemStack item(Object v, int defAmount) {
+        if (!(v instanceof Map<?, ?> mm)) return null;
+        try {
+            var mat = Material.matchMaterial(String.valueOf(mm.get("type")));
+            if (mat == null) return null;
+            int amount = mm.containsKey("amount") && mm.get("amount") != null
+                ? Math.max(0, ((Number) mm.get("amount")).intValue())
+                : defAmount;
+            return new ItemStack(mat, amount);
+        } catch (Exception e) { return null; }
     }
 
     /** 将 base64 PNG 解码为服务器列表图标（自动缩放至 64×64；失败返回 null，保持原图标）。 */

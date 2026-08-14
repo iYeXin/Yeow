@@ -198,7 +198,24 @@ eventOn('blockBreak', (e) => {
 });
 ```
 
-> **支持回写的字段**（运行时实际应用）：`cancelled`（可取消事件）、`deathMessage`（playerDeath，Message 对象 `{key, args}` / `{text}` 或字符串）、`serverPing` 的 `motd` / `maxPlayers` / `numPlayers` / `icon`。其余字段赋值会被随 mods 发送但运行时忽略（只读字段）。
+> **支持回写的字段**（运行时实际应用；其余字段赋值会被发送但运行时忽略——只读字段）：
+>
+> | 事件 | 可回写字段 | 说明 |
+> |------|-----------|------|
+> | `playerJoin` | `joinMessage` | 加入消息 |
+> | `playerQuit` | `quitMessage` | 退出消息 |
+> | `playerChat` | `message` / `format` | 聊天内容 / 格式 |
+> | `playerCommand` | `message` | 命令字符串（含 `/`） |
+> | `playerMove` / `playerTeleport` | `to` | 目标位置：`{x, y, z, yaw?, pitch?, world?}`（world 缺省用当前世界；`from` / `cause` 只读） |
+> | `playerRespawn` | `respawnLocation` | 重生位置（同上形状） |
+> | `playerDeath` | `deathMessage` | Message 对象 `{key, args}` / `{text}` 或字符串 |
+> | `foodLevelChange` | `newFoodLevel` | 新饥饿值 |
+> | `entityDamage` | `damage` | 伤害值 |
+> | `entityRegainHealth` | `amount` | 回复量 |
+> | `entityTarget` | `target` | 目标实体 UUID 或 `null`（清除目标） |
+> | `inventoryClick` | `clickedItem` / `cursorItem` | 点击物品 / 光标物品：`{type, amount?}`（`cursorItem` 的 `amount: 0` 表示清空光标） |
+> | `serverPing` | `motd` / `maxPlayers` / `numPlayers` / `icon` | 见事件表 |
+> | 全部可取消事件 | `cancelled` | 取消 |
 
 ### 方式 3：手动模式 complete(mods)
 

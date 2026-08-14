@@ -3,6 +3,8 @@ package yeow.folia;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.event.Event;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -17,6 +19,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.EntitySpawnEvent;
+import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -47,13 +50,18 @@ import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.event.server.ServerCommandEvent;
 import org.bukkit.event.server.ServerListPingEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.CachedServerIcon;
 import yeow.channel.SyncCallbackHelper;
 
+import javax.imageio.ImageIO;
+import java.io.ByteArrayInputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Logger;
@@ -361,17 +369,131 @@ public class FoliaEventBridge implements Listener {
             var r = SyncCallbackHelper.waitFor(d.eventId(), 0);
             SyncCallbackHelper.remove(d.eventId());
             eventTargets.remove(d.eventId());
-            if (r instanceof Map<?, ?> m) {
-                if (Boolean.TRUE.equals(m.get("cancelled")) && ev instanceof org.bukkit.event.Cancellable c) {
-                    c.setCancelled(true);
-                }
-                // playerDeath 死亡消息回写（对齐 Paper applyMods）：Message 对象或字符串
-                if (m.containsKey("deathMessage") && ev instanceof PlayerDeathEvent d2) {
-                    var dm = m.get("deathMessage");
-                    if (dm instanceof Map<?, ?> mm) d2.deathMessage(FoliaTextUtil.parse(gson.toJsonTree(mm)));
-                    else if (dm != null) d2.deathMessage(FoliaTextUtil.parse(gson.toJsonTree(dm)));
-                }
+            if (r instanceof Map<?, ?> m) applyMods(ev, m);
+        }
+    }
+
+    /** 事件回写应用（对齐 Paper EventBridge.applyMods；serverPing 用 Bukkit 基础类 setter）。 */
+    @SuppressWarnings("unchecked")
+    private static void applyMods(Event ev, Map<?, ?> m) {
+        if (m.containsKey("cancelled") && ev instanceof org.bukkit.event.Cancellable c)
+            c.setCancelled(Boolean.TRUE.equals(m.get("cancelled")));
+        // 玩家事件（常用稳定字段；偏门/无 setter 的字段不回写）
+        if (m.containsKey("joinMessage") && ev instanceof PlayerJoinEvent e)
+            e.setJoinMessage(str(m.get("joinMessage")));
+        if (m.containsKey("quitMessage") && ev instanceof PlayerQuitEvent e)
+            e.setQuitMessage(str(m.get("quitMessage")));
+        if (m.containsKey("message") && ev instanceof PlayerChatEvent e)
+            e.setMessage(str(m.get("message")));
+        if (m.containsKey("format") && ev instanceof PlayerChatEvent e)
+            e.setFormat(str(m.get("format")));
+        if (m.containsKey("message") && ev instanceof PlayerCommandPreprocessEvent e)
+            e.setMessage(str(m.get("message")));
+        // playerTeleport 继承 PlayerMoveEvent——同一分支覆盖两事件的 `to`（from/cause 只读）
+        if (m.containsKey("to") && ev instanceof PlayerMoveEvent e) {
+            var l = loc(m.get("to"), e.getTo());
+            if (l != null) e.setTo(l);
+        }
+        if (m.containsKey("respawnLocation") && ev instanceof PlayerRespawnEvent e) {
+            var l = loc(m.get("respawnLocation"), e.getRespawnLocation());
+            if (l != null) e.setRespawnLocation(l);
+        }
+        // playerDeath 死亡消息回写：Message 对象（{key,args}/{text}）或字符串
+        if (m.containsKey("deathMessage") && ev instanceof PlayerDeathEvent d) {
+            var dm = m.get("deathMessage");
+            if (dm instanceof Map<?, ?> mm) d.deathMessage(FoliaTextUtil.parse(gson.toJsonTree(mm)));
+            else if (dm != null) d.deathMessage(FoliaTextUtil.parse(gson.toJsonTree(dm)));
+        }
+        if (m.containsKey("newFoodLevel") && ev instanceof FoodLevelChangeEvent e)
+            e.setFoodLevel(((Number) m.get("newFoodLevel")).intValue());
+        // 实体事件
+        if (m.containsKey("damage") && ev instanceof EntityDamageEvent e)
+            e.setDamage(((Number) m.get("damage")).doubleValue());
+        if (m.containsKey("amount") && ev instanceof EntityRegainHealthEvent e)
+            e.setAmount(((Number) m.get("amount")).doubleValue());
+        if (m.containsKey("target") && ev instanceof EntityTargetEvent e) {
+            var t = m.get("target");
+            if (t instanceof String s && !s.isEmpty()) {
+                try { e.setTarget(Bukkit.getEntity(UUID.fromString(s))); }
+                catch (Exception ignored) {}
+            } else {
+                e.setTarget(null); // 清除目标
             }
+        }
+        // 背包点击（物品锁定/替换）
+        if (m.containsKey("clickedItem") && ev instanceof InventoryClickEvent e) {
+            var it = item(m.get("clickedItem"), 1);
+            if (it != null) e.setCurrentItem(it);
+        }
+        if (m.containsKey("cursorItem") && ev instanceof InventoryClickEvent e) {
+            var it = item(m.get("cursorItem"), 0);
+            if (it != null) e.setCursor(it);
+        }
+        // serverPing（对齐 Paper；Bukkit 基础类 setter——motd 为 legacy 文本）
+        if (ev instanceof ServerListPingEvent p) {
+            if (m.containsKey("motd"))
+                p.setMotd(FoliaTextUtil.toLegacy(FoliaTextUtil.parse(gson.toJsonTree(String.valueOf(m.get("motd"))))));
+            if (m.containsKey("maxPlayers"))
+                p.setMaxPlayers(((Number) m.get("maxPlayers")).intValue());
+            if (m.containsKey("numPlayers"))
+                p.setNumPlayers(((Number) m.get("numPlayers")).intValue());
+            if (m.containsKey("icon")) {
+                var icon = loadPingIcon(String.valueOf(m.get("icon")));
+                if (icon != null) p.setServerIcon(icon);
+            }
+        }
+    }
+
+    private static String str(Object v) { return v == null ? null : String.valueOf(v); }
+
+    /** 回写 Location：{x,y,z,yaw?,pitch?,world?}；world 缺失时回退事件当前世界。 */
+    private static Location loc(Object v, Location fallback) {
+        if (!(v instanceof Map<?, ?> mm)) return null;
+        try {
+            var world = mm.containsKey("world") && mm.get("world") != null
+                ? Bukkit.getWorld(String.valueOf(mm.get("world")))
+                : (fallback != null ? fallback.getWorld() : null);
+            if (world == null) return null;
+            double x = ((Number) mm.get("x")).doubleValue();
+            double y = ((Number) mm.get("y")).doubleValue();
+            double z = ((Number) mm.get("z")).doubleValue();
+            float yaw = mm.containsKey("yaw") && mm.get("yaw") != null
+                ? ((Number) mm.get("yaw")).floatValue() : (fallback != null ? fallback.getYaw() : 0f);
+            float pitch = mm.containsKey("pitch") && mm.get("pitch") != null
+                ? ((Number) mm.get("pitch")).floatValue() : (fallback != null ? fallback.getPitch() : 0f);
+            return new Location(world, x, y, z, yaw, pitch);
+        } catch (Exception e) { return null; }
+    }
+
+    /** 回写物品：{type, amount?}（inventoryClick 的 clickedItem/cursorItem 数据形状）。 */
+    private static ItemStack item(Object v, int defAmount) {
+        if (!(v instanceof Map<?, ?> mm)) return null;
+        try {
+            var mat = Material.matchMaterial(String.valueOf(mm.get("type")));
+            if (mat == null) return null;
+            int amount = mm.containsKey("amount") && mm.get("amount") != null
+                ? Math.max(0, ((Number) mm.get("amount")).intValue())
+                : defAmount;
+            return new ItemStack(mat, amount);
+        } catch (Exception e) { return null; }
+    }
+
+    /** 将 base64 PNG 解码为服务器列表图标（自动缩放至 64×64；失败返回 null，保持原图标）。 */
+    static CachedServerIcon loadPingIcon(String base64) {
+        try {
+            var img = ImageIO.read(new ByteArrayInputStream(java.util.Base64.getDecoder().decode(base64)));
+            if (img == null) return null;
+            if (img.getWidth() != 64 || img.getHeight() != 64) {
+                var scaled = new java.awt.image.BufferedImage(64, 64, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+                var g = scaled.createGraphics();
+                g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.drawImage(img, 0, 0, 64, 64, null);
+                g.dispose();
+                img = scaled;
+            }
+            return Bukkit.getServer().loadServerIcon(img);
+        } catch (Exception e) {
+            return null;
         }
     }
 

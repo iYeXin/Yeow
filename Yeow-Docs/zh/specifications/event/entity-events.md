@@ -5,7 +5,7 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `entity` | string (UUID) | 受伤的实体 |
-| `damage` | number | 伤害值 |
+| `damage` | number | 伤害值（**可回写**：`mods.damage` 覆盖伤害值） |
 | `cause` | string | 伤害类型（`ENTITY_ATTACK`、`FALL`、`LAVA` 等） |
 | `entityType` | string | 实体类型枚举名 |
 
@@ -44,7 +44,7 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `entity` | string (UUID) | 回血的实体 |
-| `amount` | number | 回血量 |
+| `amount` | number | 回血量（**可回写**：`mods.amount` 覆盖回血量） |
 | `reason` | string | 回血原因（`SATIATED`、`REGEN`、`EATING` 等） |
 
 ## `entityTarget`
@@ -52,7 +52,7 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `entity` | string (UUID) | 切换目标的实体 |
-| `target` | string \| null | 目标实体 UUID（`null` 表示取消目标） |
+| `target` | string \| null | 目标实体 UUID（**可回写**：`mods.target` 为目标 UUID 或 `null`（清除目标）；`null` 表示取消目标） |
 
 ---
 

@@ -6,6 +6,13 @@
 
 ## 2026-08-13
 
+### 事件回写字段扩展（常用稳定字段）+ Folia 对齐 Paper
+
+- **可回写字段扩充**（此前仅 `cancelled` / `deathMessage` / serverPing 四字段）：新增 `joinMessage`（加入消息）、`quitMessage`、`message` / `format`（聊天）、`message`（命令改写）、`to`（playerMove/playerTeleport 目标位置，`{x,y,z,yaw?,pitch?,world?}`）、`respawnLocation`、`newFoodLevel`、`damage`、`amount`（回血）、`target`（实体目标 UUID/null）、`clickedItem` / `cursorItem`（点击/光标物品 `{type, amount?}`）——偏门/无 setter 字段（from/cause/deathType/经验/等级/潜行/飞行等）保持只读
+- **Folia 对齐 Paper**：Folia 事件桥从"仅应用 cancelled"升级为与 Paper `applyMods` 一致的完整回写实现（含 serverPing 的 motd/maxPlayers/numPlayers/icon + PNG 图标加载）
+- 回写值格式：位置类 `{x,y,z,yaw?,pitch?,world?}`（world 缺省用事件当前世界）、物品类 `{type, amount?}`、`deathMessage` 支持 Message 对象/字符串
+- 文档：api/event.md 回写字段表、specifications 事件规范逐事件标注"可回写"、event-system.md mods 契约、advanced/events.md 同步
+
 ### 事件回写机制扩展（三种方式）与死亡消息回写
 
 - **事件回写支持"修改事件参数"**：自动模式下 `e.xxx = ...` 直接赋值事件字段即收集为回写 mods（此前只有 `cancelled` 有收集机制，其余字段必须 return）——与返回值合并，直接赋值优先；`cancelled` 语义不变（仅可取消事件暴露）

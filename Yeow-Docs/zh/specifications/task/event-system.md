@@ -45,6 +45,8 @@ Yeow 事件系统使用 `event.subscribe` 注册事件监听，`event.complete` 
 | `mods`           | 否   | 事件修改对象。省略或为 `null` 时按 `{}` 处理                                             |
 | `mods.cancelled` | 是*  | 若为 `true`，运行时必须取消该事件（`mods` 存在时）                                       |
 
+> **mods 可携带任意回写字段**，运行时按事件类型应用**常用稳定字段**（各事件的可回写字段见 [事件数据规范](../event/index.md) 中标注"可回写"的字段；未标注字段忽略）。`cancelled` 之外当前支持：`joinMessage` / `quitMessage` / `message`（聊天、命令）/ `format` / `to` / `respawnLocation` / `deathMessage` / `newFoodLevel` / `damage` / `amount` / `target` / `clickedItem` / `cursorItem` / serverPing 的 `motd` / `maxPlayers` / `numPlayers` / `icon`。
+
 ---
 
 ## 事件处理流程
