@@ -429,14 +429,15 @@ public class FoliaEventBridge implements Listener {
             var it = item(m.get("cursorItem"), 0);
             if (it != null) e.setCursor(it);
         }
-        // serverPing（对齐 Paper；Bukkit 基础类 setter——motd 为 legacy 文本）
+        // serverPing（对齐 Paper；Bukkit 基础类 setter——motd 为 legacy 文本；
+        // numPlayers 仅 Paper 的 PaperServerListPingEvent 有 setter，Folia 基类不可写）
         if (ev instanceof ServerListPingEvent p) {
             if (m.containsKey("motd"))
                 p.setMotd(FoliaTextUtil.toLegacy(FoliaTextUtil.parse(gson.toJsonTree(String.valueOf(m.get("motd"))))));
             if (m.containsKey("maxPlayers"))
                 p.setMaxPlayers(((Number) m.get("maxPlayers")).intValue());
-            if (m.containsKey("numPlayers"))
-                p.setNumPlayers(((Number) m.get("numPlayers")).intValue());
+            if (m.containsKey("numPlayers") && p instanceof com.destroystokyo.paper.event.server.PaperServerListPingEvent pp)
+                pp.setNumPlayers(((Number) m.get("numPlayers")).intValue());
             if (m.containsKey("icon")) {
                 var icon = loadPingIcon(String.valueOf(m.get("icon")));
                 if (icon != null) p.setServerIcon(icon);

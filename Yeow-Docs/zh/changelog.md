@@ -6,6 +6,12 @@
 
 ## 2026-08-13
 
+### 回调系统跨代串扰修复（PlayerDeath 幽灵触发的根因）
+
+- **根因**：回调 ID 每上下文从 `cb_1` 顺序递增——热重载/重载创建新上下文后 ID 与旧代完全重叠；旧代消息（旧定时器投递、reload 时 in-flight 的事件分发、迟到的异步结果）经共享队列落入新上下文后，`_cbs[旧ID]` 命中"同序号、不同用途"的新回调 → **事件 handler 被错误数据调用**（典型症状：playerDeath handler 收到 entityDeath（怪物死亡）数据或定时器 `true` → "玩家并未死亡却触发"、`e.player` 不存在；该问题自首版即存在）
+- **修复**：`_cbSeq` 改用**每上下文随机基址**——新旧代回调 ID 不撞号，旧代消息在新上下文查无此回调被静默丢弃；一次修复覆盖全部通道（事件/定时器/命令/服务/Worker/异步任务）
+- 规范：specifications/runtime/index.md 回调系统节补充"跨代唯一性"契约说明
+
 ### yeow-utils Command API 支持 Permission 对象（0.1.24）
 
 - `Command.create(name, { permission })` 的 `permission` 从 `string` 扩展为 `string | Permission | PermissionOptions`（`{ node, default? }` 对象 / `registerPermission` 返回值）——与 yeow-api `registerCommand` 语义一致，声明权限节点 + 默认值（如 `{ node: 'myplugin.home', default: 'all' }`）

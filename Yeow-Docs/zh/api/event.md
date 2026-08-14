@@ -214,7 +214,7 @@ eventOn('blockBreak', (e) => {
 > | `entityRegainHealth` | `amount` | 回复量 |
 > | `entityTarget` | `target` | 目标实体 UUID 或 `null`（清除目标） |
 > | `inventoryClick` | `clickedItem` / `cursorItem` | 点击物品 / 光标物品：`{type, amount?}`（`cursorItem` 的 `amount: 0` 表示清空光标） |
-> | `serverPing` | `motd` / `maxPlayers` / `numPlayers` / `icon` | 见事件表 |
+> | `serverPing` | `motd` / `maxPlayers` / `numPlayers` / `icon` | 见事件表（`numPlayers` 仅 Paper 支持——Folia 的 `ServerListPingEvent` 基类无 setter） |
 > | 全部可取消事件 | `cancelled` | 取消 |
 
 ### 方式 3：手动模式 complete(mods)
