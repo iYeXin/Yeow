@@ -54,6 +54,12 @@
 - 实现：core `yeow/util/UtilCodec.java`（纯静态可单测）+ `PluginThread.handleUtil`（同步/异步双模式，照 fs 通道骨架）；`UtilCodecTest` 7 用例（往返/级别/空/坏魔数/输出上限/UTF-8 边界）
 - 文档：api/util.md、specifications/message/util.md；版本 **yeow-api 0.3.3 → 0.3.4** / **create-yeow 0.3.3 → 0.3.4**（模板依赖 `^0.3.0` caret 覆盖）
 
+### Profiler：虚拟插件（Worker）默认不告警心跳超时
+
+- `heartbeat.timeout` 检测跳过虚拟插件（Worker）——Worker 通常承载计算密集型任务，长时间占用 JS 线程不响应心跳属预期行为
+- 实现：`WindowMetrics` 新增 `virtualPlugins` 集合（WindowCollector 在记录 ping 时按 `PluginEntity.isVirtual()` 标记）；`HeartbeatTimeoutDetector` 跳过；`DetectorTest` 增补用例（虚拟插件无 pong/慢响应均不告警，真实插件仍告警）
+- 文档：runtime-warning.md heartbeat.timeout 节补充说明
+
 ---
 
 ## 2026-08-13

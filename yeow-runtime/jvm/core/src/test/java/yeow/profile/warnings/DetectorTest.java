@@ -13,6 +13,7 @@ import yeow.profile.warnings.detectors.TabSlowDetector;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,7 +27,7 @@ class DetectorTest {
             List<WindowMetrics.EventAgg> events, List<WindowMetrics.CommandAgg> commands,
             List<String> pinged, Map<String, Long> jsPings, long tickDurNs) {
         return new WindowMetrics(0, ticks, tickDurNs, tickDurNs,
-            hnBacklog, lowBacklog, pinged, high, normal, low,
+            hnBacklog, lowBacklog, pinged, Set.of(), high, normal, low,
             Map.of(), Map.of(), jsPings, events, commands);
     }
 
@@ -58,10 +59,26 @@ class DetectorTest {
         assertFalse(d.check(w).isEmpty());
     }
 
+    @Test
+    void heartbeatSkipsVirtualPlugins() {
+        var d = new HeartbeatTimeoutDetector(CFG);
+        // 虚拟插件（Worker）：无 pong（死循环）也不告警——计算密集任务属预期（08-14）
+        var noPong = new WindowMetrics(0, 20, 1_000_000_000L, 1_000_000_000L, 0, 0,
+            List.of("w1", "hungry"), Set.of("w1"), tier(0,0), tier(0,0), tier(0,0),
+            Map.of(), Map.of(), Map.of(), List.of(), List.of());
+        assertTrue(d.check(noPong).stream().noneMatch(x -> x.plugin().equals("w1")), "virtual worker must not warn");
+        assertTrue(d.check(noPong).stream().anyMatch(x -> x.plugin().equals("hungry")), "real plugin must still warn");
+        // 虚拟插件慢响应也不告警
+        var slow = new WindowMetrics(0, 20, 1_000_000_000L, 1_000_000_000L, 0, 0,
+            List.of("w1"), Set.of("w1"), tier(0,0), tier(0,0), tier(0,0),
+            Map.of(), Map.of(), Map.of("w1", 900_000_000L), List.of(), List.of());
+        assertTrue(d.check(slow).isEmpty());
+    }
+
     /** 构造一个 1s 窗口：startMs 起、20 tick、插件已被 ping 但无 pong。 */
     private static WindowMetrics hungWindow(long startMs, String plugin) {
         return new WindowMetrics(startMs, 20, 1_000_000_000L, 1_000_000_000L, 0, 0,
-            List.of(plugin), tier(0,0), tier(0,0), tier(0,0),
+            List.of(plugin), Set.of(), tier(0,0), tier(0,0), tier(0,0),
             Map.of(), Map.of(), Map.of(), List.of(), List.of());
     }
 
@@ -85,7 +102,7 @@ class DetectorTest {
         long t0 = 10_000L;
         // 曾正常响应（窗口 end = t0+1000 → 基准）
         var ok = new WindowMetrics(t0, 20, 1_000_000_000L, 1_000_000_000L, 0, 0,
-            List.of("p"), tier(0,0), tier(0,0), tier(0,0),
+            List.of("p"), Set.of(), tier(0,0), tier(0,0), tier(0,0),
             Map.of(), Map.of(), Map.of("p", 50_000L), List.of(), List.of());
         assertTrue(d.check(ok).isEmpty());
         // 之后死循环：窗口 start = t0+(i+2)s，end = t0+(i+3)s → silent = (i+2)s
@@ -108,7 +125,7 @@ class DetectorTest {
         assertTrue(d.check(w30).stream().anyMatch(x -> x.code().equals("plugin.hung")));
         // 恢复响应 → 更新基准，不再告警
         var ok = new WindowMetrics(t0 + 31 * 1000L, 20, 1_000_000_000L, 1_000_000_000L, 0, 0,
-            List.of("p"), tier(0,0), tier(0,0), tier(0,0),
+            List.of("p"), Set.of(), tier(0,0), tier(0,0), tier(0,0),
             Map.of(), Map.of(), Map.of("p", 50_000L), List.of(), List.of());
         assertTrue(d.check(ok).isEmpty());
         // 再次死循环需重新积累（新基准 = t0+32s）

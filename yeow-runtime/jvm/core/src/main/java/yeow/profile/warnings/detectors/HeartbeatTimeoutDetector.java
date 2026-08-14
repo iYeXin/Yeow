@@ -26,6 +26,9 @@ public final class HeartbeatTimeoutDetector implements WarningDetector {
         long threshold = cfg.latencyWarnMs() * 1_000_000L;
         var out = new ArrayList<Warning>();
         for (var plugin : w.pingedPlugins()) {
+            // 虚拟插件（Worker）默认不告警心跳超时：Worker 通常承载计算密集型任务，
+            // 长时间占用 JS 线程不响应心跳属预期行为（08-14）。
+            if (w.virtualPlugins().contains(plugin)) continue;
             Long rt = w.jsPings().get(plugin);
             if (rt == null) {
                 // 发出 ping 但本窗口无任何 pong -- JS 线程未响应（死循环/长阻塞）

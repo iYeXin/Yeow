@@ -100,10 +100,10 @@ public final class Profiler implements AutoCloseable {
         for (var e : plugins.entrySet()) {
             var fut = e.getValue().ping();
             if (fut == null) {
-                collector.noteExpected(e.getKey());
+                collector.noteExpected(e.getKey(), e.getValue().isVirtual());
                 continue;
             }
-            collector.notePingSent(e.getKey());
+            collector.notePingSent(e.getKey(), e.getValue().isVirtual());
             fut.whenComplete((rt, err) -> {
                 if (rt == null) return;
                 sink.onJsPing(new JsPingMetric(e.getKey(), rt));

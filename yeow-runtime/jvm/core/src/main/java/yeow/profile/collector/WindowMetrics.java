@@ -2,6 +2,7 @@ package yeow.profile.collector;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 一个固定 1s 窗口（20 tick）的聚合输出，不可变。
@@ -21,6 +22,8 @@ public record WindowMetrics(
     int lowBacklogTicks,
     /** 本窗口发送过心跳 ping 的插件（期望响应集合）。 */
     List<String> pingedPlugins,
+    /** 本窗口发送过心跳 ping 的**虚拟插件**（Worker）——心跳超时检测默认跳过（计算密集任务属预期）。 */
+    Set<String> virtualPlugins,
     TierMetrics high,
     TierMetrics normal,
     TierMetrics low,

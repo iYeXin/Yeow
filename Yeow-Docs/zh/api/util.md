@@ -4,7 +4,7 @@
 import { gzipCompress, gzipDecompress, stringToBytes, bytesToString } from 'yeow-api';
 ```
 
-util 通道提供 **gzip 压缩/解压** 与 **UTF-8 字符串 ↔ 字节** 转换。输入输出一律为 `Uint8Array` / `string`——**不暴露 base64**（底层经 util 通道以 base64 承载，引擎原生转换）。
+util 通道提供 **gzip 压缩/解压** 与 **UTF-8 字符串 ↔ 字节** 转换。输入输出一律为 `Uint8Array` / `string`（底层经 util 通道以 base64 承载）。
 
 ## gzip
 
@@ -25,7 +25,7 @@ const packedFast = gzipCompressSync('big text...', 1);  // 快速压缩（string
 
 ### gzipDecompress(data) / gzipDecompressSync(data)
 
-解压。非 GZIP 数据报错；**解压输出上限 256 MiB**（防压缩炸弹），超限报错。
+解压。非 GZIP 数据报错；**解压输出上限 256 MiB**，超限报错。
 
 ```ts
 gzipDecompress(data: Uint8Array | string): Promise<Uint8Array>
@@ -73,6 +73,6 @@ console.log(bytesToString(raw)); // hello 你好
 
 ## 注意
 
-- **无流式接口**：一次性整体处理；超大数据的压缩请自行分块（如按 1 MiB 分片）。
+- **暂不提供流式接口**：一次性整体处理。
 - 输入上限 64 MiB（base64 字符数，≈48 MiB 原始字节），超出报错。
 - 压缩是 CPU 操作：异步版（`...Async` / `await`）在 ioExecutor 上执行，不阻塞 JS 线程与游戏线程。

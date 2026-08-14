@@ -36,6 +36,8 @@ public final class WindowCollector implements ProfileSink {
     private final Listener listener;
 
     private final Set<String> pingedThisWindow = new LinkedHashSet<>();
+    /** pingedThisWindow 中属于虚拟插件（Worker）的名字——心跳超时检测默认跳过。 */
+    private final Set<String> virtualPinged = new LinkedHashSet<>();
 
     // 窗口累加器（synchronized 保护）
     private long windowStartMs;
@@ -116,19 +118,22 @@ public final class WindowCollector implements ProfileSink {
     }
 
     /** 记录一次 ping 发起（由 Profiler 在窗口回调中调用）；in-flight 管理在插件实体（PluginEntity.ping）。 */
-    public synchronized void notePingSent(String plugin) {
+    public synchronized void notePingSent(String plugin, boolean virtual) {
         pingedThisWindow.add(plugin);
+        if (virtual) virtualPinged.add(plugin);
     }
 
     /** 标记期望响应（已有 in-flight ping、未发起新 ping 时使用），维持挂起检测的期望集合。 */
-    public synchronized void noteExpected(String plugin) {
+    public synchronized void noteExpected(String plugin, boolean virtual) {
         pingedThisWindow.add(plugin);
+        if (virtual) virtualPinged.add(plugin);
     }
 
     /** 清除某插件的全部跟踪状态（插件卸载时）。 */
     public synchronized void removePlugin(String plugin) {
         jsPings.remove(plugin);
         pingedThisWindow.remove(plugin);
+        virtualPinged.remove(plugin);
         plugins.remove(plugin);
         tasks.entrySet().removeIf(e -> e.getKey().startsWith(plugin + ":"));
         events.entrySet().removeIf(e -> e.getValue().plugin().equals(plugin));
@@ -144,6 +149,7 @@ public final class WindowCollector implements ProfileSink {
             hnBacklogTicks,
             lowBacklogTicks,
             List.copyOf(pingedThisWindow),
+            Set.copyOf(virtualPinged),
             tier(highHist), tier(normalHist), tier(lowHist),
             snapshotPlugins(plugins), snapshotTasks(tasks),
             new LinkedHashMap<>(jsPings),
@@ -186,6 +192,7 @@ public final class WindowCollector implements ProfileSink {
         events.clear();
         commands.clear();
         pingedThisWindow.clear();
+        virtualPinged.clear();
     }
 
     private static void acc(Map<String, long[]> map, String key, long ns) {
