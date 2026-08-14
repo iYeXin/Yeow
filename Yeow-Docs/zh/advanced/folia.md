@@ -28,7 +28,7 @@ Folia 是 Paper 的分支，核心差异是**区域化多线程**（regionized m
 ```
 yeow-runtime/jvm/
 ├── core/    平台无关引擎（QuickJS、消息桥、插件生命周期、TaskScheduler 契约）——Paper/Folia 共用
-├── paper/   Paper 平台实现（PaperScheduler：调度线程串行派发 + 主线程 pump）
+├── paper/   Paper 平台实现（PaperScheduler：主线程每 tick 直接消费三级池——恢复拆分前模型，无独立调度线程）
 └── folia/   Folia 平台实现（FoliaScheduler + FoliaTasks + 事件/命令桥，独立编写，不与 Paper 共享）
 ```
 

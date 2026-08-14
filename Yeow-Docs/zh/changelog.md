@@ -34,6 +34,16 @@
 - **修复（Paper）**：`drainDuringWait` 在排空 `mainQueue` 之外**同时代行泵职责**——按优先级顺序（high→normal→low）排空三个优先级池并就地执行（`executeNow`，与 `executeOne` 相同完成语义：指标 + future/callback 完成）；`poll` 原子性保证与调度线程无竞态，FIFO 顺序不变。覆盖全部自旋调用点（事件串行/并发、权限检查、tabComplete），且同步修复"handler 内同步 call（如 `Player.getSync`）同样会入池等待"的同类死锁
 - Folia 侧不受影响（`SpinPump` 自旋期间直接 `drainForPlugins` 泵池，无独立泵线程阻塞点），无需改动
 
+### Paper 调度器恢复拆分前线程模型（setBlock 吞吐 2x 回归）
+
+> 报告：循环 setBlock 吞吐量约为拆分前的一半。拆分提交 `c44f1f4` 把 Paper 从"主线程 tick 内就地执行"改成"yeow-sched 泵线程 + mainQueue + fut.get 往返"，每任务多两次线程切换 + future park/unpark + 两次队列 hop，且主线程 idleSpin 只看 mainQueue、看不见池——热循环提交→执行延迟从"同一 tick 内"变成"跨线程两跳"（拆分前 init.js/yeow-api 字节级无差异，回归纯在 Java 调度侧）。
+
+- **恢复**（Paper 平台特异，线程模型本就平台差异化——Folia 保持 region 线程模型不变）：
+  - 移除 yeow-sched 泵线程：`mainTickPump` 每 tick 直接消费三级池（tier 比例分配 → 贪婪 → 空闲自旋盯三池 + mainQueue），与拆分前 `tick()` 一致
+  - `mainQueue`/`waitMain` 仅保留为兜底路径（`executeOne` 非主线程分支，正常情况下不触发）
+  - 顺带消除"任务内触发事件"死锁的整个类别：主线程是唯一消费方，事件自旋（`drainDuringWait`）与每 tick 都直接排空池——`event.complete` 不再依赖任何中间泵
+  - 指标（TickMetric/预算缩放/LOW 积压告警）移入 `mainTickPump`
+
 ---
 
 ## 2026-08-13

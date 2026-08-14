@@ -20,16 +20,18 @@ import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 /**
- * Paper 平台调度器：三级优先级队列 + 调度线程串行派发 + 主线程 pump。
+ * Paper 平台调度器：三级优先级队列 + **主线程直接消费**（08-14 恢复拆分前模型）。
  *
  * 架构（平台特异）：
- * - 调度线程持有任务队列，串行取出任务后**路由**到主线程执行（前一个结果返回才派发下一个）
- * - 主线程 pump 分两种：事件/补全自旋时 {@link #drainDuringWait} 就地执行（调用方必为主线程）；
- *   正常情形由 {@link #mainTickPump}（runTaskTimer 每 tick）预算内执行
- * - 主线程正在自旋时路由进来的任务由 pump 执行；其余情形排队等下一个 tick
- * - 主线程自旋期间 {@link #drainDuringWait} **同时代行调度线程泵职责**：排空优先级池
- *   （08-14 事件死锁修复——事件在任务执行内被触发时，event.complete 等回执在池中，
- *   若泵线程正阻塞在 waitMain 上等当前任务，回执无人泵 → 循环等待，见 drainDuringWait 注释）
+ * - **无独立调度线程**：任务从 JS 线程入池后，由主线程每 tick 的 {@link #mainTickPump}
+ *   预算内就地执行（tier 分配 → 贪婪 → 空闲自旋盯池）——与拆分前一致，零跨线程握手
+ * - 拆分时引入的 yeow-sched 泵线程 + mainQueue 中转在 Paper 上是**纯开销**（主线程本就是
+ *   执行者）：每任务多两次线程切换 + future park/unpark + 队列 hop，热循环（setBlock 等）
+ *   吞吐减半；且造成"任务内触发事件 → event.complete 回池 → 泵被 waitMain 阻塞"的
+ *   5s 死锁（08-14 修复）——已移除
+ * - 事件/补全自旋时 {@link #drainDuringWait} 就地执行（调用方必为主线程）——同时排空
+ *   优先级池与 mainQueue（死锁修复，主线程自旋期间不依赖 tick）
+ * - mainQueue/waitMain 路径仅保留为兜底（{@link #executeOne} 非主线程分支，正常情况下不触发）
  *
  * 预算/自动降级/缩放沿用时间片模型（以"轮"为单位计 tick）。
  */
@@ -40,7 +42,7 @@ public class PaperScheduler implements TaskScheduler {
     private final ConcurrentLinkedQueue<PendingTask> highPool = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<PendingTask> normalPool = new ConcurrentLinkedQueue<>();
     private final ConcurrentLinkedQueue<PendingTask> lowPool = new ConcurrentLinkedQueue<>();
-    /** 路由到主线程等待执行的队列（调度线程投递，主线程 pump 消费）。 */
+    /** 兜底路由队列（executeOne 非主线程分支投递，主线程 pump 消费；正常情况为空）。 */
     private final ConcurrentLinkedQueue<Pending> mainQueue = new ConcurrentLinkedQueue<>();
 
     private final YeowConfig config;
@@ -51,11 +53,6 @@ public class PaperScheduler implements TaskScheduler {
     private long lastLowQueueWarnMs;
     private static final long LOW_QUEUE_WARN_INTERVAL_MS = 60_000;
     private static final long LOW_QUEUE_WARN_THRESHOLD = 100_000;
-
-    // 调度线程
-    private final Object idleMonitor = new Object();
-    private volatile boolean running = false;
-    private Thread dispatchThread;
 
     record PendingTask(String taskType, JsonObject params, CompletableFuture<String> future, Consumer<Object> callback, Priority priority, String pluginName) {
         boolean isAsync() { return callback != null; }
@@ -80,7 +77,7 @@ public class PaperScheduler implements TaskScheduler {
 
     /**
      * 当前生效的 tick 预算：BudgetScaler 动态扩容时返回扩容后的预算
-     * （原先 drainRound/mainTickPump 直接读 config，scaler 计算出的扩容从未生效）。
+     * （mainTickPump 使用；scaler 计算出的扩容始终生效）。
      */
     private long effectiveBudgetNs() {
         BudgetScaler sc = budgetScaler;
@@ -89,22 +86,9 @@ public class PaperScheduler implements TaskScheduler {
 
     public TaskFrequencyTracker freqTracker() { return freqTracker; }
 
-    @Override public void start() {
-        if (running) return;
-        running = true;
-        dispatchThread = new Thread(this::dispatchLoop, "yeow-sched");
-        dispatchThread.setDaemon(true);
-        dispatchThread.start();
-    }
+    @Override public void start() {}
 
-    @Override public void shutdown() {
-        running = false;
-        synchronized (idleMonitor) { idleMonitor.notifyAll(); }
-    }
-
-    private void wake() {
-        synchronized (idleMonitor) { idleMonitor.notifyAll(); }
-    }
+    @Override public void shutdown() {}
 
     // ── 提交 ───────────────────────────────────────────────────────
 
@@ -112,14 +96,12 @@ public class PaperScheduler implements TaskScheduler {
     public void submitGameSync(String taskType, JsonObject params, CompletableFuture<String> future, Priority priority, String pluginName) {
         var effective = effectivePriority(priority, pluginName, taskType);
         pool(effective).add(new PendingTask(taskType, params, future, null, effective, pluginName));
-        wake();
     }
 
     @Override
     public void submitGameAsync(String taskType, JsonObject params, Consumer<Object> callback, Priority priority, String pluginName) {
         var effective = effectivePriority(priority, pluginName, taskType);
         pool(effective).add(new PendingTask(taskType, params, null, callback, effective, pluginName));
-        wake();
     }
 
     private Priority effectivePriority(Priority priority, String pluginName, String taskType) {
@@ -132,54 +114,7 @@ public class PaperScheduler implements TaskScheduler {
         return switch (p) { case HIGH -> highPool; case LOW -> lowPool; default -> normalPool; };
     }
 
-    // ── 调度线程循环（串行派发） ───────────────────────────────────
-
-    private void dispatchLoop() {
-        while (running) {
-            try {
-                drainRound();
-                if (highPool.isEmpty() && normalPool.isEmpty() && lowPool.isEmpty()) {
-                    synchronized (idleMonitor) {
-                        if (running) idleMonitor.wait(50);
-                    }
-                }
-            } catch (InterruptedException e) {
-                break;
-            } catch (Exception e) {
-                LOG.warning("[Yeow] scheduler dispatch error: " + e.getMessage());
-            }
-        }
-    }
-
-    private void drainRound() {
-        long t0 = System.nanoTime();
-        long budget = effectiveBudgetNs();
-        long deadline = System.nanoTime() + budget;
-        var ratios = config.priorityRatios();
-        long highBud = (long)(budget * ratios[0]);
-        long normBud = (long)(budget * ratios[1]);
-        long lowBud  = (long)(budget * ratios[2]);
-        drainTier(highPool, highBud, deadline);
-        drainTier(normalPool, normBud, deadline);
-        drainTier(lowPool, lowBud, deadline);
-        if (System.nanoTime() < deadline) greedyDrain(deadline);
-
-        ProfileSink s = sink;
-        if (s != null) {
-            s.onTick(new TickMetric(System.currentTimeMillis(), System.nanoTime() - t0,
-                highPool.size(), normalPool.size(), lowPool.size()));
-        }
-        BudgetScaler sc = budgetScaler;
-        if (sc != null) sc.onTick(!highPool.isEmpty() || !normalPool.isEmpty());
-
-        int lowSize = lowPool.size();
-        if (lowSize > LOW_QUEUE_WARN_THRESHOLD && System.currentTimeMillis() - lastLowQueueWarnMs > LOW_QUEUE_WARN_INTERVAL_MS) {
-            lastLowQueueWarnMs = System.currentTimeMillis();
-            LOG.warning("[Yeow] LOW priority queue is critically backed up: " + lowSize
-                + " pending tasks (>100k) - a plugin is flooding low-priority async tasks;"
-                + " check scheduler saturation and plugin health");
-        }
-    }
+    // ── 主线程消费（恢复拆分前模型；无独立调度线程） ───────────────
 
     private void greedyDrain(long deadline) {
         while (System.nanoTime() < deadline) {
@@ -203,7 +138,7 @@ public class PaperScheduler implements TaskScheduler {
         }
     }
 
-    /** 串行派发：任务必须在主线程执行--投递 mainQueue 等待 pump 执行。 */
+    /** 执行单个任务：主线程上就地执行；非主线程（兜底路径）投递 mainQueue 等待 pump 执行。 */
     private void executeOne(PendingTask t) {
         try {
             var startNs = System.nanoTime();
@@ -229,11 +164,7 @@ public class PaperScheduler implements TaskScheduler {
         }
     }
 
-    /**
-     * 主线程自旋（{@link #drainDuringWait}）代行调度线程泵职责：就地执行池任务。
-     * 与 {@link #executeOne} 相同的完成语义（指标 + future/callback 完成）。
-     * 调用方必为主线程——任务就地执行无需 mainQueue 往返。
-     */
+    /** 主线程就地执行池任务（mainTickPump/drainDuringWait 使用）。与 executeOne 相同完成语义。 */
     private void executeNow(PendingTask t) {
         try {
             var startNs = System.nanoTime();
@@ -287,11 +218,45 @@ public class PaperScheduler implements TaskScheduler {
 
     // ── 主线程 pump ────────────────────────────────────────────────
 
-    /** 主线程每 tick 调用（runTaskTimer）：预算内执行队列任务；预算有剩余时空闲自旋。 */
+    /**
+     * 主线程每 tick 调用（runTaskTimer）：预算内消费优先级池（tier 分配 → 贪婪）+
+     * 兜底 mainQueue；预算有剩余时空闲自旋（盯三池 + mainQueue）。tick 末输出指标。
+     */
     public void mainTickPump() {
-        long deadline = System.nanoTime() + effectiveBudgetNs();
+        long t0 = System.nanoTime();
+        long budget = effectiveBudgetNs();
+        long deadline = System.nanoTime() + budget;
+        drainPools(budget, deadline);
         drain(deadline);
         idleSpin(deadline);
+
+        ProfileSink s = sink;
+        if (s != null) {
+            s.onTick(new TickMetric(System.currentTimeMillis(), System.nanoTime() - t0,
+                highPool.size(), normalPool.size(), lowPool.size()));
+        }
+        BudgetScaler sc = budgetScaler;
+        if (sc != null) sc.onTick(!highPool.isEmpty() || !normalPool.isEmpty());
+
+        int lowSize = lowPool.size();
+        if (lowSize > LOW_QUEUE_WARN_THRESHOLD && System.currentTimeMillis() - lastLowQueueWarnMs > LOW_QUEUE_WARN_INTERVAL_MS) {
+            lastLowQueueWarnMs = System.currentTimeMillis();
+            LOG.warning("[Yeow] LOW priority queue is critically backed up: " + lowSize
+                + " pending tasks (>100k) - a plugin is flooding low-priority async tasks;"
+                + " check scheduler saturation and plugin health");
+        }
+    }
+
+    /** 预算内按比例消费优先级池（恢复拆分前 tick 模型）：tier 分配 → 贪婪。 */
+    private void drainPools(long budget, long deadline) {
+        var ratios = config.priorityRatios();
+        long highBud = (long)(budget * ratios[0]);
+        long normBud = (long)(budget * ratios[1]);
+        long lowBud  = (long)(budget * ratios[2]);
+        drainTier(highPool, highBud, deadline);
+        drainTier(normalPool, normBud, deadline);
+        drainTier(lowPool, lowBud, deadline);
+        if (System.nanoTime() < deadline) greedyDrain(deadline);
     }
 
     /**
@@ -305,9 +270,11 @@ public class PaperScheduler implements TaskScheduler {
         long spinNs = config.idleSpinUs() * 1000L;
         if (spinNs <= 0) return;
         while (System.nanoTime() < deadline) {
+            if (!highPool.isEmpty() || !normalPool.isEmpty() || !lowPool.isEmpty()) { greedyDrain(deadline); continue; }
             if (!mainQueue.isEmpty()) { drain(deadline); continue; }
             long spinEnd = System.nanoTime() + spinNs;
             while (System.nanoTime() < spinEnd && System.nanoTime() < deadline) {
+                if (!highPool.isEmpty() || !normalPool.isEmpty() || !lowPool.isEmpty()) break;
                 if (!mainQueue.isEmpty()) break;
                 Thread.onSpinWait();
             }
@@ -315,16 +282,13 @@ public class PaperScheduler implements TaskScheduler {
     }
 
     /**
-     * 事件/补全自旋时调用（调用方必为主线程）：排空主线程队列 + **优先级池**。
+     * 事件/补全自旋时调用（调用方必为主线程）：排空**优先级池** + 主线程队列。
      * 等待期间完成任务（event.complete 等）不被饿死。
      *
-     * 08-14 死锁修复：仅排空 mainQueue 不够——调度线程 {@link #executeOne} 对路由任务执行
-     * {@code waitMain}（fut.get 阻塞）期间，若被等待的主线程任务**同步触发事件**（如
-     * player.teleport → PlayerTeleportEvent），事件自旋期间 JS 回复的 event.complete 经
-     * submitGameSync 进入优先级池；池只有调度线程能泵，而调度线程正阻塞在 waitMain 上
-     * 等待当前任务 → 循环等待直至事件 5s 超时（传送完成但服务器卡顿 5s）。
-     * 修复：主线程自旋期间代行泵职责，按优先级顺序把池中任务就地执行（{@link #executeNow}，
-     * 与 executeOne 相同完成语义）。poll 原子性保证与调度线程无竞态；FIFO 顺序不变。
+     * 主线程是任务的唯一消费方：事件在任务执行内被触发（如 player.teleport →
+     * PlayerTeleportEvent）时，JS 回复的 event.complete 经 submitGameSync 进入优先级池；
+     * 自旋期间若不消费池，回执无人执行 → 事件 5s 超时（08-14 死锁修复）。
+     * 按优先级顺序就地执行（{@link #executeNow}，与 executeOne 相同完成语义）；FIFO 顺序不变。
      */
     public void drainDuringWait() {
         drainPool(highPool);
@@ -333,7 +297,7 @@ public class PaperScheduler implements TaskScheduler {
         drain(Long.MAX_VALUE);
     }
 
-    /** 排空单个优先级池（自旋期间代行泵职责）。 */
+    /** 排空单个优先级池（主线程自旋/每 tick 消费）。 */
     private void drainPool(ConcurrentLinkedQueue<PendingTask> pool) {
         while (true) {
             var t = pool.poll();
