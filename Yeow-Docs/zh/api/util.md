@@ -6,8 +6,6 @@ import { Gzip, stringToBytes, bytesToString } from 'yeow-api';
 
 util 模块提供 **gzip 压缩/解压**（一次性 + 流式分块）与 **UTF-8 字符串 ↔ 字节** 转换。输入输出一律为 `Uint8Array` / `string`——**不暴露 base64**（底层经 util 通道以 base64 承载，引擎原生转换）。
 
-> 旧顶层导出 `gzipCompress` / `gzipCompressSync` / `gzipDecompress` / `gzipDecompressSync` 保留为兼容别名（deprecated）——新代码请用 `Gzip.*`。
-
 ## 大小上限（可配置）
 
 单次输入/解压输出上限默认 **256 MiB**（原始字节），可在 `plugins/Yeow/runtime/config.yml` 调整：
@@ -44,7 +42,7 @@ Gzip.decompressSync(data: Uint8Array | string): Uint8Array
 
 **背压机制：显式响应**——每个操作 `await` 结果后才发起下一块；处理速度由调用方消费速度决定。
 
-**块大小建议 ≥256 KiB**（deflater 窗口 32 KiB；块过小时 `write` 可能返回空输出——正常，输出会延迟到后续块或 `finish`）。
+**块大小建议 ≥256 KiB**。
 
 ### Gzip.createCompressor(options?) → GzipCompressor
 

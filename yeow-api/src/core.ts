@@ -109,8 +109,5 @@ export {
     stringToBytes, stringToBytesAsync,
     bytesToString, bytesToStringAsync,
     Gzip,
-    // 兼容别名（deprecated，见 util.ts）
-    gzipCompress, gzipCompressSync,
-    gzipDecompress, gzipDecompressSync,
 } from './util.js';
 export type { GzipCompressor, GzipDecompressor } from './util.js';

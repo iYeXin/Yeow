@@ -140,13 +140,3 @@ export const Gzip = {
   },
 };
 
-// ── 旧顶层导出（保留兼容；新代码请用 Gzip.*）──────────────────────
-
-/** @deprecated 使用 Gzip.compress */
-export const gzipCompress = Gzip.compress;
-/** @deprecated 使用 Gzip.compressSync */
-export const gzipCompressSync = Gzip.compressSync;
-/** @deprecated 使用 Gzip.decompress */
-export const gzipDecompress = Gzip.decompress;
-/** @deprecated 使用 Gzip.decompressSync */
-export const gzipDecompressSync = Gzip.decompressSync;
