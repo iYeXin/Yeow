@@ -6,6 +6,12 @@
 
 ## 2026-08-13
 
+### Folia 调度器加固（调度评估后的 P0/P1 修复）
+
+- **排队超时幽灵执行封堵（G1）**：同步任务在池中排队超过 JS 侧 `task-sync-timeout`（10s）后调用方已放弃——取件路径（`pollAny`/`pollForSpin`）即时剔除 + 周期扫描兜底（`sweepStaleQueued`，与在途扫描同拍），补 `{err: "task queue timed out"}` 绝不执行任务体（异步任务无调用方超时语义，不受影响）
+- **LOW 饿死保护（G2）**：严格 H→N→L 取件下，HIGH/NORMAL 洪泛会无限饿死 LOW（Paper 有 0.5/0.3/0.2 比例保护，Folia 无）——新增轻量轮转：LOW 池非空且超 1s 未取过 LOW 时强制取一个，不引入每插件配额
+- **卸载清理补齐（G3）**：`purgePluginTasks` 现在同时取消该插件**在途投递**（cancel + 补 err + 回收 in-flight）——插件卸载/热重载后其世界副作用不再落地（此前只清池，已投递任务 ≤5s 内仍会执行）
+
 ### 版本升级（0.3.0 发布）
 
 - **yeow-api 0.2.117 → 0.3.0** / **create-yeow 0.2.127 → 0.3.0** / **yeow-utils 0.1.20 → 0.1.21**（peer 依赖同步 `^0.3.0`）

@@ -33,10 +33,17 @@ import java.util.logging.Logger;
  *   实体下线/世界卸载的过期驻留权自动清理
  * - **事件/补全模式**：计数非零时 cycle 退出；事件线程作为临时调度器（drainForPlugins：
  *   不迁移、取事件插件任务 + 当前区域归属的其他插件任务，对齐 Paper 事件期间不冻结他人）
- * - **优先级**：取件唯一规则 = 始终优先更高优先级（HIGH → NORMAL → LOW，各池 FIFO）；
- *   LOW 不被饿死由**提交时自动降级**保证（Paper 同款滑动窗口：高频 NORMAL → LOW）
+ * - **优先级**：取件规则 = 始终优先更高优先级（HIGH → NORMAL → LOW，各池 FIFO）；
+ *   高频 NORMAL 经**提交时自动降级**为 LOW（Paper 同款滑动窗口，防交互洪泛）；
+ *   **LOW 饿死保护**：LOW 池非空且超过 LOW_STARVATION_GUARD_NS（1s）未取过 LOW 时
+ *   强制取一个 LOW（严格优先级下 HIGH/NORMAL 洪泛会无限饿死 LOW——Paper 有比例保护，
+ *   这里用轻量轮转补偿，不引入每插件配额）
  * - **投递兜底**：非阻塞投递带 5s 超时回收（region 调度器无 retired 回调，防 in-flight
- *   泄漏导致调度器停摆）
+ *   泄漏导致调度器停摆）；**排队超时保护**：同步任务在池中等待超过 JS 侧
+ *   task-sync-timeout（10s）后调用方已放弃——取件与周期扫描对其补 err 并移除
+ *   （幽灵执行防护的最后一段：调用方收到超时错误后任务不得再执行）
+ * - **卸载清理**：purgePluginTasks 除清空池外，**同时取消该插件在途投递**
+ *   （cancel + 补 err + 回收 in-flight）——插件卸载后其世界副作用不再落地
  *
  * 调度器**对任务类型零认知**，每个任务类型只提供三件事（FoliaTasks，家族共享实现）：
  * <ul>
@@ -66,6 +73,8 @@ public class FoliaScheduler implements TaskScheduler {
     private static final long CYCLE_STALE_NS = 1_000_000_000L;
     private static final long LOW_QUEUE_WARN_INTERVAL_MS = 60_000;
     private static final long LOW_QUEUE_WARN_THRESHOLD = 100_000;
+    /** LOW 饿死保护间隔：LOW 池非空且距上次取 LOW 超过该间隔时，强制优先取一个 LOW。 */
+    private static final long LOW_STARVATION_GUARD_NS = 1_000_000_000L;
     /** 调试日志开关（-Dyeow.debug.sched=true）：cycle 启停/迁移/锚定序列，用于定位调度退化。 */
     private static final boolean DBG = "true".equals(System.getProperty("yeow.debug.sched"));
 
@@ -114,19 +123,21 @@ public class FoliaScheduler implements TaskScheduler {
 
     /**
      * 在途投递条目。cancel 在投递后填入（FoliaTasks 各投递函数返回的取消动作）——
-     * 超时回收时先取消目标任务（防幽灵执行：调用方已收到超时错误，任务不得再执行），
-     * 再补 err + 回收 in-flight。
+     * 超时回收/插件卸载时先取消目标任务（防幽灵执行：调用方已收到超时错误/插件已卸载，
+     * 任务不得再执行），再补 err + 回收 in-flight。
      */
     static final class InflightEntry {
         final long dispatchedAtNs;
         final String taskType;
         final String marker;
+        final String pluginName;
         final java.util.function.Consumer<Object> finish;
         volatile Runnable cancel;
-        InflightEntry(long dispatchedAtNs, String taskType, String marker, java.util.function.Consumer<Object> finish) {
+        InflightEntry(long dispatchedAtNs, String taskType, String marker, String pluginName, java.util.function.Consumer<Object> finish) {
             this.dispatchedAtNs = dispatchedAtNs;
             this.taskType = taskType;
             this.marker = marker;
+            this.pluginName = pluginName;
             this.finish = finish;
         }
     }
@@ -136,7 +147,12 @@ public class FoliaScheduler implements TaskScheduler {
 
     private volatile boolean running = false;
 
-    record PendingTask(String taskType, JsonObject params, CompletableFuture<String> future, Consumer<Object> callback, Priority priority, String pluginName) {
+    /** 同步任务队列等待超时（ns，JS 侧 future.get 同值）：超过后调用方已放弃，取件/扫描时补 err 并移除。 */
+    private final long syncTimeoutNs;
+    /** 上次从 LOW 池取任务时刻（LOW 饿死保护用）。 */
+    private volatile long lastLowPickNs = System.nanoTime();
+
+    record PendingTask(String taskType, JsonObject params, CompletableFuture<String> future, Consumer<Object> callback, Priority priority, String pluginName, long enqueuedAtNs) {
         boolean isAsync() { return callback != null; }
     }
 
@@ -146,6 +162,7 @@ public class FoliaScheduler implements TaskScheduler {
         this.maxInflight = config.maxInflight();
         this.idleWaitNs = config.schedulerIdleWaitUs() * 1000L;
         this.budgetNs = config.tickBudgetNs();
+        this.syncTimeoutNs = config.taskSyncTimeoutMs() * 1_000_000L;
         this.freqTracker = new TaskFrequencyTracker(config.demoteThreshold());
         this.migrationThreshold = Math.max(1, config.migrationThreshold());
     }
@@ -177,10 +194,11 @@ public class FoliaScheduler implements TaskScheduler {
                 if (DBG) LOG.warning("[sched] cycle stalled, force restart region=" + schedRegion);
                 runCycleOn(schedRegion);
             }
-            // ③ 在途投递超时粗粒度扫描（每 SWEEP_INTERVAL_TICKS tick 一次）
+            // ③ 粗粒度扫描：在途投递超时（每 SWEEP_INTERVAL_TICKS tick 一次）+ 池中排队超时的同步任务
             if (++sweepTickCounter >= SWEEP_INTERVAL_TICKS) {
                 sweepTickCounter = 0;
                 sweepInflights();
+                sweepStaleQueued();
             }
         }, 1, 1);
     }
@@ -215,7 +233,7 @@ public class FoliaScheduler implements TaskScheduler {
     /** 入队 + 唤醒（驻留标记由 FoliaTasks.getScheduler 计算——纯字符串，任意线程可算）。 */
     private void submit(String taskType, JsonObject params, CompletableFuture<String> future, Consumer<Object> callback, Priority priority, String pluginName) {
         var effective = effectivePriority(priority, pluginName, taskType);
-        pool(effective).add(new PendingTask(taskType, params, future, callback, effective, pluginName));
+        pool(effective).add(new PendingTask(taskType, params, future, callback, effective, pluginName, System.nanoTime()));
         wake(FoliaTasks.getScheduler(taskType, params).marker());
     }
 
@@ -473,7 +491,7 @@ public class FoliaScheduler implements TaskScheduler {
             try { onTaskResult(t, startNs, result); } catch (Exception ignored) {}
             wake(dt.marker());
         };
-        var entry = new InflightEntry(System.nanoTime(), t.taskType(), dt.marker(), finish);
+        var entry = new InflightEntry(System.nanoTime(), t.taskType(), dt.marker(), t.pluginName(), finish);
         inflights.put(seq, entry);
         // 闭包返回取消动作（各投递函数捕获其 ScheduledTask）；先入注册表再投递，
         // 避免任务同步完成时 finish 先于 put 执行导致 in-flight 计数泄漏。
@@ -496,6 +514,39 @@ public class FoliaScheduler implements TaskScheduler {
                 }
             }
         }
+    }
+
+    /**
+     * 同步任务是否已在池中排队超过 JS 侧 task-sync-timeout——调用方 future.get 已放弃
+     * （或即将放弃），任务不得再执行（幽灵执行防护最后一段）。异步任务无调用方超时
+     * 语义，永不过期。
+     */
+    private boolean staleSyncTask(PendingTask t) {
+        return !t.isAsync() && System.nanoTime() - t.enqueuedAtNs >= syncTimeoutNs;
+    }
+
+    /** 对排队超时的同步任务补 err（不执行任务体）。 */
+    private static void errStale(PendingTask t) {
+        t.future().complete(gson.toJson(Map.of("err", "task queue timed out: " + t.taskType())));
+    }
+
+    /**
+     * 周期扫描池中排队超时的同步任务（每 SWEEP_INTERVAL_TICKS tick 一次；事件模式暂停
+     * cycle 期间由本扫描兜底，取件路径 {@link #pollAny} 另有即时检查）。
+     */
+    private void sweepStaleQueued() {
+        long cutoff = System.nanoTime() - syncTimeoutNs;
+        sweepStalePool(highPool, cutoff);
+        sweepStalePool(normalPool, cutoff);
+        sweepStalePool(lowPool, cutoff);
+    }
+
+    private static void sweepStalePool(ConcurrentLinkedQueue<PendingTask> pool, long cutoff) {
+        pool.removeIf(t -> {
+            if (t.isAsync() || t.enqueuedAtNs >= cutoff) return false;
+            errStale(t);
+            return true;
+        });
     }
 
     /** 任务结果收尾：Profile 插桩 + 完成 future/回调（就地与投递两条路径共用）。 */
@@ -558,16 +609,36 @@ public class FoliaScheduler implements TaskScheduler {
 
     /**
      * 通用取任务（调度循环）。**优先级机制的唯一实现点**：始终优先取更高优先级
-     * （HIGH → NORMAL → LOW，各池内 FIFO）。LOW 不被饿死的保证来自提交时自动降级
-     * （高频 NORMAL → LOW 不挤占交互）与 LOW_QUEUE_WARN 预警——取件本身不做复杂预算。
+     * （HIGH → NORMAL → LOW，各池内 FIFO）。两项补充保护：
+     * <ul>
+     *   <li><b>LOW 饿死保护</b>：LOW 池非空且距上次取 LOW 超过 LOW_STARVATION_GUARD_NS
+     *       （1s）时强制取一个 LOW——严格优先级下 HIGH/NORMAL 洪泛会无限饿死 LOW
+     *       （Paper 有比例保护，这里用轻量轮转补偿，不引入每插件配额）</li>
+     *   <li><b>排队超时剔除</b>：同步任务排队超过 task-sync-timeout（调用方已放弃）
+     *       时补 err 并移除，绝不执行（幽灵执行防护最后一段；周期扫描兜底见
+     *       {@link #sweepStaleQueued}）</li>
+     * </ul>
      * 与事件线程的按插件扫描互斥（queueLock）。
      */
     private PendingTask pollAny() {
         synchronized (queueLock) {
-            var t = highPool.poll();
-            if (t == null) t = normalPool.poll();
-            if (t == null) t = lowPool.poll();
-            return t;
+            while (true) {
+                // LOW 饿死保护：先于 HIGH/NORMAL 取一个 LOW（每 guard 间隔最多一次）
+                if (!lowPool.isEmpty() && System.nanoTime() - lastLowPickNs >= LOW_STARVATION_GUARD_NS) {
+                    var low = lowPool.poll();
+                    if (low != null) {
+                        lastLowPickNs = System.nanoTime();
+                        if (staleSyncTask(low)) { errStale(low); continue; }
+                        return low;
+                    }
+                }
+                var t = highPool.poll();
+                if (t == null) t = normalPool.poll();
+                if (t == null) { t = lowPool.poll(); lastLowPickNs = System.nanoTime(); }
+                if (t == null) return null;
+                if (staleSyncTask(t)) { errStale(t); continue; }
+                return t;
+            }
         }
     }
 
@@ -617,10 +688,11 @@ public class FoliaScheduler implements TaskScheduler {
                 var it = pool.iterator();
                 while (it.hasNext()) {
                     var t = it.next();
-                    if (pluginNames.contains(t.pluginName())) {
-                        it.remove();
-                        return t;
-                    }
+                    if (!pluginNames.contains(t.pluginName())) continue;
+                    // 排队超时的同步任务：调用方已放弃，补 err 并移除，不得执行
+                    if (staleSyncTask(t)) { it.remove(); errStale(t); continue; }
+                    it.remove();
+                    return t;
                 }
             }
             return null;
@@ -635,6 +707,18 @@ public class FoliaScheduler implements TaskScheduler {
             highPool.removeIf(t -> purge(t, pluginName));
             normalPool.removeIf(t -> purge(t, pluginName));
             lowPool.removeIf(t -> purge(t, pluginName));
+        }
+        // 在途投递清理：已投递未完成的同插件任务 → 取消（防插件卸载后世界副作用仍落地）
+        // + 补 err + 回收 in-flight。已开始执行的任务 cancel 为 no-op，副作用不可避免
+        // （与 Paper 已路由任务同语义）；finish 的 done 开关保证与正常完成互斥只生效一次。
+        for (var e : inflights.entrySet()) {
+            var v = e.getValue();
+            if (!pluginName.equals(v.pluginName)) continue;
+            if (inflights.remove(e.getKey(), v)) {
+                var c = v.cancel;
+                if (c != null) { try { c.run(); } catch (Exception ignored) {} }
+                v.finish.accept(Map.of("err", "plugin unloaded"));
+            }
         }
         freqTracker.removePlugin(pluginName);
     }
