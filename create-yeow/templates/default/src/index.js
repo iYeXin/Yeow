@@ -11,8 +11,8 @@ onLoad(() => {
   eventOn('playerDeath', async (e) => {
     const loc = e.player.location;
     if (!loc) return;
-    const data = JSON.stringify({ x: loc.x, y: loc.y, z: loc.z, world: loc.world || e.player.world });
-    pdcSet(e.player.uuid, 'back.deathLocation', data);
+    // PDC 自动 JSON 序列化：直接存取对象（无需手写 JSON.stringify/parse）
+    pdcSet(e.player.uuid, 'back.deathLocation', { x: loc.x, y: loc.y, z: loc.z, world: loc.world || e.player.world });
     await e.player.sendMessage(
       '<red>You died!</red> <gray>Use</gray> <click:run_command:/back><aqua><u>/back</u></aqua></click> <gray>to return</gray>',
     );
@@ -24,10 +24,9 @@ onLoad(() => {
     executor: async (p) => {
       if (p.sender === 'CONSOLE') return;
       const player = p.sender;                           // 已确认非 CONSOLE → Player
-      const raw = await pdcGet(player.uuid, 'back.deathLocation');
-      if (!raw) return player.sendMessage('<red>No death location recorded</red>');
+      const loc = await pdcGet(player.uuid, 'back.deathLocation');
+      if (!loc) return player.sendMessage('<red>No death location recorded</red>');
 
-      const loc = JSON.parse(raw);
       await player.teleport(new Location(loc.x, loc.y, loc.z, 0, 0, loc.world));
       await player.sendMessage('<green>Teleported to death location</green>');
     },

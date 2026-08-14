@@ -6,11 +6,11 @@ import { eventOn, eventOff } from 'yeow-api';
 
 ## eventOn(eventType, handler)
 
-| 参数 | 类型 | 说明 |
-|------|------|------|
-| `eventType` | `string` | 事件类型名 |
-| `handler` | `(e: EventType) => void` | 事件处理器 |
-| `options.manualRelease` | `boolean` | 手动控制事件结束（详见下文） |
+| 参数                    | 类型                     | 说明                         |
+| ----------------------- | ------------------------ | ---------------------------- |
+| `eventType`             | `string`                 | 事件类型名                   |
+| `handler`               | `(e: EventType) => void` | 事件处理器                   |
+| `options.manualRelease` | `boolean`                | 手动控制事件结束（详见下文） |
 
 返回一个取消订阅函数：`() => void`。
 
@@ -70,77 +70,77 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 
 ### 玩家事件
 
-| 类型 | 字段 | 可取消 |
-|------|------|:------:|
-| `playerJoin` | player, joinMessage | |
-| `playerQuit` | player, quitMessage | |
-| `playerChat` | player, message, format | ✔ |
-| `playerMove` | player, from, to | ✔ |
-| `playerInteract` | player, action, material, block | ✔ |
-| `playerCommand` | player, message | ✔ |
-| `playerDeath` | player, deathMessage(Message), deathType | ✔ |
-| `playerRespawn` | player, respawnLocation | |
-| `playerTeleport` | player, from, to, cause | ✔ |
-| `playerItemConsume` | player, itemType | |
-| `playerDropItem` | player, itemType, amount | ✔ |
-| `playerPickupItem` | player, itemType, amount | ✔ |
-| `playerBucketFill` | player, bucket | ✔ |
-| `playerBucketEmpty` | player, bucket | ✔ |
-| `playerExpChange` | player, amount | |
-| `playerLevelChange` | player, oldLevel, newLevel | |
-| `playerGameModeChange` | player, newGameMode | ✔ |
-| `playerAdvancementDone` | player, advancement, title(Message)?, description(Message)? | |
-| `playerToggleSneak` | player, sneaking | |
-| `playerToggleFlight` | player, flying | |
-| `foodLevelChange` | player, oldFoodLevel, newFoodLevel | ✔ |
+| 类型                    | 字段                                                        | 可取消 |
+| ----------------------- | ----------------------------------------------------------- | :----: |
+| `playerJoin`            | player, joinMessage                                         |        |
+| `playerQuit`            | player, quitMessage                                         |        |
+| `playerChat`            | player, message, format                                     |   ✔    |
+| `playerMove`            | player, from, to                                            |   ✔    |
+| `playerInteract`        | player, action, material, block                             |   ✔    |
+| `playerCommand`         | player, message                                             |   ✔    |
+| `playerDeath`           | player, deathMessage(Message), deathType                    |   ✔    |
+| `playerRespawn`         | player, respawnLocation                                     |        |
+| `playerTeleport`        | player, from, to, cause                                     |   ✔    |
+| `playerItemConsume`     | player, itemType                                            |        |
+| `playerDropItem`        | player, itemType, amount                                    |   ✔    |
+| `playerPickupItem`      | player, itemType, amount                                    |   ✔    |
+| `playerBucketFill`      | player, bucket                                              |   ✔    |
+| `playerBucketEmpty`     | player, bucket                                              |   ✔    |
+| `playerExpChange`       | player, amount                                              |        |
+| `playerLevelChange`     | player, oldLevel, newLevel                                  |        |
+| `playerGameModeChange`  | player, newGameMode                                         |   ✔    |
+| `playerAdvancementDone` | player, advancement, title(Message)?, description(Message)? |        |
+| `playerToggleSneak`     | player, sneaking                                            |        |
+| `playerToggleFlight`    | player, flying                                              |        |
+| `foodLevelChange`       | player, oldFoodLevel, newFoodLevel                          |   ✔    |
 
 ### 实体事件
 
-| 类型 | 字段 | 可取消 |
-|------|------|:------:|
-| `entityDamage` | entity, damage, cause, entityType | ✔ |
-| `entityDeath` | entity, entityType, entityName | |
-| `entitySpawn` | entity, entityType, x, y, z, world | ✔ |
-| `entityExplode` | entity, entityType, x, y, z, blockCount | ✔ |
-| `entityRegainHealth` | entity, amount, reason | |
-| `entityTarget` | entity, target | ✔ |
-| `projectileLaunch` | entity, projectileType, shooter? | ✔ |
-| `projectileHit` | entity, projectileType, hitEntity?, hitBlock? | |
+| 类型                 | 字段                                          | 可取消 |
+| -------------------- | --------------------------------------------- | :----: |
+| `entityDamage`       | entity, damage, cause, entityType             |   ✔    |
+| `entityDeath`        | entity, entityType, entityName                |        |
+| `entitySpawn`        | entity, entityType, x, y, z, world            |   ✔    |
+| `entityExplode`      | entity, entityType, x, y, z, blockCount       |   ✔    |
+| `entityRegainHealth` | entity, amount, reason                        |        |
+| `entityTarget`       | entity, target                                |   ✔    |
+| `projectileLaunch`   | entity, projectileType, shooter?              |   ✔    |
+| `projectileHit`      | entity, projectileType, hitEntity?, hitBlock? |        |
 
 ### 世界事件
 
-| 类型 | 字段 | 可取消 |
-|------|------|:------:|
-| `blockBreak` | player, block, x, y, z | ✔ |
-| `blockPlace` | player, block, blockAgainst, x, y, z | ✔ |
-| `blockFade` | block, x, y, z | |
-| `blockGrow` | block, x, y, z | |
-| `blockSpread` | block, x, y, z | |
-| `blockExplode` | block, x, y, z | ✔ |
+| 类型           | 字段                                 | 可取消 |
+| -------------- | ------------------------------------ | :----: |
+| `blockBreak`   | player, block, x, y, z               |   ✔    |
+| `blockPlace`   | player, block, blockAgainst, x, y, z |   ✔    |
+| `blockFade`    | block, x, y, z                       |        |
+| `blockGrow`    | block, x, y, z                       |        |
+| `blockSpread`  | block, x, y, z                       |        |
+| `blockExplode` | block, x, y, z                       |   ✔    |
 
 ### 背包事件
 
-| 类型 | 字段 | 可取消 |
-|------|------|:------:|
-| `inventoryOpen` | player, inventoryType, title | |
-| `inventoryClose` | player, inventoryType, **inventoryId?** | |
-| `inventoryClick` | player, slot, hotbarKey, action, inventoryType, isLeftClick, isRightClick, isShiftClick, clickedItem, cursorItem, **inventoryId?** | ✔ |
+| 类型             | 字段                                                                                                                               | 可取消 |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- | :----: |
+| `inventoryOpen`  | player, inventoryType, title                                                                                                       |        |
+| `inventoryClose` | player, inventoryType, **inventoryId?**                                                                                            |        |
+| `inventoryClick` | player, slot, hotbarKey, action, inventoryType, isLeftClick, isRightClick, isShiftClick, clickedItem, cursorItem, **inventoryId?** |   ✔    |
 
 > **inventoryId**（2026-08-13）：当事件发生在 Yeow 自定义 Inventory（`Inventory.create` 创建）上时携带该 Inventory 的句柄 id（`inventory.toString()`）——多自定义 Inventory 场景用 `e.inventoryId === inventory.toString()` 识别点击/关闭归属。非自定义 Inventory（背包、箱子等）时缺省。
 
 ### 服务器事件
 
-| 类型 | 字段 | 可取消 |
-|------|------|:------:|
-| `serverPing` | address, numPlayers, maxPlayers, motd | ✔ |
-| `serverCommand` | command, sender | ✔ |
-| `playerResourcePackStatus` | player, status, hash | |
+| 类型                       | 字段                                  | 可取消 |
+| -------------------------- | ------------------------------------- | :----: |
+| `serverPing`               | address, numPlayers, maxPlayers, motd |   ✔    |
+| `serverCommand`            | command, sender                       |   ✔    |
+| `playerResourcePackStatus` | player, status, hash                  |        |
 
-### 权限检查（Yeow 生态）
+### 权限检查（Yeow 规范）
 
-| 类型 | 字段 | 可取消 |
-|------|------|:------:|
-| `permissionCheck` | target, node | |
+| 类型              | 字段         | 可取消 |
+| ----------------- | ------------ | :----: |
+| `permissionCheck` | target, node |        |
 
 `permissionCheck` 用于 **Yeow 生态**权限拦截（仅 `player.hasPermission` 任务与 Yeow 命令执行检查触发；其他 Java 插件的权限检查不经过）。handler 返回 `{ allowed }` 决定结果（覆盖 Paper 系）；不返回视为未处理；多 handler 返回冲突以最后返回的为准。事件含 `permission` 对象（`{ node, default }`）。**⚠ 普通插件不建议监听（性能）；handler 中调用 `hasPermission` 会无限循环**。详见 [Permission](permission.md)：
 
@@ -234,8 +234,8 @@ eventOn('blockBreak', { manualRelease: true }, (e, complete) => {
 
 ## 选择指南
 
-| 场景 | 推荐 | 说明 |
-|------|------|------|
-| 仅触发逻辑（发消息、日志、API 调用） | 自动 + async | 不阻塞主线程，自由使用异步 API |
-| 需要同步决定结果（取消、改死亡消息、MOTD 等） | 自动 + 同步 handler | 直接赋值事件字段（或 return mods）即可 |
-| 需要异步获取数据后决定结果 | 手动模式 + `complete()` | 用户主动控制结束时机 |
+| 场景                                          | 推荐                    | 说明                                   |
+| --------------------------------------------- | ----------------------- | -------------------------------------- |
+| 仅触发逻辑（发消息、日志、API 调用）          | 自动 + async            | 不阻塞主线程，自由使用异步 API         |
+| 需要同步决定结果（取消、改死亡消息、MOTD 等） | 自动 + 同步 handler     | 直接赋值事件字段（或 return mods）即可 |
+| 需要异步获取数据后决定结果                    | 手动模式 + `complete()` | 用户主动控制结束时机                   |
