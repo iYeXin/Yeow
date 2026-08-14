@@ -6,6 +6,13 @@
 
 ## 2026-08-13
 
+### 事件回写机制扩展（三种方式）与死亡消息回写
+
+- **事件回写支持"修改事件参数"**：自动模式下 `e.xxx = ...` 直接赋值事件字段即收集为回写 mods（此前只有 `cancelled` 有收集机制，其余字段必须 return）——与返回值合并，直接赋值优先；`cancelled` 语义不变（仅可取消事件暴露）
+- **`playerDeath.deathMessage` 允许回写**（此前只读）：`e.deathMessage = { text: '...' }` 或 `{ key, args }`（可翻译组件）/ 字符串均可——Paper `applyMods` 与 Folia 事件桥同步支持（`TextUtil.parseMessage` 复用）
+- 回写约束不变：返回 **Promise 视为无修改立即释放**（不等待其完成），`await` 之后的修改一律无效；异步决定结果请用手动模式 `complete(mods)`——api/event.md、advanced/events.md 已重写回写章节（三种方式 + 支持回写字段清单）
+- **命令补全器与事件对齐**：自动模式返回 Promise **不再等待**（此前 await 结果后回传）——视为无补全立即释放（空补全）；异步补全请使用手动模式 `complete(res)`（api/command.md 已更新）
+
 ### Folia 调度器加固（调度评估后的 P0/P1 修复）
 
 - **排队超时幽灵执行封堵（G1）**：同步任务在池中排队超过 JS 侧 `task-sync-timeout`（10s）后调用方已放弃——取件路径（`pollAny`/`pollForSpin`）即时剔除 + 周期扫描兜底（`sweepStaleQueued`，与在途扫描同拍），补 `{err: "task queue timed out"}` 绝不执行任务体（异步任务无调用方超时语义，不受影响）

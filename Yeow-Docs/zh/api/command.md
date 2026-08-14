@@ -12,7 +12,7 @@ import { registerCommand } from 'yeow-api';
 | `description` | `string`                                         | 描述       |
 | `permission`  | `string \| Permission \| { node, default? }` | 权限节点（字符串兼容 / 权限节点对象 / `registerPermission` 返回值）；注册进 Paper 系权限系统供管理；**执行时检查**——`permissionCheck` 事件优先，无处理时回退 `hasPermission` |
 | `aliases`     | `string[]`                                       | 别名       |
-| `completer`   | `(sender, args) => string[] \| Promise<string[]>` / `ManualCompleter` | Tab 补全器（自动模式支持同步数组或 Promise，异步结果会被等待） |
+| `completer`   | `(sender, args) => string[] \| Promise<string[]>` / `ManualCompleter` | Tab 补全器（自动模式：同步返回数组立即回传；返回 Promise **不等待**（视为无补全立即释放）；异步补全请使用手动模式 `complete(res)`，见下） |
 
 ```js
 // 声明权限节点 + 普通玩家默认可执行（服主可用权限插件撤销）
@@ -49,21 +49,22 @@ registerCommand('hello', {
 ```
 
 ```js
-// 自动模式（默认）
+// 自动模式（默认）— 同步返回数组，立即回传
 registerCommand('hello', {
     executor: (p) => p.sender.sendMessage('Hi!'),
     completer: (sender, args) => ['opt1', 'opt2'],
 });
 
-// 自动模式 + async — 等待 Promise 结果后再回传（2026-08-13 起支持）
+// 自动模式 + async — 返回 Promise 不等待（与事件处理一致：视为无补全，立即释放）。
+// 需要异步查询请使用手动模式：
 registerCommand('hello', {
     executor: (p) => p.sender.sendMessage('Hi!'),
     completer: async (sender, args) => {
-        return await fetchOptions();  // 异步结果会被等待并回传
+        return await fetchOptions();  // 结果不会被回传（补全已释放）
     },
 });
 
-// 手动模式 — 异步补全的正确方式
+// 手动模式 — 异步补全的正确方式（回调中 complete(res) 回传结果）
 registerCommand('hello', {
     executor: (p) => p.sender.sendMessage('Hi!'),
     completer: {

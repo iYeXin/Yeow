@@ -79,23 +79,13 @@ export function registerCommand(name: string, options: CommandOptions, taskOptio
         } else {
           const result = completerFn(sender, data.args);
           if (result && typeof result.then === 'function') {
-            // 异步 completer：await 结果后再回传（原实现立即发空补全、Promise 结果被丢弃）
-            (result as Promise<string[]>).then(
-              (list) => {
-                $send('task', {
-                  type: 'command.tabComplete',
-                  params: { callbackId: compCbId, completions: list || [] },
-                  cb: '',
-                });
-              },
-              () => {
-                $send('task', {
-                  type: 'command.tabComplete',
-                  params: { callbackId: compCbId, completions: [] },
-                  cb: '',
-                });
-              },
-            );
+            // 自动模式不等待 Promise（与事件处理一致）：收到 Promise 视为无补全，
+            // 立即释放（空补全）；异步补全请使用手动模式 complete(res)
+            $send('task', {
+              type: 'command.tabComplete',
+              params: { callbackId: compCbId, completions: [] },
+              cb: '',
+            });
           } else {
             $send('task', {
               type: 'command.tabComplete',

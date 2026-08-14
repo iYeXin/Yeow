@@ -361,8 +361,16 @@ public class FoliaEventBridge implements Listener {
             var r = SyncCallbackHelper.waitFor(d.eventId(), 0);
             SyncCallbackHelper.remove(d.eventId());
             eventTargets.remove(d.eventId());
-            if (r instanceof Map<?, ?> m && Boolean.TRUE.equals(m.get("cancelled")) && ev instanceof org.bukkit.event.Cancellable c) {
-                c.setCancelled(true);
+            if (r instanceof Map<?, ?> m) {
+                if (Boolean.TRUE.equals(m.get("cancelled")) && ev instanceof org.bukkit.event.Cancellable c) {
+                    c.setCancelled(true);
+                }
+                // playerDeath 死亡消息回写（对齐 Paper applyMods）：Message 对象或字符串
+                if (m.containsKey("deathMessage") && ev instanceof PlayerDeathEvent d2) {
+                    var dm = m.get("deathMessage");
+                    if (dm instanceof Map<?, ?> mm) d2.deathMessage(FoliaTextUtil.parse(gson.toJsonTree(mm)));
+                    else if (dm != null) d2.deathMessage(FoliaTextUtil.parse(gson.toJsonTree(dm)));
+                }
             }
         }
     }

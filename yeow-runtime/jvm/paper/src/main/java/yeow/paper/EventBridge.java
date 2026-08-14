@@ -395,6 +395,12 @@ public class EventBridge implements Listener {
     void applyMods(Event ev, Map<?,?> m) {
         if (m.containsKey("cancelled") && ev instanceof Cancellable c)
             c.setCancelled(Boolean.TRUE.equals(m.get("cancelled")));
+        // playerDeath 死亡消息回写：Message 对象（{key,args}/{text}）或字符串
+        if (m.containsKey("deathMessage") && ev instanceof PlayerDeathEvent d) {
+            var dm = m.get("deathMessage");
+            if (dm instanceof Map<?, ?> mm) d.deathMessage(TextUtil.parseMessage(gson.toJsonTree(mm)));
+            else if (dm != null) d.deathMessage(TextUtil.parse(String.valueOf(dm)));
+        }
         if (ev instanceof PaperServerListPingEvent p) {
             if (m.containsKey("motd"))
                 p.setMotd(TextUtil.toLegacy(TextUtil.parse(String.valueOf(m.get("motd")))));

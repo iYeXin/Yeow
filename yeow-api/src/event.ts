@@ -358,11 +358,12 @@ function loc(raw: Record<string, unknown> | null): Location | null {
   );
 }
 
-function adaptEvent<K extends keyof EventMap>(type: K, data: RawEvent): EventMap[K] {
-  const wrap: Record<string, unknown> = {};
+function adaptEvent<K extends keyof EventMap>(type: K, data: RawEvent): { event: EventMap[K]; mods: Record<string, unknown> } {
+  // 初始值：原始数据（跳过 _ 前缀内部字段），player/from/to/respawnLocation 适配为对象
+  const initial: Record<string, unknown> = {};
   for (const key of Object.keys(data)) {
     if (key.startsWith('_')) continue;
-    wrap[key] = data[key];
+    initial[key] = data[key];
   }
   const hasPlayer = [
     'playerJoin', 'playerQuit', 'playerChat', 'playerMove',
@@ -375,13 +376,33 @@ function adaptEvent<K extends keyof EventMap>(type: K, data: RawEvent): EventMap
     'playerAdvancementDone', 'playerToggleSneak', 'playerToggleFlight',
     'inventoryClick', 'playerResourcePackStatus',
   ] as K[];
-  if (hasPlayer.includes(type) && data.player) {
-    wrap.player = Player.getSync(data.player as string);
+  if (hasPlayer.includes(type) && data.player) initial.player = Player.getSync(data.player as string);
+  if (data.from) initial.from = loc(data.from as Record<string, unknown>);
+  if (data.to) initial.to = loc(data.to as Record<string, unknown>);
+  if (data.respawnLocation) initial.respawnLocation = loc(data.respawnLocation as Record<string, unknown>);
+
+  // 修改收集：所有字段经 getter/setter——handler 直接赋值（e.xxx = ...）即记录为回写 mods。
+  // cancelled 单独处理（仅可取消事件暴露；读取语义保持原状：未设置时返回 false）。
+  const mods: Record<string, unknown> = {};
+  const wrap: Record<string, unknown> = {};
+  for (const key of Object.keys(initial)) {
+    if (key === 'cancelled') continue;
+    Object.defineProperty(wrap, key, {
+      get: () => (key in mods ? mods[key] : initial[key]),
+      set: (v: unknown) => { mods[key] = v; },
+      enumerable: true,
+      configurable: true,
+    });
   }
-  if (data.from) wrap.from = loc(data.from as Record<string, unknown>);
-  if (data.to) wrap.to = loc(data.to as Record<string, unknown>);
-  if (data.respawnLocation) wrap.respawnLocation = loc(data.respawnLocation as Record<string, unknown>);
-  return wrap as unknown as EventMap[K];
+  if (data._cancellable) {
+    Object.defineProperty(wrap, 'cancelled', {
+      get: () => (mods.cancelled as boolean) || false,
+      set: (v: boolean) => { mods.cancelled = v; },
+      enumerable: true,
+      configurable: true,
+    });
+  }
+  return { event: wrap as unknown as EventMap[K], mods };
 }
 
 // ── Event Subscription ─────────────────────────────────────────────
@@ -411,18 +432,8 @@ export function eventOn<K extends keyof EventMap>(
   const pluginName = __plugin?.name || 'unknown';
 
   const cbId = _registerCallback((data: RawEvent) => {
-    const wrapped = adaptEvent(eventType, data);
+    const { event: wrapped, mods: mutatedMods } = adaptEvent(eventType, data);
     const eventId = data?._eventId;
-    const cancellable = data?._cancellable;
-    const localMods: { cancelled?: boolean } = {};
-
-    if (cancellable) {
-      Object.defineProperty(wrapped, 'cancelled', {
-        get: () => localMods.cancelled || false,
-        set: (v: boolean) => { localMods.cancelled = v; },
-        enumerable: true,
-      });
-    }
 
     if (manualRelease) {
       const complete = (result?: Record<string, unknown>) => {
@@ -437,10 +448,12 @@ export function eventOn<K extends keyof EventMap>(
     }
 
     const result = (handler as EventHandler<typeof eventType>)(wrapped);
+    // 回写合并：返回值（mods）优先合并，事件参数直接赋值（e.xxx = ...）覆盖之——
+    // 返回 Promise 时视为无修改（Promise 不展开），事件立即释放
     const mods: Record<string, unknown> = {
       ...(result && typeof result === 'object' ? result : {}),
+      ...mutatedMods,
     };
-    if (localMods.cancelled) mods.cancelled = true;
     $send('task', { type: 'event.complete', params: { eventId, mods }, cb: '' });
   }, { persistent: true });
 

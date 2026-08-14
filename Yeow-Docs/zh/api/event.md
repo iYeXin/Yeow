@@ -78,7 +78,7 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 | `playerMove` | player, from, to | ✔ |
 | `playerInteract` | player, action, material, block | ✔ |
 | `playerCommand` | player, message | ✔ |
-| `playerDeath` | player, deathMessage(Message), deathType | |
+| `playerDeath` | player, deathMessage(Message), deathType | ✔ |
 | `playerRespawn` | player, respawnLocation | |
 | `playerTeleport` | player, from, to, cause | ✔ |
 | `playerItemConsume` | player, itemType | |
@@ -156,41 +156,53 @@ eventOn('permissionCheck', (e) => {
 
 > `player` 字段在 JS 侧自动转为 `Player.get(uuid)`。`block` 为命名空间 ID（如 `minecraft:stone`）。
 
-## 取消事件
+## 事件回写
 
-### 自动模式（默认）
+事件结果通过**三种方式**回写。回写只在 handler 的**同步段**生效——返回 Promise 时事件立即释放，`await` 之后的修改一律无效（见下文各方式的约束）。
 
-可取消事件在同步代码段中设置 `e.cancelled = true`：
+### 方式 1：返回值（mods）— 自动模式
 
-```js
-eventOn('blockBreak', (e) => {
-    if (e.block === 'minecraft:bedrock') e.cancelled = true;
-});
-```
-
-handler 的**返回值**会合并到事件回写（mods）——支持 `cancelled` 之外的修改字段（如 `serverPing` 的 `icon`）：
+handler 的**返回值**合并到事件回写（mods）：
 
 ```js
 eventOn('serverPing', (e) => {
-    return { icon: base64Png };   // 合并回写，修改服务器列表图标
+    return { motd: 'Hello!' };   // 合并回写，修改服务器列表 MOTD
 });
 ```
 
-async handler 在返回 Promise 时**立即释放**，只有第一个 `await` 前的同步修改生效：
+返回 **Promise 时视为无修改，立即释放，不等待其完成**（async handler 的异步结果不会回写）：
 
 ```js
 eventOn('blockBreak', async (e) => {
     e.cancelled = true;           // ✅ 同步段生效
-    await fetchData();
-    e.cancelled = false;          // ❌ 事件已释放，无效
+    await fetchData();            // 事件已释放
+    return { cancelled: false };  // ❌ 无效
 });
 ```
 
-注意：自动模式下 `e.icon = ...` 等**非 cancelled 字段的直接赋值无效**——只有 `e.cancelled` 有收集机制，其它字段请通过 handler 返回值回写（或使用手动模式）。
+### 方式 2：修改事件参数（event）— 自动模式
 
-### 手动模式
+自动模式下**直接赋值事件字段**同样回写（与返回值合并，直接赋值优先于返回值；`cancelled` 之外的所有字段都收集）：
 
-设置 `{ manualRelease: true }` 后，handler 接收 `(event, complete)`，通过调用 `complete(result)` 控制何时结束事件。适合需要异步操作后再决定取消的场景：
+```js
+eventOn('playerDeath', (e) => {
+    e.deathMessage = { text: '§cA hero has fallen.' };  // 回写死亡消息（Message 对象或字符串）
+});
+
+eventOn('serverPing', (e) => {
+    e.motd = 'Hello!';            // 与 return { motd } 等价
+});
+
+eventOn('blockBreak', (e) => {
+    e.cancelled = true;           // 取消（可取消事件）
+});
+```
+
+> **支持回写的字段**（运行时实际应用）：`cancelled`（可取消事件）、`deathMessage`（playerDeath，Message 对象 `{key, args}` / `{text}` 或字符串）、`serverPing` 的 `motd` / `maxPlayers` / `numPlayers` / `icon`。其余字段赋值会被随 mods 发送但运行时忽略（只读字段）。
+
+### 方式 3：手动模式 complete(mods)
+
+设置 `{ manualRelease: true }` 后，handler 接收 `(event, complete)`，通过调用 `complete(result)` 控制何时结束事件。适合需要异步获取数据后再决定结果的场景：
 
 ```js
 eventOn('blockBreak', { manualRelease: true }, (e, complete) => {
@@ -208,5 +220,5 @@ eventOn('blockBreak', { manualRelease: true }, (e, complete) => {
 | 场景 | 推荐 | 说明 |
 |------|------|------|
 | 仅触发逻辑（发消息、日志、API 调用） | 自动 + async | 不阻塞主线程，自由使用异步 API |
-| 需要同步决定结果（取消、改掉落等） | 自动 + 同步 handler | `await` 前设值即可 |
+| 需要同步决定结果（取消、改死亡消息、MOTD 等） | 自动 + 同步 handler | 直接赋值事件字段（或 return mods）即可 |
 | 需要异步获取数据后决定结果 | 手动模式 + `complete()` | 用户主动控制结束时机 |

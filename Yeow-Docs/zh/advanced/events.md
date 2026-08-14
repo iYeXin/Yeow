@@ -18,13 +18,13 @@ Paper 系事件触发
   → JS $hm → _hm → _cbs[cbId].h(r)
   → yeow-api 回调内:
       自动模式:
-        同步 handler: 执行完 → $send('task', {type:'event.complete', params:{eventId, mods}})
+        同步 handler: 执行完 → 收集修改（返回值 mods + 事件参数直接赋值）→ $send('task', {type:'event.complete', params:{eventId, mods}})
         返回 Promise: → 立即 $send('event.complete')，只有同步段修改生效
       手动模式:
         handler(e, complete) → 用户调用 complete(mods)
   → Scheduler → Tasks.execute('event.complete')
   → SyncCallbackHelper.complete(cbId, mods)
-  → applyMods(): if (cancelled) event.setCancelled(true)
+  → applyMods(): 应用回写字段（cancelled / deathMessage / serverPing motd 等）
 ```
 
 ## 并发事件处理
@@ -43,6 +43,7 @@ Paper 系事件触发
 所有事件字段是基本类型（string/number/boolean/object），JS 端 yeow-api 的 `adaptEvent()` 自动包装：
 - `player` UUID → `Player.getSync(uuid)` 对象（同步转换，不影响事件处理）
 - `from`/`to`/`respawnLocation` → `Location` 对象
+- 全部字段经 getter/setter 包装——handler **直接赋值**（`e.deathMessage = ...` 等）即记录为回写 mods（与返回值合并，直接赋值优先）；`cancelled` 仅可取消事件暴露
 
 ## 事件处理器中的操作
 
@@ -121,7 +122,7 @@ eventOn('playerJoin', async (e) => {
 | 场景                                     | 推荐模式                | 原因                                      |
 | ---------------------------------------- | ----------------------- | ----------------------------------------- |
 | 仅需触发逻辑（发消息、改数据、记录日志） | 自动模式 + async        | 不阻塞主线程，代码简洁                    |
-| 需要同步决定结果（取消、修改掉落等）     | 自动模式 + 同步 handler | `await` 前设值即可                        |
+| 需要同步决定结果（取消、修改死亡消息/MOTD 等）     | 自动模式 + 同步 handler | 直接赋值事件字段（或 return mods），`await` 前生效 |
 | 需要异步获取数据后决定结果               | 手动模式 + `complete()` | 由用户控制 `$send('event.complete')` 时机 |
 
 > **规则**：如果你的事件处理器逻辑不需要阻塞主线程等待结果，大胆使用 async。主线程自旋等待 JS 结果期间无法处理 tick、AI、物理等，长时间自旋会影响服务器性能。
