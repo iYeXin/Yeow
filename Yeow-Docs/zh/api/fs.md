@@ -131,6 +131,58 @@ fs.outer.getServerPathSync(): string
 
 > **⚠ 权限建议**：直接声明 `fs:*`（整个 fs 通道）是**危险且不专业的**——等于把服务器根与任意路径的读写权交给插件。只读写插件自己的配置文件时**无需声明任何 fs 权限**（`fs:plugin.*` 节点默认允许）。确需访问服务器文件时，尽可能**精确声明**（如 `fs:server.readFile`、`fs:outer.systemPaths`），而非整组/通道通配。即使声明 `fs:*`，构建的 `computedPermissions` 也会自动展开为 `fs:outer.*, fs:server.*`。
 
+## 流式读写（大文件）
+
+大文件应使用流式 API——**有状态句柄**保持文件位置，分块读写，内存占用与块大小成正比（运行时缓冲 256 KiB）。
+
+**背压机制：显式响应**——每个操作 `await` 结果后才发起下一块；块大小由 `read(maxBytes?)` 指定或调用方控制（建议 ≥256 KiB）。
+
+```ts
+import { createReadStream, createWriteStream } from 'yeow-api';
+
+// 读流（也可 for await）
+const r = await createReadStream('big.bin');        // fs:plugin.openRead
+const chunk: Uint8Array | null = await r.read();    // 默认 1 MiB；null = EOF
+await r.close();
+
+// 写流
+const w = await createWriteStream('out.bin');       // fs:plugin.openWrite
+await w.write(chunk);                               // 等到写入完成（显式响应背压）
+await w.end();                                      // 冲刷缓冲并关闭
+```
+
+### ReadStream
+
+```ts
+interface ReadStream {
+  read(maxBytes?: number): Promise<Uint8Array | null>;  // null = EOF
+  close(): Promise<void>;
+  [Symbol.asyncIterator](): AsyncIterator<Uint8Array>;
+}
+```
+
+```ts
+const r = await createReadStream('big.bin');
+for await (const chunk of r) { /* 逐块处理 */ }
+await r.close();
+```
+
+### WriteStream
+
+```ts
+interface WriteStream {
+  write(chunk: Uint8Array | string): Promise<void>;  // 写入完成即 resolve（背压点）
+  end(): Promise<void>;                              // 冲刷 + 关闭（此后不可 write）
+  close(): Promise<void>;
+}
+```
+
+### 权限
+
+流操作按访问段继承 fs 权限节点：`fs:plugin.openRead/read/openWrite/write/end/close`（plugin 段免声明）；`fs.server.*` / `fs.outer.*` 需声明（`fs:server.*` 等通配已覆盖流操作）。
+
+> 流句柄需显式 `close()` / `end()`；卸载、热重载时运行时自动关闭全部残留句柄。
+
 ## path 工具
 
 路径拼接与解析（POSIX 风格，与平台无关）：

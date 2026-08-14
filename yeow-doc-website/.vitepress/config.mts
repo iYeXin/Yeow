@@ -138,6 +138,7 @@ export default defineConfig({
                             { text: 'FS', link: '/api/fs' },
                             { text: 'Assets', link: '/api/assets' },
                             { text: 'PDC', link: '/api/pdc' },
+                            { text: 'Util', link: '/api/util' },
                         ],
                     },
                     {

@@ -54,6 +54,8 @@ export { assets, read as assetsRead, readSync as assetsReadSync,
     extract as assetsExtract, extractSync as assetsExtractSync,
     extractDir as assetsExtractDir, extractDirSync as assetsExtractDirSync } from './assets.js';
 export { path } from './path.js';
+export { createReadStream, createWriteStream } from './fs.js';
+export type { ReadStream, WriteStream } from './fs.js';
 export { listen, respond, close, request, requestSync } from './http.js';
 export type { RespondOptions } from './http.js';
 export { logError } from './log-error.js';
@@ -106,6 +108,9 @@ export type { WorkerOptions } from './worker.js';
 export {
     stringToBytes, stringToBytesAsync,
     bytesToString, bytesToStringAsync,
+    Gzip,
+    // 兼容别名（deprecated，见 util.ts）
     gzipCompress, gzipCompressSync,
     gzipDecompress, gzipDecompressSync,
 } from './util.js';
+export type { GzipCompressor, GzipDecompressor } from './util.js';

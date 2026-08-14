@@ -108,6 +108,11 @@ public class YeowConfig {
     /** 同步 task 调用超时（毫秒），默认 10000。 */
     public long taskSyncTimeoutMs() { return getInt("task-sync-timeout-ms", 10000); }
 
+    /** util 通道单次输入上限（原始字节，默认 256 MiB）。 */
+    public int utilMaxInputBytes() { return getInt("util.max-input-bytes", 256 * 1024 * 1024); }
+    /** util 通道 gzip 解压输出上限（原始字节，默认 256 MiB）。 */
+    public int utilMaxOutputBytes() { return getInt("util.max-output-bytes", 256 * 1024 * 1024); }
+
     /** Folia：in-flight 任务上限（同时投递未完成数），默认 100（folia section）。 */
     public int maxInflight() { return getInt("folia.max-inflight", 100); }
 
@@ -173,6 +178,10 @@ public class YeowConfig {
         m.put("idle-spin-us", 100);                // Paper 专用（Folia 用 folia.scheduler-idle-wait-us）
         m.put("concurrent-events", true);
         m.put("task-sync-timeout-ms", 10000);
+        var util = new LinkedHashMap<String, Object>();
+        util.put("max-input-bytes", 256 * 1024 * 1024);   // util 通道单次输入上限（原始字节）
+        util.put("max-output-bytes", 256 * 1024 * 1024);  // gzip 解压输出上限（防压缩炸弹）
+        m.put("util", util);
         m.put("profile", profile);
         m.put("native-service-require-approval", true);
 

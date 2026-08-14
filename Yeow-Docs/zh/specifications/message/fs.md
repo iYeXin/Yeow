@@ -117,6 +117,21 @@ Base64 编码的二进制读写。
 
 返回服务器根目录（Java 进程工作目录）的绝对路径——`server` 前缀节点与 assets 解压等相对路径均以它为基准。仅 `outer` 前缀可用（`outer.getServerPath`），需 `fs:outer.*` 或 `fs:outer.getServerPath` 权限。
 
+## 流式读写操作
+
+有状态句柄：`openRead/openWrite → read/write ×n → end/close`。**背压 = 显式响应**——调用方等每个操作返回后才发起下一块。运行时缓冲 256 KiB（降低跨线程往返的 syscall 开销）；单块大小由调用方控制（`read` 的 `maxBytes` 默认 1 MiB、上限 1 MiB）。句柄 per-plugin 管理，插件卸载/热重载时自动关闭。
+
+| 操作 | 请求 | 返回 | 说明 |
+|---|---|---|---|
+| `openRead` | `{ path }` | `{ "id", "size" }` | 打开读句柄（`size` = 文件字节数）；非文件 → err |
+| `read` | `{ id, maxBytes? }` | `{ "data": <b64> }` 或 `{ "eof": true }` | 读取一块；EOF 返回 `{eof: true}` |
+| `openWrite` | `{ path }` | `{ "id" }` | 打开写句柄（覆盖创建，父目录自动创建） |
+| `write` | `{ id, data: <b64> }` | `"true"` | 写入一块（已入缓冲即返回） |
+| `end` | `{ id }` | `"true"` | 冲刷缓冲并关闭写句柄 |
+| `close` | `{ id }` | `"true"` | 关闭任意句柄 |
+
+未知/已关闭句柄 → `{ "err": "unknown fr/fw handle: ..." }`。
+
 ---
 
 ## 路径安全

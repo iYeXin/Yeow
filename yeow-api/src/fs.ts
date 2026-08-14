@@ -1,5 +1,7 @@
 type FsLevel = 'plugin' | 'server' | 'outer';
 
+import { stringToBytes } from './util.js';
+
 function _sendFs(payload: Record<string, unknown>): unknown {
   const r = $send('fs', payload);
   if (r == null) return undefined;
@@ -114,12 +116,23 @@ function _makeFs(level: FsLevel) {
     return (_sendFs({ t: t('getServerPath') }) as { path: string }).path;
   }
 
+  async function createReadStream(path: string): Promise<ReadStream> {
+    const r = await _sendFsAsync({ t: t('openRead'), p: { path } }) as { id: string };
+    return _makeReadStream((op, p2) => _sendFsAsync({ t: t(op), p: p2 }), r.id);
+  }
+
+  async function createWriteStream(path: string): Promise<WriteStream> {
+    const r = await _sendFsAsync({ t: t('openWrite'), p: { path } }) as { id: string };
+    return _makeWriteStream((op, p2) => _sendFsAsync({ t: t(op), p: p2 }), r.id);
+  }
+
   return {
     readFile, readFileSync, readFileBase64, readFileBase64Sync,
     writeFile, writeFileSync, writeFileBase64, writeFileBase64Sync,
     appendFile, appendFileSync,
     exists, existsSync, isDirectory, isDirectorySync,
     deleteFile, deleteFileSync, mkdir, mkdirSync, list, listSync,
+    createReadStream, createWriteStream,
     // outer 专属能力（systemPaths / getServerPath）
     ...(level === 'outer' ? { systemPaths, systemPathsSync, getServerPath, getServerPathSync } : {}),
   };
@@ -154,3 +167,75 @@ export const mkdir = fs.mkdir;
 export const mkdirSync = fs.mkdirSync;
 export const list = fs.list;
 export const listSync = fs.listSync;
+export const createReadStream = fs.createReadStream;
+export const createWriteStream = fs.createWriteStream;
+
+// ── 流式读写（有状态句柄；背压 = 显式响应——每个操作 await 结果后才发起下一块）──
+
+/** 文件读流：read() 一次返回一块（默认 1 MiB），null = EOF；可 for await。 */
+export interface ReadStream {
+  read(maxBytes?: number): Promise<Uint8Array | null>;
+  close(): Promise<void>;
+  [Symbol.asyncIterator](): AsyncIterator<Uint8Array>;
+}
+
+/** 文件写流：write(chunk) 等到写入完成（显式响应背压），end() 冲刷并关闭。 */
+export interface WriteStream {
+  write(chunk: Uint8Array | string): Promise<void>;
+  /** 冲刷缓冲并关闭（调用后不可再 write）。 */
+  end(): Promise<void>;
+  close(): Promise<void>;
+}
+
+function _makeReadStream(
+  op: (name: string, p: Record<string, unknown>) => Promise<unknown>,
+  id: string,
+): ReadStream {
+  let closed = false;
+  const check = () => { if (closed) throw new Error('read stream closed'); };
+  return {
+    async read(maxBytes?: number) {
+      check();
+      const r = await op('read', { id, maxBytes }) as { data?: string; eof?: boolean };
+      if (r.eof) return null;
+      return Uint8Array.fromBase64(r.data as string);
+    },
+    async close() {
+      if (closed) return;
+      closed = true;
+      await op('close', { id });
+    },
+    async *[Symbol.asyncIterator]() {
+      while (true) {
+        const chunk = await this.read();
+        if (chunk === null) break;
+        yield chunk;
+      }
+    },
+  };
+}
+
+function _makeWriteStream(
+  op: (name: string, p: Record<string, unknown>) => Promise<unknown>,
+  id: string,
+): WriteStream {
+  let closed = false;
+  const check = () => { if (closed) throw new Error('write stream closed'); };
+  return {
+    async write(chunk: Uint8Array | string) {
+      check();
+      const data = typeof chunk === 'string' ? stringToBytes(chunk) : chunk;
+      await op('write', { id, data: data.toBase64() });
+    },
+    async end() {
+      check();
+      closed = true;
+      await op('end', { id });
+    },
+    async close() {
+      if (closed) return;
+      closed = true;
+      await op('close', { id });
+    },
+  };
+}

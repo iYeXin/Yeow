@@ -60,6 +60,16 @@
 - 实现：`WindowMetrics` 新增 `virtualPlugins` 集合（WindowCollector 在记录 ping 时按 `PluginEntity.isVirtual()` 标记）；`HeartbeatTimeoutDetector` 跳过；`DetectorTest` 增补用例（虚拟插件无 pong/慢响应均不告警，真实插件仍告警）
 - 文档：runtime-warning.md heartbeat.timeout 节补充说明
 
+### 流式 API：文件流 + 分块 gzip；util 上限可配置；http 回调修复
+
+- **util 上限配置化**：`config.yml` 新增 `util` 段（`max-input-bytes` / `max-output-bytes`，默认均 **256 MiB**，按原始字节计）——替代原先硬编码的 64 MiB base64 / 256 MiB 输出
+- **流式文件读写**（fs 通道，`plugin/server/outer` 三段均可用）：`createReadStream` / `createWriteStream`——有状态句柄（`openRead/openWrite → read/write ×n → end/close`），运行时缓冲 256 KiB 降低跨线程往返开销；**背压 = 显式响应**（每操作 await 结果后才发起下一块）；`ReadStream` 支持 `for await`
+- **Gzip 命名空间**（util.ts 重构）：`Gzip.compress/compressSync/decompress/decompressSync`（迁移原顶层方法）+ `Gzip.createCompressor()` / `Gzip.createDecompressor()`（**分块输入压缩/解压**，管道式 `write×n → finish`；非 syncFlush，拼接输出与一次性压缩字节级一致）；旧顶层导出保留为 deprecated 别名
+- **流句柄生命周期**：per-plugin 注册表，卸载/热重载自动关闭（gzip 压缩/解压 + 文件读写）
+- **http server 回调丢失修复**：`getRequestBody().readAllBytes()` 对无 Content-Length 的 keep-alive 请求（如普通 GET）永久阻塞（未定义长度流等 EOF）→ 回调永不投递且 io 线程被占死；改为仅当 `Content-Length > 0` 或 chunked 时读 body，处理异常加日志
+- 实现：core `yeow/util/{GzipCompressor,GzipDecompressor,FileStreams}.java`（可单测）+ `PluginThread` 流操作；`UtilCodecTest` 新增 4 用例（分块往返/单块与一次性一致/空输入/穿插空块）
+- 文档：api/util.md（重写）、api/fs.md（流式节）、specifications/message/{util,fs}.md、operations.md；站点侧边栏加入 Util 页
+
 ### CommandBuilder 重载匹配校验 enum 值（yeow-utils 0.1.25）
 
 - `match` 此前只数 token 数、不校验 enum 值——`action+name`（2 token）重载并列时先注册者胜：`/proj info test` 会被先注册的 `paste <name>` 吃掉

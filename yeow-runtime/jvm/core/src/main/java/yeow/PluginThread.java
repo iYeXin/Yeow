@@ -27,10 +27,6 @@ public class PluginThread implements Runnable, PluginEntity {
     private final Logger log;
     /** 依附于本插件的 Worker（虚拟插件）：key = worker 名；主插件卸载时连带卸载。 */
     private final ConcurrentHashMap<String, WorkerThread> workers = new ConcurrentHashMap<>();
-    /** util 通道输入上限（base64 字符数 ≈ 48 MiB 原始字节）：防内存炸弹。 */
-    private static final int MAX_UTIL_INPUT_B64 = 64 * 1024 * 1024;
-    /** gzip 解压输出上限（原始字节）：防压缩炸弹。 */
-    private static final int MAX_UTIL_OUTPUT_BYTES = 256 * 1024 * 1024;
     private final Set<String> permissions;
     private final Map<String, String> nativeHashes; // 打包后路径(assets/<id>/...) → SHA-256（yeow.json native 声明）
     private volatile QuickJSContext ctx;
@@ -213,6 +209,9 @@ public class PluginThread implements Runnable, PluginEntity {
         var dir = "plugins/" + name;
         httpServers.entrySet().removeIf(e -> { if (e.getKey().startsWith(dir)) { try { e.getValue().stop(0); } catch (Exception ignored) {} return true; } return false; });
         httpPending.entrySet().removeIf(e -> { if (e.getValue().serverId().startsWith(dir)) { try { e.getValue().exchange().close(); } catch (Exception ignored) {} return true; } return false; });
+        // 流句柄（gzip 压缩/解压、文件读/写）：热重载/卸载时统一关闭
+        for (var h : streamHandles.values()) { try { h.close(); } catch (Exception ignored) {} }
+        streamHandles.clear();
         // 平台侧命令/事件/GUI/BossBar 清理（热重载、卸载、Worker 均经此路径）
         core.host().purgePlatformResources(name);
     }
@@ -670,6 +669,37 @@ public class PluginThread implements Runnable, PluginEntity {
                     if (!"outer".equals(level)) throw new IllegalArgumentException("getServerPath is outer-level only");
                     yield gson.toJson(Map.of("path", Path.of("").toAbsolutePath().normalize().toString()));
                 }
+                // ── 流式读写（有状态句柄：openXxx → read/write ×n → end/close；缓冲 256 KiB）──
+                case "openRead" -> {
+                    var path = resolvePath(base, p.get("path").getAsString(), false);
+                    if (!Files.isRegularFile(path)) throw new IllegalArgumentException("not a file: " + path);
+                    var id = newHandle("fr", new yeow.util.FileStreams.Reader(path));
+                    yield gson.toJson(Map.of("id", id, "size", Files.size(path)));
+                }
+                case "read" -> {
+                    var h = handle("fr", p, yeow.util.FileStreams.Reader.class);
+                    var max = p.has("maxBytes") ? p.get("maxBytes").getAsInt() : 1024 * 1024;
+                    var b = h.read(max);
+                    yield b == null ? gson.toJson(Map.of("eof", true))
+                        : gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(b)));
+                }
+                case "openWrite" -> {
+                    var path = resolvePath(base, p.get("path").getAsString());
+                    assertNotRuntimeDir(path);
+                    yield gson.toJson(Map.of("id", newHandle("fw", new yeow.util.FileStreams.Writer(path))));
+                }
+                case "write" -> {
+                    var h = handle("fw", p, yeow.util.FileStreams.Writer.class);
+                    h.write(Base64.getDecoder().decode(p.get("data").getAsString()));
+                    yield "true";
+                }
+                case "end" -> {
+                    var h = handle("fw", p, yeow.util.FileStreams.Writer.class);
+                    h.end();
+                    streamHandles.remove(p.get("id").getAsString());
+                    yield "true";
+                }
+                case "close" -> { closeHandle(p); yield "true"; }
                 default -> throw new IllegalArgumentException("Unknown fs: " + task);
             };
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
@@ -720,13 +750,24 @@ public class PluginThread implements Runnable, PluginEntity {
                             req.put("serverId", id); req.put("connId", connId);
                             req.put("method", exchange.getRequestMethod()); req.put("path", exchange.getRequestURI().getPath());
                             req.put("query", exchange.getRequestURI().getQuery());
-                            req.put("body", new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
                             var headers = new LinkedHashMap<String, String>();
                             exchange.getRequestHeaders().forEach((k,v) -> headers.put(k.toLowerCase(), String.join(", ", v)));
                             req.put("headers", headers);
+                            // 仅当存在请求体时才读取：无 Content-Length 的 keep-alive 请求
+                            // （如普通 GET）体流为未定义长度，readAllBytes 会永久阻塞等 EOF →
+                            // 该请求的回调永不投递且 io 线程被占死（http 回调丢失根因）。
+                            var cl = headers.get("content-length");
+                            var te = headers.get("transfer-encoding");
+                            if ((cl != null && Long.parseLong(cl) > 0) || "chunked".equalsIgnoreCase(te)) {
+                                req.put("body", new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+                            } else {
+                                req.put("body", "");
+                            }
                             httpPending.put(connId, new HttpConn(id, System.currentTimeMillis(), exchange));
                             queue.sendJs(gson.toJson(Map.of("t","cb","p",callbackId,"r",req)));
-                        } catch (Exception ignored) {}
+                        } catch (Exception ex) {
+                            log.warning("[" + name + "] http request handling error: " + ex.getMessage());
+                        }
                     });
                     server.setExecutor(ioExecutor); server.start();
                     httpServers.put(id, server);
@@ -929,42 +970,101 @@ public class PluginThread implements Runnable, PluginEntity {
     }
 
     /**
-     * util 通道：gzip.compress / gzip.decompress / encode.utf8 / decode.utf8。
-     * 字节数据一律以 base64 字符串承载（encode/decode 语义 = buffer ↔ UTF-8 字符串，
-     * base64 只是承载形式）；无流式接口，一次性整体处理。
+     * util 通道：gzip.compress / gzip.decompress / encode.utf8 / decode.utf8 +
+     * gzip 流式压缩/解压（compressor / decompressor）。
+     * 字节数据一律以 base64 字符串承载；流式操作分块显式响应（背压基于调用方等待返回值）。
+     * 输入/输出上限由 config.yml `util` 段配置（默认 256 MiB）。
      */
     private String handleUtil(String pld) {
         try {
             var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
             var t = obj.get("t").getAsString();
             var p = obj.has("p") ? obj.getAsJsonObject("p") : new JsonObject();
-            var data = p.get("data").getAsString();
-            // 输入上限（base64 字符数，≈48 MiB 原始字节）：防内存炸弹
-            if (data.length() > MAX_UTIL_INPUT_B64)
-                throw new IllegalArgumentException("util input exceeds " + MAX_UTIL_INPUT_B64 + " b64 chars");
+            int maxInput = core.config().utilMaxInputBytes();
+            int maxOutput = core.config().utilMaxOutputBytes();
+            // 输入上限：先按 base64 长度粗筛（防解码分配炸弹），解码后按原始字节精确校验
+            if (p.has("data")) {
+                var d = p.get("data").getAsString();
+                if (d.length() > (long) maxInput * 2) throw new IllegalArgumentException("util input exceeds " + maxInput + " bytes");
+                var raw = Base64.getDecoder().decode(d);
+                if (raw.length > maxInput) throw new IllegalArgumentException("util input exceeds " + maxInput + " bytes");
+            }
             return switch (t) {
                 case "gzip.compress" -> {
                     var level = p.has("level") ? p.get("level").getAsInt() : -1;
                     if (level < 0 || level > 9) throw new IllegalArgumentException("level must be 0-9");
-                    var raw = Base64.getDecoder().decode(data);
+                    var raw = Base64.getDecoder().decode(p.get("data").getAsString());
                     yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.gzip(raw, level))));
                 }
                 case "gzip.decompress" -> {
-                    var raw = Base64.getDecoder().decode(data);
-                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.gunzip(raw, MAX_UTIL_OUTPUT_BYTES))));
+                    var raw = Base64.getDecoder().decode(p.get("data").getAsString());
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.gunzip(raw, maxOutput))));
                 }
                 // 字符串 → 字节（b64 承载）
-                case "encode.utf8" -> gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.utf8(data))));
+                case "encode.utf8" -> gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.utf8(p.get("data").getAsString()))));
                 // 字节（b64 承载）→ 字符串（非法 UTF-8 序列替换为 U+FFFD）
                 case "decode.utf8" -> {
-                    var raw = Base64.getDecoder().decode(data);
+                    var raw = Base64.getDecoder().decode(p.get("data").getAsString());
                     yield gson.toJson(Map.of("data", yeow.util.UtilCodec.utf8(raw)));
                 }
+                // ── 流式 gzip（分块压缩/解压；句柄生命周期：create → write×n → finish → close）──
+                case "gzip.compressor.create" -> {
+                    var level = p.has("level") ? p.get("level").getAsInt() : -1;
+                    if (level < 0 || level > 9) throw new IllegalArgumentException("level must be 0-9");
+                    yield gson.toJson(Map.of("id", newHandle("gc", new yeow.util.GzipCompressor(level))));
+                }
+                case "gzip.compressor.write" -> {
+                    var h = handle("gc", p, yeow.util.GzipCompressor.class);
+                    var out = h.write(Base64.getDecoder().decode(p.get("data").getAsString()));
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(out)));
+                }
+                case "gzip.compressor.finish" -> {
+                    var h = handle("gc", p, yeow.util.GzipCompressor.class);
+                    var out = h.finish();
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(out)));
+                }
+                case "gzip.compressor.close" -> { closeHandle(p); yield "true"; }
+                case "gzip.decompressor.create" -> gson.toJson(Map.of("id", newHandle("gd", new yeow.util.GzipDecompressor())));
+                case "gzip.decompressor.write" -> {
+                    var h = handle("gd", p, yeow.util.GzipDecompressor.class);
+                    var out = h.write(Base64.getDecoder().decode(p.get("data").getAsString()));
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(out)));
+                }
+                case "gzip.decompressor.finish" -> {
+                    var h = handle("gd", p, yeow.util.GzipDecompressor.class);
+                    var out = h.finish();
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(out)));
+                }
+                case "gzip.decompressor.close" -> { closeHandle(p); yield "true"; }
                 default -> throw new IllegalArgumentException("Unknown util op: " + t);
             };
         } catch (Exception e) {
             return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
         }
+    }
+
+    // ── 流句柄注册表（util gzip 流 + fs 文件流；per-plugin，卸载/热重载时统一关闭）──
+
+    private final ConcurrentHashMap<String, AutoCloseable> streamHandles = new ConcurrentHashMap<>();
+    private final java.util.concurrent.atomic.AtomicLong streamSeq = new java.util.concurrent.atomic.AtomicLong();
+
+    private String newHandle(String prefix, AutoCloseable h) {
+        var id = prefix + streamSeq.incrementAndGet();
+        streamHandles.put(id, h);
+        return id;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T handle(String prefix, JsonObject p, Class<T> cls) {
+        var id = p.get("id").getAsString();
+        var h = streamHandles.get(id);
+        if (h == null || !id.startsWith(prefix)) throw new IllegalArgumentException("unknown " + prefix + " handle: " + id);
+        return (T) h;
+    }
+
+    private void closeHandle(JsonObject p) throws Exception {
+        var h = streamHandles.remove(p.get("id").getAsString());
+        if (h != null) h.close();
     }
 
     private String handleService(String pld) {

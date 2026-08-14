@@ -44,6 +44,10 @@ demote-threshold: 200            # 降级阈值（次/秒）
 idle-spin-us: 100                # 空闲自旋（us），0 关闭
 task-sync-timeout-ms: 10000      # 同步 task 调用超时（ms），受服务器负载影响大，默认 10s
 
+util:
+  max-input-bytes: 268435456     # util 通道单次输入上限（原始字节，默认 256 MiB）
+  max-output-bytes: 268435456    # gzip 解压输出上限（防压缩炸弹，默认 256 MiB）
+
 native-service-require-approval: true  # 声明原生服务的插件需要批准（默认 true；false = 默认批准）。
                                        # 运行时直接修改即生效（config.yml 为信任源）。
 
