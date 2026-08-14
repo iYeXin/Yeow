@@ -45,7 +45,9 @@ public interface PlatformHost {
 
     /**
      * debug 通道 `command` 节点（运行时内部测试，如性能基准）。
-     * 默认不实现（返回 not implemented）——平台按需覆写；
+     * **可选接口**：默认不实现（返回 not implemented），平台按需覆写；
+     * core 只转发结果，不关心具体逻辑——指令解析、执行线程等均由平台实现负责
+     * （Paper：切主线程执行世界修改；Folia 不实现）。
      * 开放条件（仅开发模式）与协议解析在 core（PluginThread）。
      */
     default Object debugCommand(JsonObject p) {

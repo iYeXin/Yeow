@@ -383,7 +383,9 @@ public class PluginThread implements Runnable, PluginEntity {
                     else if ("pong".equals(dt)) { onPong(); }
                     else if ("command".equals(dt)) {
                         // 运行时内部测试节点（如性能基准）：**仅开发模式开放**（-Dyeow.dev=true，
-                        // dev-server 默认启用）——生产环境拒绝；指令实现委托平台（默认不实现）。
+                        // dev-server 默认启用）——生产环境拒绝。
+                        // core 只转发、不关心具体逻辑（指令解析/执行线程由平台实现负责；
+                        // 可选接口，平台不实现返回 not implemented；Folia 不实现）。
                         if (!devMode) return gson.toJson(Map.of("err", "debug command disabled (dev-only)"));
                         var cp = obj.has("p") ? obj.getAsJsonObject("p") : new JsonObject();
                         return gson.toJson(core.host().debugCommand(cp));

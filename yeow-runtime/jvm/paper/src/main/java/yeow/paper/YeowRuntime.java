@@ -352,9 +352,31 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
 
     /** fill 指令的方块数上限（防手滑巨型区域）。 */
     private static final long MAX_FILL_BLOCKS = 1_000_000;
+    /** debug command 超时（ms）：fill 等基准指令可能执行很久（百万方块级）。 */
+    private static final long DEBUG_COMMAND_TIMEOUT_MS = 600_000;
 
+    /**
+     * debug 通道 command 节点（core 只转发，平台实现负责执行线程）：
+     * debug 通道在插件 JS 线程处理——世界修改指令必须切主线程执行
+     * （Paper AsyncCatcher 拒绝异步方块修改：Asynchronous block remove!）。
+     */
     @Override
     public Object debugCommand(JsonObject p) {
+        if (Bukkit.isPrimaryThread()) return runDebugCommand(p);
+        var fut = new java.util.concurrent.CompletableFuture<Object>();
+        try {
+            Bukkit.getScheduler().runTask(this, () -> {
+                try { fut.complete(runDebugCommand(p)); }
+                catch (Exception e) { fut.complete(java.util.Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
+            });
+            return fut.get(DEBUG_COMMAND_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            return java.util.Map.of("err", "debug command failed: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
+    }
+
+    /** 指令解析（已在主线程执行）。 */
+    private Object runDebugCommand(JsonObject p) {
         var cmd = p.has("cmd") ? p.get("cmd").getAsString() : "";
         try {
             return switch (cmd) {
