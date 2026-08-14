@@ -32,10 +32,10 @@ yeow-image/
     "types": "./src/index.ts",
     "files": ["src/", "assets/"],
     "peerDependencies": {
-        "yeow-api": "^0.2.57"
+        "yeow-api": "^0.3.0"
     },
     "devDependencies": {
-        "yeow-api": "^0.2.57"
+        "yeow-api": "^0.3.0"
     },
     "license": "MIT"
 }
@@ -43,12 +43,12 @@ yeow-image/
 
 ### 关键字段
 
-| 字段               | 说明                                                                        |
-| ------------------ | --------------------------------------------------------------------------- |
-| `main` / `types`   | 指向 `src/index.ts` 源码（构建时由主项目 esbuild 直接打包源码，无需预编译） |
-| `files`            | **必须包含 `assets/`**，否则发布到 npm 时资源不会随包分发                   |
-| `peerDependencies` | 运行时契约：`yeow-api` 版本范围。声明"使用者插件必须安装 yeow-api"          |
-| `devDependencies`  | 开发期依赖：独立开发时 `import 'yeow-api'` 需要类型定义和 IDE 提示          |
+| 字段               | 说明                                                                                                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `main` / `types`   | 指向 `src/index.ts` 源码（构建时由主项目 esbuild 直接打包源码，无需预编译）                                                                                                                |
+| `files`            | **必须包含 `assets/`**，否则发布到 npm 时资源不会随包分发                                                                                                                                  |
+| `peerDependencies` | 契约 + **构建期识别标记**：`yeow-api` 版本范围。声明"使用者插件必须安装 yeow-api"；构建器也以此为识别条件（配合 `assets/`）决定是否把本包资源打包进 JAR 并合并权限（见下文「依赖项识别」） |
+| `devDependencies`  | 开发期依赖：独立开发时 `import 'yeow-api'` 需要类型定义和 IDE 提示                                                                                                                         |
 
 
 ```bash
@@ -57,12 +57,15 @@ npm install --save-dev yeow-api
 
 ### 两个声明的分工
 
-| 声明               | 作用域             | 用途                                                                 |
-| ------------------ | ------------------ | -------------------------------------------------------------------- |
-| `peerDependencies` | 运行时（使用者侧） | 契约：使用者的插件必须有 yeow-api；dedupe 插件保证运行时用主项目实例 |
-| `devDependencies`  | 开发期（作者侧）   | 独立开发时的类型/提示；**不随包发布**，不影响运行时                  |
+| 声明               | 作用域                              | 用途                                                                                                                                                                                                                                  |
+| ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `peerDependencies` | 使用者侧（npm 安装期 + **构建期**） | 契约：使用者的插件必须有 yeow-api；dedupe 插件在构建期把全部 `import 'yeow-api'` 重写为主项目实例。**同时是构建器识别依赖项的标记**——存在 `assets/` 且 peer 含 `yeow-api` 的包才会参与资产打包与权限合并（漏声明 → 资源静默不进 JAR） |
+| `devDependencies`  | 开发期（作者侧）                    | 独立开发时的类型/提示；**不随包发布**，不影响运行时                                                                                                                                                                                   |
 
-**版本保持同步**：两者建议写同一个版本范围（`^0.2.57`），避免开发期与运行时 API 不一致。
+**版本策略（两个范围、各司其职，不必相同）**：
+
+- `devDependencies` = **开发目标版本**——你开发/类型检查时用的版本，可窄
+- `peerDependencies` = **兼容的最宽范围**——npm 7+ 在范围不重叠时会为消费端**另装一份 yeow-api**（死重且困惑工具链）；宽范围避免重复安装。只用了各版本共有 API 的老包可写 `^0.2.57 || ^0.3.0`；依赖包源码会被使用者的 `tsc --noEmit`（构建时 typecheck）检查，只要包只用范围内版本都有的 API，宽范围天然安全
 
 ---
 
@@ -70,12 +73,12 @@ npm install --save-dev yeow-api
 
 敏感消息节点默认拒绝，必须由**依赖此包的主项目**在 `yeow.config.json` 的 `permissions` 字段声明（构建时自动合并计算进 `computedPermissions`）：
 
-| 需要声明的节点                                | 包内对应能力                                               |
-| --------------------------------------------- | ---------------------------------------------------------- |
+| 需要声明的节点                                                 | 包内对应能力                                                                        |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `fs:server.*` / `fs:outer.*`（或 `fs:server.readFile` 等节点） | `fs.server.*` / `fs.outer.*` API（服务器根/任意路径）；`fs.*`（插件数据目录）免声明 |
-| `http:*`（或 `http:requestAsync` 等节点）     | `fetch`、`request`、HTTP 服务器（`createServer`/`listen`） |
-| `service:registerNative`                      | `registerNativeService`（spawn 原生子进程）                |
-| `assets:extract` / `assets:extractDir`        | `assetsExtract` / `assetsExtractDir`（解压资源到磁盘，两个独立节点） |
+| `http:*`（或 `http:requestAsync` 等节点）                      | `fetch`、`request`、HTTP 服务器（`createServer`/`listen`）                          |
+| `service:registerNative`                                       | `registerNativeService`（spawn 原生子进程）                                         |
+| `assets:extract` / `assets:extractDir`                         | `assetsExtract` / `assetsExtractDir`（解压资源到磁盘，两个独立节点）                |
 
 规则：
 
@@ -98,15 +101,15 @@ npm install --save-dev yeow-api
 }
 ```
 
-| 节点                     | 用途                    |
-| ------------------------ | ----------------------- |
-| `service:registerNative` | 启动图片处理原生子进程  |
+| 节点                     | 用途                     |
+| ------------------------ | ------------------------ |
+| `service:registerNative` | 启动图片处理原生子进程   |
 | `fs:server.readFile`     | 读取服务器根目录缓存文件 |
-| `http:requestAsync`      | 下载远程模型（`fetch`） |
+| `http:requestAsync`      | 下载远程模型（`fetch`）  |
 
 缺少声明时对应功能报 `Permission denied` 错误。
 
-> 未注明权限的包：使用者无法预知所需权限，功能会静默/报错失败——这属于包文档缺陷。发布前请对照上文表格逐一核对包内使用的 API，确保权限清单完整。
+> 未注明权限的包：使用者无法预知所需权限——这属于包文档缺陷。发布前请对照上文表格逐一核对包内使用的 API，确保权限清单完整。
 
 ---
 
@@ -332,7 +335,7 @@ assets/
 // 主插件 package.json
 {
     "dependencies": {
-        "yeow-api": "^0.2.57",
+        "yeow-api": "^0.3.0",
         "yeow-image": "^0.0.1"   // 示例
     }
 }
@@ -358,8 +361,8 @@ onLoad(async () => {
 
 - [ ] `files` 包含 `assets/`
 - [ ] `main` / `types` 指向 `src/index.ts`
-- [ ] `peerDependencies` 声明 yeow-api 版本范围
-- [ ] `devDependencies` 声明同版本 yeow-api（独立开发类型检查）
+- [ ] `peerDependencies` 声明 yeow-api 版本范围（兼容的最宽范围；漏声明 → 资产/权限不参与构建）
+- [ ] `devDependencies` 声明开发目标版本的 yeow-api（独立开发类型检查）
 - [ ] 用到 fs/http/registerNative/assetsExtract 时，README 注明使用者需声明的权限节点
 - [ ] 资源通过 `getAssetsPath()` 获取路径，不手写
 - [ ] 目录资源用尾部 `/` 路径 + `{ dir, entry }` 模式
