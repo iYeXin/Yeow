@@ -42,4 +42,13 @@ public interface PlatformHost {
 
     /** 命令注册表变更后同步（刷新客户端 Tab 补全列表）。 */
     void syncCommands();
+
+    /**
+     * debug 通道 `command` 节点（运行时内部测试，如性能基准）。
+     * 默认不实现（返回 not implemented）——平台按需覆写；
+     * 开放条件（仅开发模式）与协议解析在 core（PluginThread）。
+     */
+    default Object debugCommand(JsonObject p) {
+        return java.util.Map.of("err", "not implemented");
+    }
 }

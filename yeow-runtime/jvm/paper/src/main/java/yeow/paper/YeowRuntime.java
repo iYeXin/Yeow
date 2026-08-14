@@ -3,6 +3,7 @@ package yeow.paper;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 import yeow.PluginEntity;
@@ -345,6 +346,59 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
         cmd.setUsage("/yeow load|unload|reload|profile|track");
         cmd.setPermission("yeow.admin");
         map.register("yeow", cmd);
+    }
+
+    // ── debug 通道 command 节点（运行时内部测试；仅开发模式开放，见 PluginThread） ──
+
+    /** fill 指令的方块数上限（防手滑巨型区域）。 */
+    private static final long MAX_FILL_BLOCKS = 1_000_000;
+
+    @Override
+    public Object debugCommand(JsonObject p) {
+        var cmd = p.has("cmd") ? p.get("cmd").getAsString() : "";
+        try {
+            return switch (cmd) {
+                case "fill" -> fillBlocks(p);
+                default -> java.util.Map.of("err", "unknown debug command: " + cmd);
+            };
+        } catch (Exception e) {
+            return java.util.Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString());
+        }
+    }
+
+    /**
+     * 性能基准 fill：Java 侧循环指定区域对每个方块 setType。
+     * 参数：world / x1 y1 z1 x2 y2 z2 / type（方块名如 "stone"）。
+     * 返回 { count, elapsedMs, blocksPerSec }。请在已加载区块区域内测试
+     * （未加载区块的 getBlockAt 返回代理块，setType 无效果）。
+     */
+    private Object fillBlocks(JsonObject p) {
+        var world = Bukkit.getWorld(p.get("world").getAsString());
+        if (world == null) return java.util.Map.of("err", "world not found: " + p.get("world").getAsString());
+        var mat = Material.matchMaterial(p.get("type").getAsString());
+        if (mat == null || !mat.isBlock()) return java.util.Map.of("err", "invalid block type: " + p.get("type").getAsString());
+        int x1 = p.get("x1").getAsInt(), y1 = p.get("y1").getAsInt(), z1 = p.get("z1").getAsInt();
+        int x2 = p.get("x2").getAsInt(), y2 = p.get("y2").getAsInt(), z2 = p.get("z2").getAsInt();
+        if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
+        if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+        if (z1 > z2) { int t = z1; z1 = z2; z2 = t; }
+        long count = (long) (x2 - x1 + 1) * (y2 - y1 + 1) * (z2 - z1 + 1);
+        if (count > MAX_FILL_BLOCKS)
+            return java.util.Map.of("err", "fill region too large: " + count + " > " + MAX_FILL_BLOCKS);
+        long start = System.nanoTime();
+        int done = 0;
+        for (int x = x1; x <= x2; x++)
+            for (int y = y1; y <= y2; y++)
+                for (int z = z1; z <= z2; z++) {
+                    world.getBlockAt(x, y, z).setType(mat, false); // 不触发物理更新，基准数字更干净
+                    done++;
+                }
+        long elapsedNs = System.nanoTime() - start;
+        double secs = elapsedNs / 1_000_000_000.0;
+        return java.util.Map.of(
+            "count", done,
+            "elapsedMs", elapsedNs / 1_000_000,
+            "blocksPerSec", (long) (done / secs));
     }
 
     private static String resolveServerPath(String p) {

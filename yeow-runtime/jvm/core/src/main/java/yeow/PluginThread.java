@@ -381,6 +381,13 @@ public class PluginThread implements Runnable, PluginEntity {
                     var dt = obj.get("t").getAsString();
                     if ("reportError".equals(dt)) { handleJSReport(gson.toJson(obj.get("p"))); }
                     else if ("pong".equals(dt)) { onPong(); }
+                    else if ("command".equals(dt)) {
+                        // 运行时内部测试节点（如性能基准）：**仅开发模式开放**（-Dyeow.dev=true，
+                        // dev-server 默认启用）——生产环境拒绝；指令实现委托平台（默认不实现）。
+                        if (!devMode) return gson.toJson(Map.of("err", "debug command disabled (dev-only)"));
+                        var cp = obj.has("p") ? obj.getAsJsonObject("p") : new JsonObject();
+                        return gson.toJson(core.host().debugCommand(cp));
+                    }
                     return null;
                 } else if ("lifecycle".equals(channel)) {
                     var o = gson.fromJson(pld, JsonObject.class); var lt = o.has("type") ? o.get("type").getAsString() : "";

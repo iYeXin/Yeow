@@ -18,6 +18,13 @@
 - **请求**：`{ "t": "pong" }`
 - **返回**：`null`
 
+## `command`（运行时内部测试节点）
+
+运行时内部测试入口（如性能基准），JS 侧可提交。**仅开发模式开放**——JVM 参数 `-Dyeow.dev=true`（dev-server 默认启用）时可用，生产环境一律拒绝。具体指令属运行时内部实现，**不在此文档列出**（以运行时为准）。
+
+- **请求**：`{ "t": "command", "p": { "cmd": "<指令名>", ...指令参数 } }`
+- **返回**：指令结果对象；未开放 → `{ "err": "debug command disabled (dev-only)" }`；未知指令 → `{ "err": "unknown debug command: ..." }`；平台未实现 → `{ "err": "not implemented" }`
+
 ## `DEBUG` 消息（运行时 → JS）
 
 运行时通过消息队列向 JS 投递 `DEBUG` 类型消息。JS 端 `$hm` 在收到 `t === 'DEBUG'` 时处理。
