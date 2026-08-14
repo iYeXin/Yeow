@@ -26,6 +26,14 @@
   3. **eventData 不再静默吞异常**：提取失败改为告警 + 返回 null（dispatch 丢弃），杜绝残废载荷再次投递
 - 有效性过滤保留为纵深防御
 
+### 任务内触发事件 → 5s 死锁（Paper 调度器，社区报告）
+
+> 报告场景：插件在命令执行器里 `await player.teleport(...)`（Yeow 游戏任务）→ 传送同步触发 PlayerTeleportEvent → 事件桥投递 JS → **事件超时约 5s，主线程阻塞、服务器卡顿**。handler 与执行器均无同步调用，非"经典事件重入"。
+
+- **机制（确认）**：事件自旋期间 JS 回复的 `event.complete`（cb 为空 → `submitGameSync`）进入**优先级池**；池只有调度线程 `yeow-sched` 能泵，而 yeow-sched 正阻塞在 `waitMain`（`fut.get`）等待主线程执行中的传送任务；主线程自旋期间 `drainDuringWait` 只排空 `mainQueue`，不碰池 → **循环等待**直至事件 5s 超时。事件在"Yeow 游戏任务执行过程中"被触发即命中（serverPing 由 Paper 自身触发、playerDeath 由原版逻辑触发，故正常）
+- **修复（Paper）**：`drainDuringWait` 在排空 `mainQueue` 之外**同时代行泵职责**——按优先级顺序（high→normal→low）排空三个优先级池并就地执行（`executeNow`，与 `executeOne` 相同完成语义：指标 + future/callback 完成）；`poll` 原子性保证与调度线程无竞态，FIFO 顺序不变。覆盖全部自旋调用点（事件串行/并发、权限检查、tabComplete），且同步修复"handler 内同步 call（如 `Player.getSync`）同样会入池等待"的同类死锁
+- Folia 侧不受影响（`SpinPump` 自旋期间直接 `drainForPlugins` 泵池，无独立泵线程阻塞点），无需改动
+
 ---
 
 ## 2026-08-13

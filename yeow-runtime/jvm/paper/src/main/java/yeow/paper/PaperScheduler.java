@@ -27,6 +27,9 @@ import java.util.logging.Logger;
  * - 主线程 pump 分两种：事件/补全自旋时 {@link #drainDuringWait} 就地执行（调用方必为主线程）；
  *   正常情形由 {@link #mainTickPump}（runTaskTimer 每 tick）预算内执行
  * - 主线程正在自旋时路由进来的任务由 pump 执行；其余情形排队等下一个 tick
+ * - 主线程自旋期间 {@link #drainDuringWait} **同时代行调度线程泵职责**：排空优先级池
+ *   （08-14 事件死锁修复——事件在任务执行内被触发时，event.complete 等回执在池中，
+ *   若泵线程正阻塞在 waitMain 上等当前任务，回执无人泵 → 循环等待，见 drainDuringWait 注释）
  *
  * 预算/自动降级/缩放沿用时间片模型（以"轮"为单位计 tick）。
  */
@@ -220,24 +223,46 @@ public class PaperScheduler implements TaskScheduler {
                 // >taskSyncTimeoutMs 后恢复的瞬间，且副作用已不可避免，属可接受。
                 if (!fut.isDone()) mainQueue.removeIf(p -> p == pending);
             }
-            var elapsed = System.nanoTime() - startNs;
-            ProfileSink s = sink;
-            if (s != null && s.taskSampled()) {
-                s.onTask(new TaskMetric(t.pluginName(), t.taskType(),
-                    switch (t.priority()) {
-                        case HIGH -> TaskPriority.HIGH;
-                        case NORMAL -> TaskPriority.NORMAL;
-                        case LOW -> TaskPriority.LOW;
-                    },
-                    elapsed));
-            }
-            if (t.isAsync()) t.callback().accept(result);
-            else t.future().complete(gson.toJson(result));
+            finish(t, result, startNs);
         } catch (Exception e) {
-            var err = errObject(e, t.taskType());
-            if (t.isAsync()) t.callback().accept(err);
-            else t.future().complete(gson.toJson(err));
+            fail(t, e);
         }
+    }
+
+    /**
+     * 主线程自旋（{@link #drainDuringWait}）代行调度线程泵职责：就地执行池任务。
+     * 与 {@link #executeOne} 相同的完成语义（指标 + future/callback 完成）。
+     * 调用方必为主线程——任务就地执行无需 mainQueue 往返。
+     */
+    private void executeNow(PendingTask t) {
+        try {
+            var startNs = System.nanoTime();
+            finish(t, Tasks.execute(t.taskType(), t.params()), startNs);
+        } catch (Exception e) {
+            fail(t, e);
+        }
+    }
+
+    private void finish(PendingTask t, Object result, long startNs) {
+        var elapsed = System.nanoTime() - startNs;
+        ProfileSink s = sink;
+        if (s != null && s.taskSampled()) {
+            s.onTask(new TaskMetric(t.pluginName(), t.taskType(),
+                switch (t.priority()) {
+                    case HIGH -> TaskPriority.HIGH;
+                    case NORMAL -> TaskPriority.NORMAL;
+                    case LOW -> TaskPriority.LOW;
+                },
+                elapsed));
+        }
+        if (t.isAsync()) t.callback().accept(result);
+        else t.future().complete(gson.toJson(result));
+    }
+
+    private void fail(PendingTask t, Exception e) {
+        var err = errObject(e, t.taskType());
+        if (t.isAsync()) t.callback().accept(err);
+        else t.future().complete(gson.toJson(err));
     }
 
     private Object waitMain(CompletableFuture<Object> fut, String taskType) {
@@ -290,11 +315,31 @@ public class PaperScheduler implements TaskScheduler {
     }
 
     /**
-     * 事件/补全自旋时调用（调用方必为主线程）：排空主线程队列--
+     * 事件/补全自旋时调用（调用方必为主线程）：排空主线程队列 + **优先级池**。
      * 等待期间完成任务（event.complete 等）不被饿死。
+     *
+     * 08-14 死锁修复：仅排空 mainQueue 不够——调度线程 {@link #executeOne} 对路由任务执行
+     * {@code waitMain}（fut.get 阻塞）期间，若被等待的主线程任务**同步触发事件**（如
+     * player.teleport → PlayerTeleportEvent），事件自旋期间 JS 回复的 event.complete 经
+     * submitGameSync 进入优先级池；池只有调度线程能泵，而调度线程正阻塞在 waitMain 上
+     * 等待当前任务 → 循环等待直至事件 5s 超时（传送完成但服务器卡顿 5s）。
+     * 修复：主线程自旋期间代行泵职责，按优先级顺序把池中任务就地执行（{@link #executeNow}，
+     * 与 executeOne 相同完成语义）。poll 原子性保证与调度线程无竞态；FIFO 顺序不变。
      */
     public void drainDuringWait() {
+        drainPool(highPool);
+        drainPool(normalPool);
+        drainPool(lowPool);
         drain(Long.MAX_VALUE);
+    }
+
+    /** 排空单个优先级池（自旋期间代行泵职责）。 */
+    private void drainPool(ConcurrentLinkedQueue<PendingTask> pool) {
+        while (true) {
+            var t = pool.poll();
+            if (t == null) break;
+            executeNow(t);
+        }
     }
 
     private void drain(long deadline) {
