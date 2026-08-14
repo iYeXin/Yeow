@@ -13,12 +13,18 @@
 - **日志前缀对齐拆分前**：console.log / JS 警告经 `host.logger()` 输出——拆分后该 logger 为插件 logger，多出 `[Yeow]` 前缀。改回根 logger（`Bukkit.getLogger()`，paper + folia 一致）：输出恢复 `[12:42:00 INFO]: [yeow-tools] xxx`
 - 产物：模板内置 `yeow-runtime-0.2.0.jar` 更新；**yeow-api 0.3.2 → 0.3.3** / **create-yeow 0.3.2 → 0.3.3**（模板依赖 `^0.3.0` caret 自动覆盖）
 
-### PlayerDeath 幽灵触发：标记 + Java 侧无效事件过滤（权宜之计）
+### PlayerDeath 幽灵触发：**根因已定位并修复**（原标记 TODO[ghost] 解除）
 
-> **标记（TODO[ghost]）**：PlayerDeath 幽灵触发在 cbId 随机化（跨代串扰根因修复）后**仍可复现**，且仅 PlayerDeath 受影响——排除"回调跨代串扰"为该问题根因。Paper 分发链路静态分析未见异常路径，**根因未定位**，待深查。
+> **现场证据**（过滤日志）：`Dropped invalid playerDeath dispatch: {"_cancellable":true}`——载荷只有 `_cancellable`，即 `eventData()` 内 `(PlayerDeathEvent)ev` **强转失败**（switch 只执行了开头的 `_cancellable` 填充），异常被 `catch(Exception ignored)` 静默吞掉后残废载荷照常投递给 JS。
 
-- **权宜之计**：事件分发前做载荷有效性校验（Paper + Folia 两侧）——玩家事件必须有合法 `player` UUID、实体事件必须有合法 `entity` UUID，载荷与事件类型不匹配即**丢弃不投递**（防止 handler 收到 `e.player` 不存在之类的脏数据）；被过滤时告警并打印载荷（作为幽灵事件的现场记录，供根因排查）
-- **顺带修复（Folia）**：`playerDeath`/`entityDeath` 合并监听器只按事件类型字符串去重——插件同时订阅两个事件时会把同一 `EntityDeathEvent` 监听器**注册两次** → 同一死亡事件被投递两遍（已修复：合并监听器一次注册后把两个 et 都记入 reg）
+- **根因（两层）**：
+  1. **平台侧（分发串扰）**：`dispatch("playerDeath", ev)` 收到的 `ev` 是**纯 `EntityDeathEvent`（怪物死亡）**——该 Folia 系 build 的事件分发把纯 EntityDeathEvent 投递给注册为 PlayerDeathEvent 的监听器（FoliaEventBridge 中早有此现象的注释记载）；因 PlayerDeathEvent 是 EVENTS 表中唯一"注册类有父类也在表中"的事件，故**仅 PlayerDeath 受影响**
+  2. **运行时侧（吞异常）**：Paper `eventData()` 的 `catch(Exception ignored)` 吞掉强转失败后，残废载荷 `{"_cancellable":true}` 照常进入投递 → JS handler 收到无 `player` 的数据（"玩家并未死亡却触发"、`e.player` 不存在）。**cbId 随机化当然无效——载荷本身就是残废的，与回调跨代无关**
+- **修复**（Paper + Folia 两侧一致）：
+  1. **死亡事件合并监听器**（Paper 侧新增，对齐 Folia）：`playerDeath`/`entityDeath` 合并注册为一个 `EntityDeathEvent` 监听器，按 `instanceof PlayerDeathEvent` 分流；两个 et 都记入 reg 防重复注册（双投递）
+  2. **dispatch 类型守卫**：`et` 与事件实际类型必须匹配，不匹配即丢弃并告警（兜底）
+  3. **eventData 不再静默吞异常**：提取失败改为告警 + 返回 null（dispatch 丢弃），杜绝残废载荷再次投递
+- 有效性过滤保留为纵深防御
 
 ---
 

@@ -274,6 +274,14 @@ public class FoliaEventBridge implements Listener {
     }
 
     private static void dispatch(String et, Event ev) {
+        // 类型守卫（TODO[ghost] 根因修复）：et 必须与事件实际类型匹配——合并监听器已按
+        // instanceof 分流，这里兜底（防平台分发串扰把纯 EntityDeathEvent 投进 playerDeath）。
+        if (("playerDeath".equals(et) && !(ev instanceof PlayerDeathEvent))
+            || ("entityDeath".equals(et) && !(ev instanceof EntityDeathEvent))) {
+            LOG.warning("[EventValidity] Dropped " + et + " dispatch: event class "
+                + ev.getClass().getSimpleName() + " mismatch");
+            return;
+        }
         var pluginMap = subs.get(et);
         if (pluginMap == null || pluginMap.isEmpty()) return;
         // 路由目标：事件主体（玩家 uuid / 方块所在世界+坐标——带坐标使 event.complete
@@ -704,11 +712,12 @@ public class FoliaEventBridge implements Listener {
 
     // ── 辅助 ─────────────────────────────────────────────────────────
 
-    // ── TODO[ghost] 权宜之计：无效事件过滤（2026-08-14，见 changelog 标记）──
-    // PlayerDeath 幽灵触发在 cbId 随机化后仍复现且仅 PlayerDeath 受影响；根因未定位。
-    // 本过滤兜底：玩家事件必须有合法 player UUID、实体事件必须有合法 entity UUID，
-    // 载荷与事件类型不匹配即丢弃——防止 handler 收到 `e.player` 不存在之类的脏数据。
-    // 被过滤时告警（含载荷）供根因排查。根因定位后移除。
+    // ── TODO[ghost] 无效事件过滤（2026-08-14，见 changelog 标记）──
+    // PlayerDeath 幽灵触发根因已定位：平台分发把纯 EntityDeathEvent（怪物死亡）投递给
+    // PlayerDeathEvent 监听器 → eventData 强转失败被静默吞掉 → 残废载荷照常投递 JS。
+    // 修复：死亡事件合并监听器 + dispatch 类型守卫 + eventData 不再吞异常（见 dispatch/ensureRegistered）。
+    // 本过滤保留为纵深防御：玩家事件必须有合法 player UUID、实体事件必须有合法 entity UUID，
+    // 载荷与事件类型不匹配即丢弃；被过滤时告警（含载荷）。
     private static final Set<String> PLAYER_EVENTS = Set.of(
         "playerJoin", "playerQuit", "playerChat", "playerMove", "playerInteract",
         "playerCommand", "playerDeath", "playerRespawn", "playerTeleport",

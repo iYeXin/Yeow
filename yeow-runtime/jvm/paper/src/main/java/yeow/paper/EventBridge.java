@@ -108,6 +108,20 @@ public class EventBridge implements Listener {
         // 死循环插件场景下 N 个监听器 = N × 5s 阻塞主线程。
         // dispatch() 开头已对空订阅短路，空订阅时监听器零开销。
         if (reg.putIfAbsent(et, true) == null) {
+            // 死亡事件合并注册（对齐 Folia 侧）：PlayerDeathEvent 继承 EntityDeathEvent——
+            // 部分 Folia 系 build 的事件分发会把纯 EntityDeathEvent（怪物死亡）投递给注册为
+            // PlayerDeathEvent 的监听器（PlayerDeath 幽灵触发的**平台侧根因**，见 changelog 2026-08-14）。
+            // 合并为一个 EntityDeathEvent 监听器 + instanceof 分流：玩家死亡 → playerDeath，
+            // 其他实体 → entityDeath。两个 et 都记入 reg，防重复注册（同一死亡事件双投递）。
+            if (et.equals("playerDeath") || et.equals("entityDeath")) {
+                reg.put("entityDeath", true);
+                reg.put("playerDeath", true);
+                Bukkit.getPluginManager().registerEvent(EntityDeathEvent.class, this, EventPriority.NORMAL, (l, e) -> {
+                    var ev = (Event) e;
+                    dispatch(ev, ev instanceof PlayerDeathEvent ? "playerDeath" : "entityDeath");
+                }, runtime);
+                return;
+            }
             // AsyncPlayerChatEvent fires on a Netty thread - hop to the main thread before dispatching,
             // because dispatch() runs the scheduler tick (Bukkit API must stay on the main thread).
             // ServerListPingEvent 也在 Netty 线程触发，但**必须同步 dispatch（不 hop）**：
@@ -214,6 +228,16 @@ public class EventBridge implements Listener {
     }
 
     void dispatch(Event ev, String et) {
+        // 类型守卫（TODO[ghost] 根因修复）：et 必须与事件实际类型匹配——防止平台分发串扰把
+        // 纯 EntityDeathEvent 投进 playerDeath（此前 eventData 强转失败被吞 → 残废载荷
+        // {"_cancellable":true} 照常投递 JS = PlayerDeath 幽灵触发）。合并监听器已按
+        // instanceof 分流，这里兜底。
+        var cls = EVENTS.get(et);
+        if (cls != null && !cls.isInstance(ev)) {
+            LOG.warning("[EventValidity] Dropped " + et + " dispatch: event class " + ev.getClass().getSimpleName()
+                + " mismatch (expected " + cls.getSimpleName() + ")");
+            return;
+        }
         var pluginMap = subs.get(et); if (pluginMap == null || pluginMap.isEmpty()) return;
         // 跳过空回调集合的插件（理论上 subscribe 后至少一个，防御性过滤）
         var active = new java.util.HashMap<String, Set<String>>();
@@ -630,7 +654,13 @@ public class EventBridge implements Listener {
                 m.put("hash",e.getHash() != null ? e.getHash() : "");
                 break;
             }
-        }} catch(Exception ignored){}
+        }} catch (Exception ex) {
+            // **不得静默吞掉**：强转/字段提取失败若被吞，残废载荷（仅 _cancellable）会照常投递
+            // 给 JS——即 PlayerDeath 幽灵触发（载荷与事件类型不匹配的根因，见 changelog 2026-08-14）。
+            // 改为告警并丢弃本次分发（dispatch 侧 data==null 短路）。
+            LOG.warning("[EventValidity] eventData failed for " + type + ": " + ex);
+            return null;
+        }
         return m;
     }
 
@@ -638,11 +668,12 @@ public class EventBridge implements Listener {
         m.put("player", p != null ? p.getUniqueId().toString() : null);
     }
 
-    // ── TODO[ghost] 权宜之计：无效事件过滤（2026-08-14，见 changelog 标记）──
-    // PlayerDeath 幽灵触发在 cbId 随机化后仍复现且仅 PlayerDeath 受影响；Paper 分发链路
-    // 静态分析未见异常路径，根因未定位。本过滤兜底：玩家事件必须有合法 player UUID、
-    // 实体事件必须有合法 entity UUID，载荷与事件类型不匹配即丢弃——防止 handler 收到
-    // `e.player` 不存在之类的脏数据。被过滤时告警（含载荷）供根因排查。根因定位后移除。
+    // ── TODO[ghost] 无效事件过滤（2026-08-14，见 changelog 标记）──
+    // PlayerDeath 幽灵触发根因已定位：平台分发把纯 EntityDeathEvent（怪物死亡）投递给
+    // PlayerDeathEvent 监听器 → eventData 强转失败被静默吞掉 → 残废载荷照常投递 JS。
+    // 修复：死亡事件合并监听器 + dispatch 类型守卫 + eventData 不再吞异常（见 subscribe/dispatch/eventData）。
+    // 本过滤保留为纵深防御：玩家事件必须有合法 player UUID、实体事件必须有合法 entity UUID，
+    // 载荷与事件类型不匹配即丢弃；被过滤时告警（含载荷）。
     private static final Set<String> PLAYER_EVENTS = Set.of(
         "playerJoin", "playerQuit", "playerChat", "playerMove", "playerInteract",
         "playerCommand", "playerDeath", "playerRespawn", "playerTeleport",
