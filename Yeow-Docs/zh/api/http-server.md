@@ -7,7 +7,13 @@ import { createServer } from 'yeow-utils';
 import type { Server, RouteRequest } from 'yeow-utils';
 ```
 
-> **权限**：HTTP 服务器属于 http 通道，默认拒绝——需在 `yeow.config.json` 的 `permissions` 中声明 `"http:*"`（或 `"http:listen"` 等节点），否则 `listen` 返回 `Permission denied`。
+> **权限**：http 通道**整个默认拒绝**——需在 `yeow.config.json` 的 `permissions` 中声明 `"http:*"`，或按节点声明：
+>
+> | 节点 | 用途 |
+> |------|------|
+> | `http:listen` | 启动 HTTP 服务器（创建监听端口） |
+> | `http:respond` | 响应请求（发送状态/响应体） |
+> | `http:close` | 关闭服务器 |
 
 创建 HTTP 服务器，支持路由和自动响应。
 
@@ -38,11 +44,11 @@ server.close()                  // 关闭服务器
 
 **返回值规范化**（中间件与路由一致）：
 
-| 返回 | 处理 |
-|------|------|
-| 字符串 | 文本响应（`{ body }`） |
-| `{ status, body, bodyBase64, headers }`（含任一字段） | 响应选项，原样使用 |
-| **其他普通对象**（如 `{ ok: true }`） | **自动 JSON 序列化**（`body` + `content-type: application/json`） |
+| 返回                                                  | 处理                                                              |
+| ----------------------------------------------------- | ----------------------------------------------------------------- |
+| 字符串                                                | 文本响应（`{ body }`）                                            |
+| `{ status, body, bodyBase64, headers }`（含任一字段） | 响应选项，原样使用                                                |
+| **其他普通对象**（如 `{ ok: true }`）                 | **自动 JSON 序列化**（`body` + `content-type: application/json`） |
 
 ### 中间件（洋葱模型）
 

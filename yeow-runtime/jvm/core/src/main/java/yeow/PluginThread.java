@@ -982,12 +982,19 @@ public class PluginThread implements Runnable, PluginEntity {
             var p = obj.has("p") ? obj.getAsJsonObject("p") : new JsonObject();
             int maxInput = core.config().utilMaxInputBytes();
             int maxOutput = core.config().utilMaxOutputBytes();
-            // 输入上限：先按 base64 长度粗筛（防解码分配炸弹），解码后按原始字节精确校验
+            // 输入上限：二进制操作（data 为 base64 承载）解码后按原始字节校验；
+            // encode.utf8 的 data 是**明文文本**（UTF-8 承载，非 base64）——按字节数校验，不得解码
             if (p.has("data")) {
-                var d = p.get("data").getAsString();
-                if (d.length() > (long) maxInput * 2) throw new IllegalArgumentException("util input exceeds " + maxInput + " bytes");
-                var raw = Base64.getDecoder().decode(d);
-                if (raw.length > maxInput) throw new IllegalArgumentException("util input exceeds " + maxInput + " bytes");
+                if ("encode.utf8".equals(t)) {
+                    var s = p.get("data").getAsString();
+                    if (s.getBytes(StandardCharsets.UTF_8).length > maxInput)
+                        throw new IllegalArgumentException("util input exceeds " + maxInput + " bytes");
+                } else {
+                    var d = p.get("data").getAsString();
+                    if (d.length() > (long) maxInput * 2) throw new IllegalArgumentException("util input exceeds " + maxInput + " bytes");
+                    var raw = Base64.getDecoder().decode(d);
+                    if (raw.length > maxInput) throw new IllegalArgumentException("util input exceeds " + maxInput + " bytes");
+                }
             }
             return switch (t) {
                 case "gzip.compress" -> {

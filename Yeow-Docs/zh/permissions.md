@@ -22,7 +22,7 @@ Yeow 对**敏感消息节点**实施声明式权限：插件在 `yeow.config.jso
 | 权限节点                     | 覆盖范围                                                                                             |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------- |
 | `fs:server.*` / `fs:outer.*` | fs 通道 `server` / `outer` 前缀节点（服务器根 / 任意路径）；`fs:plugin.*` 节点（插件数据目录）**免声明** |
-| `http:*`                     | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen` 等）                               |
+| `http:*`                     | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen`、`http:respond`、`http:close`） |
 | `service:registerNative`     | 注册原生服务（spawn 子进程）                                                                         |
 | `assets:extract` / `assets:extractDir` | 解压资源到磁盘（单文件 / 目录提取，**两个独立节点**）                                    |
 
@@ -40,6 +40,9 @@ Yeow 对**敏感消息节点**实施声明式权限：插件在 `yeow.config.jso
 
 > [!WARNING]
 > 全局 `fetch` 底层依赖 `http:requestAsync` —— 未声明 http 权限时 `fetch` 会返回 `Permission denied: http:requestAsync`。使用 `fetch` / `request` 前请确保声明了 `"http:*"` 或 `"http:requestAsync"`。
+
+> [!WARNING]
+> **HTTP 服务器需要 `http:listen` + `http:respond` 两个节点**——只声明 `http:listen` 而漏掉 `http:respond` 时，服务器能启动、请求能到达回调，但 `respond` 被拒绝 → 响应永不发送 → **客户端请求挂起超时**（curl 超时 / CLOSE_WAIT，服务端日志无异常）。声明 `"http:*"`，或同时声明 `"http:listen"` 与 `"http:respond"`。
 
 > 修改 `permissions` 后需重新构建并完整重载插件（`/yeow reload` 或重启服务器）；开发模式热重载只重载代码，不更新权限。
 

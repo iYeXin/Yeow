@@ -67,6 +67,8 @@
 - **Gzip 命名空间**（util.ts 重构）：`Gzip.compress/compressSync/decompress/decompressSync`（迁移原顶层方法）+ `Gzip.createCompressor()` / `Gzip.createDecompressor()`（**分块输入压缩/解压**，管道式 `write×n → finish`；非 syncFlush，拼接输出与一次性压缩字节级一致）；**旧顶层导出已移除**（破坏性变更：`gzipCompress` 等 → `Gzip.*`）
 - **流句柄生命周期**：per-plugin 注册表，卸载/热重载自动关闭（gzip 压缩/解压 + 文件读写）
 - **http server 回调丢失修复**：`getRequestBody().readAllBytes()` 对无 Content-Length 的 keep-alive 请求（如普通 GET）永久阻塞（未定义长度流等 EOF）→ 回调永不投递且 io 线程被占死；改为仅当 `Content-Length > 0` 或 chunked 时读 body，处理异常加日志
+- **util 通道输入校验修复**：`encode.utf8` 的 `data` 是明文文本（非 base64 承载）——输入上限校验曾对所有操作统一按 base64 解码，导致 `stringToBytes` 对含非 base64 字符的文本报错（`Illegal base64 character`）；改为文本按 UTF-8 字节数校验、二进制操作按 base64 解码校验
+- **HTTP 服务器权限文档**：`http:listen` / `http:respond` 均默认拒绝——漏声明 `http:respond` 时服务器可启动、回调可达但响应被拒 → 请求挂起超时（假阳性排查结论）；api/http-server.md 与 permissions.md 补充节点表与症状说明
 - 实现：core `yeow/util/{GzipCompressor,GzipDecompressor,FileStreams}.java`（可单测）+ `PluginThread` 流操作；`UtilCodecTest` 新增 4 用例（分块往返/单块与一次性一致/空输入/穿插空块）
 - 文档：api/util.md（重写）、api/fs.md（流式节）、specifications/message/{util,fs}.md、operations.md；站点侧边栏加入 Util 页
 
