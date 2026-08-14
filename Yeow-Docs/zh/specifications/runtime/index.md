@@ -431,7 +431,7 @@ string[]
   "memory": 17179869184,
   "arch": "windows-x64",
   "minecraftVersion": "1.21.4",
-  "yeow": { "platform": "paper", "version": "0.1.0" },
+  "yeow": { "platform": "paper", "version": "0.2.0" },
   "now": 1723100000000000
 }
 ```

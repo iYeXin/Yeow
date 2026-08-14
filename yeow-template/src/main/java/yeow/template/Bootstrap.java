@@ -1,7 +1,7 @@
 package yeow.template;
 
 import org.bukkit.plugin.java.JavaPlugin;
-import yeow.YeowRuntime;
+import yeow.paper.YeowRuntime;
 
 /**
  * Bootstrap for all Yeow plugins.

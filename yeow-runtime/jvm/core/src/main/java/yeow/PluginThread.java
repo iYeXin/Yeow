@@ -541,7 +541,7 @@ public class PluginThread implements Runnable, PluginEntity {
         var now = java.time.Instant.now();
         long nowUs = now.getEpochSecond() * 1_000_000L + now.getNano() / 1000L;
         String yeowVersion = core.host().runtimeVersion();
-        if (yeowVersion == null) yeowVersion = "0.1.0";
+        if (yeowVersion == null) yeowVersion = "0.2.0";
         return gson.toJson(Map.of(
             "cpus", Runtime.getRuntime().availableProcessors(),
             "memory", Runtime.getRuntime().totalMemory(),

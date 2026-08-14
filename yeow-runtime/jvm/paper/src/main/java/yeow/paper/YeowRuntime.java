@@ -60,6 +60,13 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
     // ── 任务类 / 事件桥访问入口 ─────────────────────────────────────
 
     public RuntimeCore core() { return core; }
+
+    /**
+     * 模板 Bootstrap 契约（拆分前即有的公开入口）：按包路径注册插件。
+     * 签名保持与拆分前一致（boolean registerPlugin(String)），旧模板 jar 亦兼容。
+     */
+    public boolean registerPlugin(String jarPath) { return core.registerPlugin(jarPath); }
+
     public PaperScheduler getScheduler() { return paperScheduler; }
     public yeow.YeowConfig getYeowConfig() { return core.config(); }
     public yeow.service.ServiceManager getServiceManager() { return core.serviceManager(); }

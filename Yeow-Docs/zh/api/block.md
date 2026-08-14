@@ -27,8 +27,8 @@ block.isAir()            // Promise<boolean> — 是否为空气
 block.isAirSync()        // boolean
 
 // 世界操作（需要 location，否则报错）：
-block.breakNaturally()       // Promise<boolean> — 自然破坏并掉落物品
-block.breakNaturallySync()   // boolean
+block.breakNaturally(itemStack)       // Promise<boolean> — 模拟使用工具自然破坏并掉落物品，不传参数仍产生掉落
+block.breakNaturallySync(itemStack)   // boolean
 ```
 
 状态对应 **Minecraft 原版的方块状态**（键值对枚举，值统一为字符串），如 `minecraft:water[level=8]` → `{ type: "minecraft:water", state: { level: "8" } }`。

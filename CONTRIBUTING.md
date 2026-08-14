@@ -81,10 +81,10 @@ cd yeow-runtime/jvm
 mvn clean install -DskipTests    # 一次构建 core + paper 并安装到本地 Maven 仓库
 ```
 
-构建产物 `paper/target/yeow-runtime-0.1.0.jar`（shaded，含 core + 引擎 + 配置解析）需要**复制到脚手架模板**，供 `create-yeow` 生成的插件项目使用：
+构建产物 `paper/target/yeow-runtime-0.2.0.jar`（shaded，含 core + 引擎 + 配置解析）需要**复制到脚手架模板**，供 `create-yeow` 生成的插件项目使用：
 
 ```bash
-cp paper/target/yeow-runtime-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
+cp paper/target/yeow-runtime-0.2.0.jar ../create-yeow/templates/default/.yeow/assets/
 ```
 
 ### 3. yeow-template

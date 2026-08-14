@@ -172,7 +172,7 @@ Folia 没有"主线程"可供自旋，Yeow 的同步桥（JS 同步调用要等�
 
 **与 Paper 完全一致**：
 
-1. 将 Folia 运行时 jar（`yeow-runtime-folia-0.1.0.jar`）放入服务器 `plugins/`
+1. 将 Folia 运行时 jar（`yeow-runtime-folia-0.2.0.jar`）放入服务器 `plugins/`
 2. 插件包（`.yeow.zip` 或模板 JAR）放入 `plugins/Yeow/`（自动扫描）或 `/yeow load <path>` 动态加载
 3. 插件数据、`/yeow` 管理命令、热重载等行为与 Paper 相同
 

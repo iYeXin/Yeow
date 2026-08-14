@@ -35,7 +35,7 @@ const HEADLESS = process.argv.includes('--eula') || process.argv.includes('--tim
   || process.argv.includes('--wait') || process.argv.includes('--outfile') || KEEP;
 
 const cfg = JSON.parse(readFileSync(resolve(ROOT, 'yeow.config.json'), 'utf-8'));
-const RUNTIME = resolve(ROOT, '.yeow', 'assets', 'yeow-runtime-0.1.0.jar');
+const RUNTIME = resolve(ROOT, '.yeow', 'assets', 'yeow-runtime-0.2.0.jar');
 
 // Dev server config (optional, from yeow.config.json)
 const devCfg = cfg.dev || {};

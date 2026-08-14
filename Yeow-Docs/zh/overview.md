@@ -6,7 +6,7 @@ Yeow 是一个面向 Minecraft 服务端的插件开发框架（**Paper 与 [Fol
 
 > Yeow 暂未正式发布。Yeow 在正式发布前不保证 API 的稳定性。
 
-> 如果 Modrinth 上的 Yeow 项目仍未结束 Under Review 状态，可以[点此下载](https://raw.githubusercontent.com/iYeXin/Yeow/main/create-yeow/templates/default/.yeow/assets/yeow-runtime-0.1.0.jar) Yeow 运行时插件。
+> 如果 Modrinth 上的 Yeow 项目仍未结束 Under Review 状态，可以[点此下载](https://raw.githubusercontent.com/iYeXin/Yeow/main/create-yeow/templates/default/.yeow/assets/yeow-runtime-0.2.0.jar) Yeow 运行时插件。
 
 文档内容较多，不确定从哪里开始？按你的角色找到入口：
 

@@ -5,7 +5,7 @@
 修改 `yeow-runtime/jvm/paper`（Java，Paper 平台实现）后，将编译产物复制到模板：
 
 ```
-create-yeow\templates\default\.yeow\assets\yeow-runtime-0.1.0.jar   ← yeow-runtime\jvm\paper\target\yeow-runtime-0.1.0.jar
+create-yeow\templates\default\.yeow\assets\yeow-runtime-0.2.0.jar   ← yeow-runtime\jvm\paper\target\yeow-runtime-0.2.0.jar
 ```
 
 若变更涉及 `yeow-api`（TypeScript），依次执行：
