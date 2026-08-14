@@ -37,6 +37,10 @@ public class PluginThread implements Runnable, PluginEntity {
     private ScheduledExecutorService timer;
     private ExecutorService ioExecutor;
     private final List<ScheduledFuture<?>> timerFutures = Collections.synchronizedList(new ArrayList<>());
+    /** cbId → 定时任务（clear 协议用：JS 侧 clearTimeout/clearInterval 经 timer 通道取消，防僵尸周期任务）。 */
+    private final ConcurrentHashMap<String, ScheduledFuture<?>> timerTasks = new ConcurrentHashMap<>();
+    /** 代际计数：每次 reload 自增——旧代 timer 任务投递前校验，杜绝热重载后消息串扰新生代。 */
+    private volatile long generation = 0;
     private volatile String devAssetsDir;
     private volatile boolean devMode;
     private final ConcurrentHashMap<String, com.sun.net.httpserver.HttpServer> httpServers = new ConcurrentHashMap<>();
@@ -145,6 +149,7 @@ public class PluginThread implements Runnable, PluginEntity {
         forceKilled = false;
         cleanupResources();
         if (killed) return false;
+        generation++; // 代际隔离：旧代 timer 任务投递前校验（见 sendTimerCb），不再进入新生代队列
         queue.clear();
         this.userCode = newCode;
         start();
@@ -194,6 +199,8 @@ public class PluginThread implements Runnable, PluginEntity {
             core.unloadPlugin(w.name());
         }
         workers.clear();
+        timerTasks.forEach((k, f) -> f.cancel(false));
+        timerTasks.clear();
         timerFutures.forEach(f -> f.cancel(false));
         timerFutures.clear();
         if (timer != null) timer.shutdownNow();
@@ -204,6 +211,12 @@ public class PluginThread implements Runnable, PluginEntity {
         httpPending.entrySet().removeIf(e -> { if (e.getValue().serverId().startsWith(dir)) { try { e.getValue().exchange().close(); } catch (Exception ignored) {} return true; } return false; });
         // 平台侧命令/事件/GUI/BossBar 清理（热重载、卸载、Worker 均经此路径）
         core.host().purgePlatformResources(name);
+    }
+
+    /** 定时器回调投递：代际校验——热重载后旧代 timer 消息不得进入新生代队列（防跨代 cbId 串扰）。 */
+    private void sendTimerCb(String cbId, long gen) {
+        if (gen != generation) return;
+        queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",true)));
     }
 
     @Override
@@ -291,13 +304,27 @@ public class PluginThread implements Runnable, PluginEntity {
                     // task 通道为共有接口（适配器同一入口：YeowRuntime.submitTask）
                     return rt != null ? rt.submitTask(PluginThread.this, pld) : gson.toJson(Map.of("err", "runtime unavailable"));
                 } else if ("timer".equals(channel)) {
-                    var obj = gson.fromJson(pld, JsonObject.class); var type = obj.get("type").getAsString(); var cbId = obj.get("cb").getAsString(); var delay = obj.get("delay").getAsLong();
+                    var obj = gson.fromJson(pld, JsonObject.class); var type = obj.get("type").getAsString();
+                    if ("clear".equals(type)) {
+                        // clear 协议：JS 侧 clearTimeout/clearInterval 取消 Java 定时任务
+                        // （此前只做本地注销——interval 的 scheduleAtFixedRate 会永久空转）
+                        var cbId = obj.get("cb").getAsString();
+                        var f = timerTasks.remove(cbId);
+                        if (f != null) f.cancel(false);
+                        return null;
+                    }
+                    var cbId = obj.get("cb").getAsString(); var delay = obj.get("delay").getAsLong();
+                    // 延迟下限（协议层防御）：timeout ≥0；interval ≥1（scheduleAtFixedRate period 必须 >0，
+                    // 否则抛 IAE 且 JS 侧回调已注册——静默失败 + 悬挂注册）
+                    final long gen = generation; // 代际捕获：热重载后旧任务投递前校验
                     if ("timeout".equals(type)) {
-                        var f = timer.schedule(() -> queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",true))), delay, TimeUnit.MILLISECONDS);
-                        timerFutures.add(f);
+                        var f = timer.schedule(() -> { timerTasks.remove(cbId); sendTimerCb(cbId, gen); },
+                            Math.max(0, delay), TimeUnit.MILLISECONDS);
+                        timerTasks.put(cbId, f);
                     } else if ("interval".equals(type)) {
-                        var f = timer.scheduleAtFixedRate(() -> queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",true))), delay, delay, TimeUnit.MILLISECONDS);
-                        timerFutures.add(f);
+                        var f = timer.scheduleAtFixedRate(() -> sendTimerCb(cbId, gen),
+                            Math.max(1, delay), Math.max(1, delay), TimeUnit.MILLISECONDS);
+                        timerTasks.put(cbId, f);
                     }
                     return null;
                 } else if ("fs".equals(channel)) {

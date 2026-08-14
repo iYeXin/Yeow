@@ -6,6 +6,13 @@
 
 ## 2026-08-13
 
+### Timer 通道修复（三项）
+
+- **clear 协议**：`clearTimeout`/`clearInterval` 现在经 timer 通道发送 `{type:'clear', cb}` 通知 Java **取消定时任务**（此前只做本地回调注销——`setInterval` 的 `scheduleAtFixedRate` 会永久空转，长生命周期插件反复 create/clear 定时器会累积僵尸周期任务；`timerFutures` 列表也随之无界增长）。一次性 timeout 触发后自动释放登记
+- **延迟下限**：Java 侧防御 `timeout ≥ 0`、`interval ≥ 1`（`scheduleAtFixedRate` 的 period 必须 >0——`setInterval(fn, 0)` 此前抛 `IllegalArgumentException` 被静默吞掉，JS 回调却已注册 → 悬挂）
+- **代际隔离**：reload 时递增 generation，timer 任务投递前校验代际——热重载窗口内在途的旧 timer 消息不再进入新生代队列（旧 cbId 与新上下文 `cb_N` 撞号时曾会幽灵调用新插件回调）
+- 规范同步：specifications/message/timer.md 补 `clear` 操作与延迟下限；runtime/index.md 定时器实现说明更新
+
 ### 事件回写字段扩展（常用稳定字段）+ Folia 对齐 Paper
 
 - **可回写字段扩充**（此前仅 `cancelled` / `deathMessage` / serverPing 四字段）：新增 `joinMessage`（加入消息）、`quitMessage`、`message` / `format`（聊天）、`message`（命令改写）、`to`（playerMove/playerTeleport 目标位置，`{x,y,z,yaw?,pitch?,world?}`）、`respawnLocation`、`newFoodLevel`、`damage`、`amount`（回血）、`target`（实体目标 UUID/null）、`clickedItem` / `cursorItem`（点击/光标物品 `{type, amount?}`）——偏门/无 setter 字段（from/cause/deathType/经验/等级/潜行/飞行等）保持只读

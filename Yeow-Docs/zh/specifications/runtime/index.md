@@ -276,9 +276,9 @@ clearInterval(id: string): void
 定时器函数，行为符合 Web 标准。
 
 - 返回唯一标识符（字符串），可用于 `clearTimeout`/`clearInterval`
-- `ms` 精度为毫秒，不支持小于 1ms 的延迟
-- **内部实现依赖：** `_registerCallback` + `$send('timer', {type:'timeout'|'interval', cb, delay})`
-- `setInterval` 的回调以 `persistent: true` 注册，`clearInterval` 通过 `_unregisterCallback` + 停止定时器来实现
+- `ms` 精度为毫秒，不支持小于 1ms 的延迟（`setInterval(fn, 0)` 按 1ms 处理）
+- **内部实现依赖：** `_registerCallback` + `$send('timer', {type:'timeout'|'interval'|'clear', cb, delay})`
+- `setInterval` 的回调以 `persistent: true` 注册；`clearTimeout`/`clearInterval` 通过 `_unregisterCallback` + `$send('timer', {type:'clear', cb})` **取消 Java 侧定时任务**（仅本地注销会导致 interval 周期任务永久空转）
 - 定时器回调投递格式：`{ "t": "cb", "p": "<id>", "r": null }`（空结果）
 
 ### `console`

@@ -44,6 +44,10 @@ public class WorkerThread implements PluginEntity, Runnable {
     private ScheduledExecutorService timer;
     private ExecutorService ioExecutor;
     private final List<ScheduledFuture<?>> timerFutures = Collections.synchronizedList(new ArrayList<>());
+    /** cbId → 定时任务（clear 协议用：JS 侧 clearTimeout/clearInterval 经 timer 通道取消，防僵尸周期任务）。 */
+    private final ConcurrentHashMap<String, ScheduledFuture<?>> timerTasks = new ConcurrentHashMap<>();
+    /** 代际计数：每次 reload 自增——旧代 timer 任务投递前校验，杜绝热重载后消息串扰新生代。 */
+    private volatile long generation = 0;
     private volatile CompletableFuture<Long> pendingPing;
     private volatile long pendingPingSentAt;
     /** 主插件 → worker 消息回调 id（worker-inject 注册）。 */
@@ -128,6 +132,7 @@ public class WorkerThread implements PluginEntity, Runnable {
         forceKilled = false;
         cleanupResources();
         if (killed) return false;
+        generation++; // 代际隔离：旧代 timer 任务投递前校验（见 sendTimerCb），不再进入新生代队列
         queue.clear();
         this.userCode = newCode;
         start();
@@ -168,6 +173,8 @@ public class WorkerThread implements PluginEntity, Runnable {
     }
 
     private void cleanupResources() {
+        timerTasks.forEach((k, f) -> f.cancel(false));
+        timerTasks.clear();
         timerFutures.forEach(f -> f.cancel(false));
         timerFutures.clear();
         if (timer != null) timer.shutdownNow();
@@ -175,6 +182,12 @@ public class WorkerThread implements PluginEntity, Runnable {
         scheduler.purgePluginTasks(entityName);
         // 命令注销/事件退订/服务清理/指标注销由 RuntimeCore.unloadPlugin 统一完成
         // http 监听经主插件注册（委托处理），随主插件生命周期清理
+    }
+
+    /** 定时器回调投递：代际校验——热重载后旧代 timer 消息不得进入新生代队列（防跨代 cbId 串扰）。 */
+    private void sendTimerCb(String cbId, long gen) {
+        if (gen != generation) return;
+        queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",true)));
     }
 
     @Override
@@ -256,13 +269,25 @@ public class WorkerThread implements PluginEntity, Runnable {
                     return rt != null ? rt.submitTask(WorkerThread.this, pld) : gson.toJson(Map.of("err", "runtime unavailable"));
                 }
                 if ("timer".equals(channel)) {
-                    var obj = gson.fromJson(pld, JsonObject.class); var type = obj.get("type").getAsString(); var cbId = obj.get("cb").getAsString(); var delay = obj.get("delay").getAsLong();
+                    var obj = gson.fromJson(pld, JsonObject.class); var type = obj.get("type").getAsString();
+                    if ("clear".equals(type)) {
+                        // clear 协议：JS 侧 clearTimeout/clearInterval 取消 Java 定时任务
+                        var cbId = obj.get("cb").getAsString();
+                        var f = timerTasks.remove(cbId);
+                        if (f != null) f.cancel(false);
+                        return null;
+                    }
+                    var cbId = obj.get("cb").getAsString(); var delay = obj.get("delay").getAsLong();
+                    // 延迟下限（协议层防御）：timeout ≥0；interval ≥1（scheduleAtFixedRate period 必须 >0）
+                    final long gen = generation; // 代际捕获：热重载后旧任务投递前校验
                     if ("timeout".equals(type)) {
-                        var f = timer.schedule(() -> queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",true))), delay, TimeUnit.MILLISECONDS);
-                        timerFutures.add(f);
+                        var f = timer.schedule(() -> { timerTasks.remove(cbId); sendTimerCb(cbId, gen); },
+                            Math.max(0, delay), TimeUnit.MILLISECONDS);
+                        timerTasks.put(cbId, f);
                     } else if ("interval".equals(type)) {
-                        var f = timer.scheduleAtFixedRate(() -> queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",true))), delay, delay, TimeUnit.MILLISECONDS);
-                        timerFutures.add(f);
+                        var f = timer.scheduleAtFixedRate(() -> sendTimerCb(cbId, gen),
+                            Math.max(1, delay), Math.max(1, delay), TimeUnit.MILLISECONDS);
+                        timerTasks.put(cbId, f);
                     }
                     return null;
                 }

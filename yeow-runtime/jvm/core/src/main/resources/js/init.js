@@ -132,7 +132,7 @@ globalThis.setTimeout = (fn, ms) => {
     const id = 't' + (_tSeq++); const cb = _registerCallback(() => { delete _timers[id]; return fn(); }); _timers[id] = cb;
     $_send('timer', JSON.stringify({ type: 'timeout', cb, delay: ms || 0 })); return id;
 };
-globalThis.clearTimeout = (id) => { const c = _timers[id]; if (c) _unregisterCallback(c); delete _timers[id]; };
+globalThis.clearTimeout = (id) => { const c = _timers[id]; if (c) { _unregisterCallback(c); try { $_send('timer', JSON.stringify({ type: 'clear', cb: c })); } catch (ex) { /* ignore */ } } delete _timers[id]; };
 globalThis.setInterval = (fn, ms) => {
     const id = 'i' + (_tSeq++); const cb = _registerCallback(fn, { persistent: true }); _timers[id] = cb;
     $_send('timer', JSON.stringify({ type: 'interval', cb, delay: ms || 0 })); return id;
