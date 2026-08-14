@@ -60,12 +60,11 @@
 - 实现：`WindowMetrics` 新增 `virtualPlugins` 集合（WindowCollector 在记录 ping 时按 `PluginEntity.isVirtual()` 标记）；`HeartbeatTimeoutDetector` 跳过；`DetectorTest` 增补用例（虚拟插件无 pong/慢响应均不告警，真实插件仍告警）
 - 文档：runtime-warning.md heartbeat.timeout 节补充说明
 
-### Debug 通道新增 `command` 节点（运行时内部测试，仅开发模式）
+### 版本升级（0.3.5 / 0.1.25）
 
-- debug 通道新增 `command` 节点：JS 侧可提交 `{t:'command', p:{cmd:...}}` 触发运行时内部测试逻辑（如性能基准）；**生产环境不开放**——仅 `-Dyeow.dev=true`（dev-server 默认启用）时可用，否则返回 `{err: "debug command disabled (dev-only)"}`
-- 实现：core `PluginThread` 解析节点（devMode 门禁）→ 委托 `PlatformHost.debugCommand`（**默认不实现**，返回 not implemented，平台按需覆写）；Paper 侧实现 `fill`——Java 侧循环指定区域对每个方块 `setType`（参数 world/坐标范围/type，上限 100 万方块，返回 count/elapsedMs/blocksPerSec），用于性能基准测试
-- **具体指令不入文档**（运行时内部实现）；debug.md 仅记录节点契约
-- **修正（执行线程）**：`command` 节点在插件 JS 线程处理——core **只转发结果**，不关心具体逻辑（指令解析/执行线程由平台实现负责）；Paper 侧 `debugCommand` 内部切主线程执行（`Bukkit.getScheduler().runTask` + future 同步等待，10 分钟超时）——fill 的 setType 不再被 Paper 主线程检查拒绝（AsyncCatcher: Asynchronous block remove!）；Folia 不实现（default 返回 not implemented）
+- **yeow-api 0.3.4 → 0.3.5** / **create-yeow 0.3.4 → 0.3.5** / **yeow-utils 0.1.24 → 0.1.25**
+- 运行时内容更新：模板内置 `yeow-runtime-0.2.0.jar`（含 util 通道、调度器/事件桥/Profile 修复）
+- 模板依赖范围 `^0.3.0` / `^0.1.21` caret 自动覆盖，无需改动
 
 ---
 
