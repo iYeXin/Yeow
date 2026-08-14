@@ -222,6 +222,12 @@ public class EventBridge implements Listener {
         }
         if (active.isEmpty()) return;
         var data = eventData(ev, et); if (data == null) return;
+        // TODO[ghost] 权宜之计：载荷与事件类型不匹配视为无效事件，Java 侧丢弃（见 validEventData）。
+        // 被过滤即告警（含载荷）——幽灵事件的现场记录，供后续根因排查。
+        if (!validEventData(et, data)) {
+            LOG.warning("[EventValidity] Dropped invalid " + et + " dispatch: " + gson.toJson(data));
+            return;
+        }
 
         if (runtime.getYeowConfig().concurrentEvents())
             dispatchConcurrent(ev, et, active, data);
@@ -630,6 +636,35 @@ public class EventBridge implements Listener {
 
     private void putP(Map<String,Object> m, org.bukkit.entity.Player p) {
         m.put("player", p != null ? p.getUniqueId().toString() : null);
+    }
+
+    // ── TODO[ghost] 权宜之计：无效事件过滤（2026-08-14，见 changelog 标记）──
+    // PlayerDeath 幽灵触发在 cbId 随机化后仍复现且仅 PlayerDeath 受影响；Paper 分发链路
+    // 静态分析未见异常路径，根因未定位。本过滤兜底：玩家事件必须有合法 player UUID、
+    // 实体事件必须有合法 entity UUID，载荷与事件类型不匹配即丢弃——防止 handler 收到
+    // `e.player` 不存在之类的脏数据。被过滤时告警（含载荷）供根因排查。根因定位后移除。
+    private static final Set<String> PLAYER_EVENTS = Set.of(
+        "playerJoin", "playerQuit", "playerChat", "playerMove", "playerInteract",
+        "playerCommand", "playerDeath", "playerRespawn", "playerTeleport",
+        "playerItemConsume", "playerDropItem", "playerPickupItem", "playerBucketFill",
+        "playerBucketEmpty", "playerExpChange", "playerLevelChange",
+        "playerGameModeChange", "foodLevelChange", "blockBreak", "blockPlace",
+        "inventoryOpen", "inventoryClose", "playerAdvancementDone",
+        "playerToggleSneak", "playerToggleFlight", "inventoryClick",
+        "playerResourcePackStatus"
+    );
+    private static final Set<String> ENTITY_EVENTS = Set.of(
+        "entityDeath", "entityDamage", "entitySpawn", "entityExplode",
+        "entityRegainHealth", "entityTarget", "projectileLaunch", "projectileHit"
+    );
+    private static boolean validEventData(String et, Map<String, Object> data) {
+        if (PLAYER_EVENTS.contains(et)) return validUuid(data.get("player"));
+        if (ENTITY_EVENTS.contains(et)) return validUuid(data.get("entity"));
+        return true;
+    }
+    private static boolean validUuid(Object v) {
+        if (!(v instanceof String s) || s.isEmpty()) return false;
+        try { UUID.fromString(s); return true; } catch (IllegalArgumentException e) { return false; }
     }
     private Map<String,Object> pos(org.bukkit.Location l) {
         if(l==null) return null;

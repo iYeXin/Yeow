@@ -13,6 +13,13 @@
 - **日志前缀对齐拆分前**：console.log / JS 警告经 `host.logger()` 输出——拆分后该 logger 为插件 logger，多出 `[Yeow]` 前缀。改回根 logger（`Bukkit.getLogger()`，paper + folia 一致）：输出恢复 `[12:42:00 INFO]: [yeow-tools] xxx`
 - 产物：模板内置 `yeow-runtime-0.2.0.jar` 更新；**yeow-api 0.3.2 → 0.3.3** / **create-yeow 0.3.2 → 0.3.3**（模板依赖 `^0.3.0` caret 自动覆盖）
 
+### PlayerDeath 幽灵触发：标记 + Java 侧无效事件过滤（权宜之计）
+
+> **标记（TODO[ghost]）**：PlayerDeath 幽灵触发在 cbId 随机化（跨代串扰根因修复）后**仍可复现**，且仅 PlayerDeath 受影响——排除"回调跨代串扰"为该问题根因。Paper 分发链路静态分析未见异常路径，**根因未定位**，待深查。
+
+- **权宜之计**：事件分发前做载荷有效性校验（Paper + Folia 两侧）——玩家事件必须有合法 `player` UUID、实体事件必须有合法 `entity` UUID，载荷与事件类型不匹配即**丢弃不投递**（防止 handler 收到 `e.player` 不存在之类的脏数据）；被过滤时告警并打印载荷（作为幽灵事件的现场记录，供根因排查）
+- **顺带修复（Folia）**：`playerDeath`/`entityDeath` 合并监听器只按事件类型字符串去重——插件同时订阅两个事件时会把同一 `EntityDeathEvent` 监听器**注册两次** → 同一死亡事件被投递两遍（已修复：合并监听器一次注册后把两个 et 都记入 reg）
+
 ---
 
 ## 2026-08-13

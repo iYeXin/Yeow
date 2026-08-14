@@ -210,10 +210,15 @@ public class FoliaEventBridge implements Listener {
             // PlayerDeathEvent 继承 EntityDeathEvent——此 Folia build 的事件分发会向父类型注册的
             // 监听器串扰（注册 PlayerDeathEvent 监听器会收到纯 EntityDeathEvent），故合并为一个
             // 监听器，按 instanceof 分流：玩家死亡 → playerDeath；其他实体 → entityDeath
-            case "playerDeath", "entityDeath" -> pm.registerEvent(EntityDeathEvent.class, inst, EventPriority.NORMAL, (l, e) -> {
-                if (e instanceof PlayerDeathEvent pe) dispatch("playerDeath", pe);
-                else dispatch("entityDeath", (EntityDeathEvent) e);
-            }, runtime);
+            // 注意：合并监听器一次注册后必须把两个 et 都记入 reg——否则第二个 et 首次订阅会
+            // 再注册一个同 class 监听器 → 同一死亡事件被投递两次（PlayerDeath 幽灵触发的疑似来源）
+            case "playerDeath", "entityDeath" -> {
+                reg.put("entityDeath", true);
+                pm.registerEvent(EntityDeathEvent.class, inst, EventPriority.NORMAL, (l, e) -> {
+                    if (e instanceof PlayerDeathEvent pe) dispatch("playerDeath", pe);
+                    else dispatch("entityDeath", (EntityDeathEvent) e);
+                }, runtime);
+            }
             case "playerInteract" -> pm.registerEvent(PlayerInteractEvent.class, inst, EventPriority.NORMAL, (l, e) -> dispatch("playerInteract", (Event) e), runtime);
             case "playerTeleport" -> pm.registerEvent(PlayerTeleportEvent.class, inst, EventPriority.NORMAL, (l, e) -> dispatch("playerTeleport", (Event) e), runtime);
             case "playerRespawn" -> pm.registerEvent(PlayerRespawnEvent.class, inst, EventPriority.NORMAL, (l, e) -> dispatch("playerRespawn", (Event) e), runtime);
@@ -324,6 +329,12 @@ public class FoliaEventBridge implements Listener {
         if (target == null && !"serverPing".equals(et) && !"serverCommand".equals(et)) return;
 
         var data = eventData(et, ev);
+        // TODO[ghost] 权宜之计：载荷与事件类型不匹配视为无效事件，Java 侧丢弃（见 validEventData）。
+        // 被过滤即告警（含载荷）——幽灵事件的现场记录，供后续根因排查。
+        if (!validEventData(et, data)) {
+            LOG.warning("[EventValidity] Dropped invalid " + et + " dispatch: " + gson.toJson(data));
+            return;
+        }
         // 派发单元 = （插件, 回调）逐个生成独立 eventId——同一插件多 handler 时
         // 不再共用一个 eventId（旧实现 eventIds 按插件生成、按 cb 消费，会越界且 latch 错位）
         var dispatches = new ArrayList<Dispatch>();
@@ -692,6 +703,35 @@ public class FoliaEventBridge implements Listener {
     }
 
     // ── 辅助 ─────────────────────────────────────────────────────────
+
+    // ── TODO[ghost] 权宜之计：无效事件过滤（2026-08-14，见 changelog 标记）──
+    // PlayerDeath 幽灵触发在 cbId 随机化后仍复现且仅 PlayerDeath 受影响；根因未定位。
+    // 本过滤兜底：玩家事件必须有合法 player UUID、实体事件必须有合法 entity UUID，
+    // 载荷与事件类型不匹配即丢弃——防止 handler 收到 `e.player` 不存在之类的脏数据。
+    // 被过滤时告警（含载荷）供根因排查。根因定位后移除。
+    private static final Set<String> PLAYER_EVENTS = Set.of(
+        "playerJoin", "playerQuit", "playerChat", "playerMove", "playerInteract",
+        "playerCommand", "playerDeath", "playerRespawn", "playerTeleport",
+        "playerItemConsume", "playerDropItem", "playerPickupItem", "playerBucketFill",
+        "playerBucketEmpty", "playerExpChange", "playerLevelChange",
+        "playerGameModeChange", "foodLevelChange", "blockBreak", "blockPlace",
+        "inventoryOpen", "inventoryClose", "playerAdvancementDone",
+        "playerToggleSneak", "playerToggleFlight", "inventoryClick",
+        "playerResourcePackStatus"
+    );
+    private static final Set<String> ENTITY_EVENTS = Set.of(
+        "entityDeath", "entityDamage", "entitySpawn", "entityExplode",
+        "entityRegainHealth", "entityTarget", "projectileLaunch", "projectileHit"
+    );
+    private static boolean validEventData(String et, Map<String, Object> data) {
+        if (PLAYER_EVENTS.contains(et)) return validUuid(data.get("player"));
+        if (ENTITY_EVENTS.contains(et)) return validUuid(data.get("entity"));
+        return true;
+    }
+    private static boolean validUuid(Object v) {
+        if (!(v instanceof String s) || s.isEmpty()) return false;
+        try { UUID.fromString(s); return true; } catch (IllegalArgumentException e) { return false; }
+    }
 
     /** 世界目标 key（带世界坐标，event.complete 精确路由到目标区块）。 */
     private static String worldTarget(org.bukkit.Location l) {
