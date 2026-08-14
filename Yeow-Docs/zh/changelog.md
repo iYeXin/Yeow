@@ -6,6 +6,12 @@
 
 ## 2026-08-13
 
+### 版本升级（0.3.2 / 0.1.23）
+
+- **yeow-api 0.3.1 → 0.3.2** / **yeow-utils 0.1.22 → 0.1.23** / **create-yeow 0.3.1 → 0.3.2**
+- create-yeow 内容变更：模板内置 `yeow-runtime-0.2.0.jar` 更新（含 timer 通道三项修复）；yeow-api/yeow-utils 为发布节奏一致升版（源码无变更）
+- 模板依赖范围 `^0.3.0` / `^0.1.21` caret 自动覆盖，无需改动
+
 ### Timer 通道修复（三项）
 
 - **clear 协议**：`clearTimeout`/`clearInterval` 现在经 timer 通道发送 `{type:'clear', cb}` 通知 Java **取消定时任务**（此前只做本地回调注销——`setInterval` 的 `scheduleAtFixedRate` 会永久空转，长生命周期插件反复 create/clear 定时器会累积僵尸周期任务；`timerFutures` 列表也随之无界增长）。一次性 timeout 触发后自动释放登记
