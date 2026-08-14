@@ -6,6 +6,12 @@
 
 ## 2026-08-13
 
+### 版本升级（0.3.0 发布）
+
+- **yeow-api 0.2.117 → 0.3.0** / **create-yeow 0.2.127 → 0.3.0** / **yeow-utils 0.1.20 → 0.1.21**（peer 依赖同步 `^0.3.0`）
+- 破坏性变更：GUI 术语整体弃用并入 Inventory（`GUI.create` → `Inventory.create`、`guiId` → `inventoryId`）；PDC 裸 key 默认命名空间由 `yeow` 改为**插件名**（历史数据需 `yeow:key` 显式迁移）
+- 模板依赖范围同步：`yeow-api ^0.3.0`、`yeow-utils ^0.1.21`
+
 ### API 覆盖扩充（Entity / WorldBorder / Tab / 批量任务 / Inventory 内容物）
 
 - **Entity 基础补齐**：`getVelocity`/`setVelocity`（速度向量）、`getFireTicks`/`setFireTicks`（着火）、`getTicksLived`/`setTicksLived`、`isOnGround`、`damage(amount, damager?)`；yeow-api 的 `Entity`/`LivingEntity` 类补齐对应属性与方法

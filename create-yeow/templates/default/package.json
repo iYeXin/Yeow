@@ -8,8 +8,8 @@
         "permissions": "node .yeow/permissions.js"
     },
     "dependencies": {
-        "yeow-api": "^0.2.117",
-        "yeow-utils": "^0.1.20"
+        "yeow-api": "^0.3.0",
+        "yeow-utils": "^0.1.21"
     },
     "devDependencies": {
         "esbuild": "^0.25.0",
