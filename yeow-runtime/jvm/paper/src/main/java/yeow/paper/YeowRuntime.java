@@ -390,7 +390,8 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
         for (int x = x1; x <= x2; x++)
             for (int y = y1; y <= y2; y++)
                 for (int z = z1; z <= z2; z++) {
-                    world.getBlockAt(x, y, z).setType(mat, false); // 不触发物理更新，基准数字更干净
+                    // 与 world.setBlock 任务行为一致：默认 setType（触发物理更新）
+                    world.getBlockAt(x, y, z).setType(mat);
                     done++;
                 }
         long elapsedNs = System.nanoTime() - start;
