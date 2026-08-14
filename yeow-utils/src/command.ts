@@ -186,6 +186,10 @@ function buildHandlers(nodes: SchemaNode[], options?: CompleterOptions) {
         const available = args.length - argPos;
         if (node.required && available <= 0) return -1;
         if (available < node.count) break;
+        // enum 值校验：token 与声明值不匹配 → 本重载不匹配。
+        // 否则并列重载只看 token 数、先注册者胜——`paste <name>` 会吃掉 `info <name>` 等
+        // （action 为 enum 的 2-token 重载）。
+        if (node.type === 'enum' && node.values && !node.values.includes(args[argPos])) return -1;
         argPos += node.count;
       }
       return argPos;

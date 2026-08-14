@@ -3,15 +3,20 @@ export function join(...segments: (string | null | undefined)[]): string {
 }
 
 export function basename(p: string): string {
-    const s = p.replace(/\/+$/, '');
-    const i = s.lastIndexOf('/');
+    // 双分隔符：兼容 Windows 反斜杠路径（fs 通道在 Windows 上返回 `\` 路径）
+    const s = p.replace(/[\\/]+$/, '');
+    const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
     return i === -1 ? s : s.substring(i + 1);
 }
 
 export function dirname(p: string): string {
-    const s = p.replace(/\/+$/, '');
-    const i = s.lastIndexOf('/');
-    return i === -1 ? '.' : s.substring(0, i) || '/';
+    const s = p.replace(/[\\/]+$/, '');
+    const i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
+    if (i === -1) return '.';
+    const d = s.substring(0, i);
+    // 根：POSIX `/`；Windows 盘符根（`C:\` → `C:\`，`C:\a` → `C:` 兼容）
+    if (d === '') return s.length >= 3 && s[1] === ':' ? s.substring(0, 3) : '/';
+    return d;
 }
 
 export function extname(p: string): string {

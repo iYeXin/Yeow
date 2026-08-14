@@ -60,6 +60,16 @@
 - 实现：`WindowMetrics` 新增 `virtualPlugins` 集合（WindowCollector 在记录 ping 时按 `PluginEntity.isVirtual()` 标记）；`HeartbeatTimeoutDetector` 跳过；`DetectorTest` 增补用例（虚拟插件无 pong/慢响应均不告警，真实插件仍告警）
 - 文档：runtime-warning.md heartbeat.timeout 节补充说明
 
+### CommandBuilder 重载匹配校验 enum 值（yeow-utils 0.1.25）
+
+- `match` 此前只数 token 数、不校验 enum 值——`action+name`（2 token）重载并列时先注册者胜：`/proj info test` 会被先注册的 `paste <name>` 吃掉
+- 修复：enum 节点校验 token 是否在声明值内，不匹配即该重载不匹配（补全过滤同样受益）
+
+### path 模块兼容 Windows 反斜杠路径（yeow-api 0.3.5）
+
+- `basename`/`dirname` 原为 POSIX 实现（仅 `/`）——Windows 上 fs 通道返回 `\` 路径时 `basename` 返回整串（如 `proj list` 显示完整路径）
+- 修复：按 `/` 与 `\` 双分隔符切分（`extname` 基于 basename 自动受益）；`join` 保持 `/` 连接（Windows API 同样接受正斜杠）
+
 ### 版本升级（0.3.5 / 0.1.25）
 
 - **yeow-api 0.3.4 → 0.3.5** / **create-yeow 0.3.4 → 0.3.5** / **yeow-utils 0.1.24 → 0.1.25**
