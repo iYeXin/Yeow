@@ -24,8 +24,6 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 | --------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
 | [`yeow-runtime`](yeow-runtime/)         | Java 21    | **核心运行时**（Paper 系插件）：QuickJS 上下文管理、三级优先级调度器、事件/命令桥、Service、Profile 预警与全量分析 |
 | [`yeow-api`](yeow-api/)                 | TypeScript | 插件开发期 npm 依赖：OOP 封装全部底层协议（Player/World/Event/Command/Service…），构建时随插件 bundle             |
-| [`packages/yeow-command`](packages/yeow-command/) | TypeScript | 重载式命令构建器（类型化 schema、补全、权限），独立 npm 包（`yeow-command`），随插件 bundle                       |
-| [`packages/yeow-server`](packages/yeow-server/)   | TypeScript | HTTP 服务器高层封装（路由、洋葱中间件、静态挂载），独立 npm 包（`yeow-server`），随插件 bundle                     |
 | [`create-yeow`](create-yeow/)           | Node.js    | `npm create yeow` 脚手架：交互式项目模板、dev-server（Paper + 热重载 + source-map 错误定位）、构建脚本            |
 | [`yeow-template`](yeow-template/)       | Java 21    | 空 JAR 骨架（`Bootstrap` 类），构建时注入 JS 代码生成标准 Paper 插件 JAR                                          |
 | [`quickjs-wrapper`](quickjs-wrapper/) | Java + C++ | QuickJS 2026-06-04 的 JVM 封装（fork），含四平台预编译原生库。**本仓库中的副本仅为镜像**——主维护仓库：[github.com/iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper)（版本标签、多平台 CI 构建、Release 发布均在那里进行）。`native/quickjs`（QuickJS 本体 C 源码）为 **git submodule**（[iyexin/quickjs](https://github.com/iyexin/quickjs)，上游 bellard/quickjs 的 fork，锁定 2026-06-04 快照） |
@@ -40,7 +38,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 插件 JAR/.yeow.zip ──► yeow-template(Bootstrap) ──► yeow-runtime ──► Paper
                               ▲                        │
         create-yeow 构建 ──────┘      quickjs-wrapper(QuickJS 引擎)
-        yeow-api / yeow-command / yeow-server（打包进插件）
+        yeow-api（打包进插件）
 ```
 
 ---
@@ -88,4 +86,4 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 ## 许可证
 
-各组件独立：`yeow-runtime` / `yeow-api` / `packages/yeow-command` / `packages/yeow-server` / `create-yeow` / `yeow-template` / `yeow-dev` / `yeow-tools` 为 MIT；`quickjs-wrapper` 为 Apache-2.0（QuickJS 引擎 MIT）；`Yeow-Docs` 与文档站点为 MIT。
+各组件独立：`yeow-runtime` / `yeow-api` / `create-yeow` / `yeow-template` / `yeow-dev` / `yeow-tools` 为 MIT；`quickjs-wrapper` 为 Apache-2.0（QuickJS 引擎 MIT）；`Yeow-Docs` 与文档站点为 MIT。

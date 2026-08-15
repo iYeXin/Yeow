@@ -21,19 +21,20 @@
 - 实现：core `yeow/util/{GzipCompressor,GzipDecompressor,FileStreams}.java`（可单测）+ `PluginThread` 流操作；`UtilCodecTest` 新增 4 用例（分块往返/单块与一次性一致/空输入/穿插空块）
 - 文档：api/util.md（重写）、api/fs.md（流式节）、specifications/message/{util,fs}.md、operations.md；站点侧边栏加入 Util 页
 
-### yeow-utils 拆分为 yeow-command + yeow-server（独立包）
+### yeow-utils 拆分为 yeow-command + yeow-server（独立 npm 包）
 
 - **`yeow-utils` 拆分并迁移至 `packages/`**：`yeow-command`（重载式命令构建器：Command/CommandSchema/Completer）与 `yeow-server`（HTTP 服务器：createServer/中间件/静态挂载）——各自独立 package.json / tsconfig / README.md，**从本仓库 Git 追踪移除**（`/packages/` 已入 .gitignore，与 `yeow-fflate` 同处）
+- **主仓库策略**：`packages/` 下为**独立 npm 包**（yeow-fflate / yeow-command / yeow-server），各自独立仓库管理，**不并入本仓库**——本仓库只追踪运行时 / yeow-api / create-yeow / 文档等核心组件；组件清单（README/CONTRIBUTING/LICENSE）不再列举这些独立包
+- **模板不预装**：模板项目仅依赖 `yeow-api`——需要命令构建器 / HTTP 服务器时自行 `npm install yeow-command` / `yeow-server`（构建脚本的依赖统一解析已支持这两个包）
 - **导入变更（破坏性）**：`import { Command, CommandSchema } from 'yeow-command'`、`import { createServer } from 'yeow-server'`——`yeow-utils` 不再发布
-- 模板依赖更新：`yeow-utils ^0.1.21` → `yeow-command ^0.1.0` + `yeow-server ^0.1.0`；AGENTS.md / sitemap.md / 各文档示例导入同步
-- 文档：api/http-server.md 与 api/command.md 顶部引用 [yeow-server](https://www.npmjs.com/package/yeow-server) / [yeow-command](https://www.npmjs.com/package/yeow-command) npm 链接；README/CONTRIBUTING/LICENSE 组件清单更新
+- 文档：api/http-server.md 与 api/command.md 顶部引用 [yeow-server](https://www.npmjs.com/package/yeow-server) / [yeow-command](https://www.npmjs.com/package/yeow-command) npm 链接；示例导入同步
 
 ### 版本升级（0.3.10 / 0.1.30）
 
 - **yeow-api 0.3.9 → 0.3.10** / **create-yeow 0.3.9 → 0.3.10** / **yeow-command 0.1.0** / **yeow-server 0.1.0**（原 `yeow-utils` 0.1.30 由拆分替代，不再发布）
 - 内容：流式文件读写（start/end 偏移、flags、fs.stat）+ 分块 gzip（Gzip 命名空间 + **raw 原始 deflate 选项**）、util 上限配置化、http 回调修复、`encode.utf8` 输入校验修复、http 权限文档（listen/respond）、旧 gzip 导出移除（破坏性：用 `Gzip.*`）
 - 运行时内容更新：模板内置 `yeow-runtime-0.2.0.jar`（含 util 通道、调度器/事件桥/Profile 修复、流句柄、util 校验修复、fs.stat、raw deflate）
-- 模板依赖范围 `^0.3.0` / `^0.1.0` caret 自动覆盖，无需改动
+- 模板依赖：仅 `yeow-api ^0.3.0`（caret 自动覆盖；`yeow-command`/`yeow-server` 为独立 npm 包，按需自行安装）
 
 ---
 

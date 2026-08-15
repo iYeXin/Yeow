@@ -15,7 +15,7 @@
 - **语言**：TypeScript / JavaScript（Node.js 18+，开发）
 - **构建**：esbuild（bundle → IIFE，`target: esnext`），脚本在 `.yeow/build.js`
 - **开发服务器**：`.yeow/dev-server.js`（下载并启动 Paper、WebSocket 热重载、source-map 错误定位）
-- **API**：`yeow-api`（运行时 API：Player/World/Event/Command/Worker/fs/http…）、`yeow-command`（重载式命令构建器）、`yeow-server`（HTTP 服务器）——均打包进产物
+- **API**：`yeow-api`（运行时 API：Player/World/Event/Command/Worker/fs/http…）——打包进产物
 - **运行时**：`yeow-runtime`（Java 21，Paper 插件）——仓库 `yeow-runtime/`；本模板 `.yeow/assets/` 内置其 jar
 - **Worker（虚拟插件）**：`createWorker` 提供独立线程；配置见 `yeow.config.json` 的 `dev.worker`
 

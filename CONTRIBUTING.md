@@ -8,7 +8,7 @@
 
 | 工具 | 版本 | 用途 |
 |------|------|------|
-| Node.js | 18+ | `yeow-api` / `packages/yeow-command` / `packages/yeow-server` / `create-yeow` / 文档站点 |
+| Node.js | 18+ | `yeow-api` / `create-yeow` / 文档站点 |
 | JDK | 21+ | `yeow-runtime/jvm` / `yeow-template` / `yeow-tools` / `quickjs-wrapper` |
 | Maven | 3.9+ | 运行时与模板构建 |
 | Gradle | 8.x（仓库自带 wrapper） | quickjs-wrapper 构建 |
@@ -32,7 +32,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 | `yeow-runtime/jvm/core` | 平台无关引擎（artifact `yeow-runtime-core`，零 Bukkit 依赖） | 随父工程构建；单独构建 `mvn -pl core install` |
 | `yeow-runtime/jvm/paper` | Paper/Bukkit 平台实现（artifact `yeow-runtime`，产出运行 jar） | 随父工程构建；单独构建 `mvn -pl paper install`（需先装 core） |
 | `yeow-template` | 空 JAR 骨架 | `mvn package`（依赖 yeow-runtime，需先安装到本地 Maven 仓库） |
-| `yeow-api` / `packages/yeow-command` / `packages/yeow-server` | TS 库 | 无构建步骤（源码直接随插件 bundle）；类型检查 `tsc --noEmit` |
+| `yeow-api` | TS 库 | 无构建步骤（源码直接随插件 bundle）；类型检查 `tsc --noEmit` |
 | `create-yeow` | CLI 脚手架 | 无构建步骤；模板改动直接生效 |
 | `quickjs-wrapper` | QuickJS JVM 封装 | Gradle + CMake（详见下文） |
 | `yeow-tools` | 开发基准/诊断工具 | `mvn package`（独立，不依赖运行时） |
