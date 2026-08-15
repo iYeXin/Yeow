@@ -89,6 +89,12 @@
 
 递归创建目录。
 
+### `stat`
+
+- **p**：`{ "path": "<path>" }`
+- **返回**：`{ "isFile": <bool>, "isDirectory": <bool>, "size": <int>, "mtimeMs": <int>, "ctimeMs": <int> }`
+- 路径不存在 → `{ "err": "not found: <path>" }`
+
 ### `list`
 
 - **p**：`{ "path": "<path>" }`

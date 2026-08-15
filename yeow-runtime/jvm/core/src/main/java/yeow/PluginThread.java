@@ -649,6 +649,17 @@ public class PluginThread implements Runnable, PluginEntity {
                 case "writeFile" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.writeString(path, p.get("data").getAsString()); yield "true"; }
                 case "appendFile" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.writeString(path, p.get("data").getAsString(), StandardOpenOption.CREATE, StandardOpenOption.APPEND); yield "true"; }
                 case "exists" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield String.valueOf(Files.exists(path)); }
+                case "stat" -> {
+                    var path = resolvePath(base, p.get("path").getAsString(), false);
+                    if (!Files.exists(path)) throw new IllegalArgumentException("not found: " + path);
+                    var attrs = Files.readAttributes(path, java.nio.file.attribute.BasicFileAttributes.class);
+                    yield gson.toJson(Map.of(
+                        "isFile", attrs.isRegularFile(),
+                        "isDirectory", attrs.isDirectory(),
+                        "size", attrs.size(),
+                        "mtimeMs", attrs.lastModifiedTime().toMillis(),
+                        "ctimeMs", attrs.creationTime().toMillis()));
+                }
                 case "isDirectory" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield String.valueOf(Files.isDirectory(path)); }
                 case "delete" -> { var path = resolvePath(base, p.get("path").getAsString(), false); assertNotRuntimeDir(path); yield String.valueOf(Files.deleteIfExists(path)); }
                 case "mkdir" -> { var path = resolvePath(base, p.get("path").getAsString(), false); assertNotRuntimeDir(path); Files.createDirectories(path); yield "true"; }

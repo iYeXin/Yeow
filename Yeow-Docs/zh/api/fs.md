@@ -26,6 +26,28 @@ fs.outer.readFileSync('/etc/hosts');     // fs:outer.readFile：任意路径
 
 > **权限**：plugin 段节点（`fs.*`）默认允许。`fs.server.*` / `fs.outer.*` 默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明（构建后自动计算进 `computedPermissions`）：`"fs:server.*"`（整组）或节点级（如 `"fs:server.readFile"`）。`"fs:*"` 通配整个 fs 通道（含 server/outer）。未声明调用返回错误 `Permission denied: fs:server.<op>`（异步 API 以 Promise reject 呈现）。详见 [权限与原生服务可信性](../permissions.md)。
 
+## fs.stat(path) / fs.statSync(path)
+
+获取文件状态（类型/大小/时间戳）。路径不存在报错。
+
+```ts
+fs.stat('config.json'): Promise<FileStat>
+fs.statSync('config.json'): FileStat
+
+interface FileStat {
+  isFile: boolean       // 常规文件
+  isDirectory: boolean  // 目录
+  size: number          // 字节数（目录为平台相关值，无实际意义）
+  mtimeMs: number       // 最后修改时间（epoch 毫秒）
+  ctimeMs: number       // 创建时间（epoch 毫秒）
+}
+```
+
+```ts
+const s = fs.statSync('big.bin');
+console.log(s.size, s.mtimeMs);
+```
+
 ## fs.readFile(path) / fs.readFileSync(path)
 
 读取文件为 UTF-8 字符串。

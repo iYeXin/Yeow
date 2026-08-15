@@ -69,6 +69,13 @@ function _makeFs(level: FsLevel) {
     return r === true || String(r) === 'true';
   }
 
+  async function stat(path: string): Promise<FileStat> {
+    return await _sendFsAsync({ t: t('stat'), p: { path } }) as FileStat;
+  }
+  function statSync(path: string): FileStat {
+    return _sendFs({ t: t('stat'), p: { path } }) as FileStat;
+  }
+
   async function isDirectory(path: string): Promise<boolean> {
     const r = await _sendFsAsync({ t: t('isDirectory'), p: { path } });
     return r === true || String(r) === 'true';
@@ -130,7 +137,8 @@ function _makeFs(level: FsLevel) {
     readFile, readFileSync, readFileBase64, readFileBase64Sync,
     writeFile, writeFileSync, writeFileBase64, writeFileBase64Sync,
     appendFile, appendFileSync,
-    exists, existsSync, isDirectory, isDirectorySync,
+    exists, existsSync, stat, statSync,
+    isDirectory, isDirectorySync,
     deleteFile, deleteFileSync, mkdir, mkdirSync, list, listSync,
     createReadStream, createWriteStream,
     // outer 专属能力（systemPaths / getServerPath）
@@ -159,6 +167,8 @@ export const appendFile = fs.appendFile;
 export const appendFileSync = fs.appendFileSync;
 export const exists = fs.exists;
 export const existsSync = fs.existsSync;
+export const stat = fs.stat;
+export const statSync = fs.statSync;
 export const isDirectory = fs.isDirectory;
 export const isDirectorySync = fs.isDirectorySync;
 export const deleteFile = fs.deleteFile;
@@ -181,6 +191,15 @@ export interface ReadStreamOptions {
 /** 写流选项：打开模式——w 覆盖（默认）/ a 追加 / wx 排他创建（已存在报错）。 */
 export interface WriteStreamOptions {
   flags?: 'w' | 'a' | 'wx';
+}
+
+/** 文件状态（stat）。mtimeMs / ctimeMs 为 epoch 毫秒。 */
+export interface FileStat {
+  isFile: boolean;
+  isDirectory: boolean;
+  size: number;
+  mtimeMs: number;
+  ctimeMs: number;
 }
 
 /** 文件读流：read() 一次返回一块（默认 1 MiB），null = EOF；可 for await。 */
