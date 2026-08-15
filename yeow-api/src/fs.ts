@@ -116,13 +116,13 @@ function _makeFs(level: FsLevel) {
     return (_sendFs({ t: t('getServerPath') }) as { path: string }).path;
   }
 
-  async function createReadStream(path: string): Promise<ReadStream> {
-    const r = await _sendFsAsync({ t: t('openRead'), p: { path } }) as { id: string };
+  async function createReadStream(path: string, options?: ReadStreamOptions): Promise<ReadStream> {
+    const r = await _sendFsAsync({ t: t('openRead'), p: { path, ...options } }) as { id: string };
     return _makeReadStream((op, p2) => _sendFsAsync({ t: t(op), p: p2 }), r.id);
   }
 
-  async function createWriteStream(path: string): Promise<WriteStream> {
-    const r = await _sendFsAsync({ t: t('openWrite'), p: { path } }) as { id: string };
+  async function createWriteStream(path: string, options?: WriteStreamOptions): Promise<WriteStream> {
+    const r = await _sendFsAsync({ t: t('openWrite'), p: { path, ...options } }) as { id: string };
     return _makeWriteStream((op, p2) => _sendFsAsync({ t: t(op), p: p2 }), r.id);
   }
 
@@ -171,6 +171,17 @@ export const createReadStream = fs.createReadStream;
 export const createWriteStream = fs.createWriteStream;
 
 // ── 流式读写（有状态句柄；背压 = 显式响应——每个操作 await 结果后才发起下一块）──
+
+/** 读流选项：字节偏移区间（start 含、end 含；缺省 = 全文件）。 */
+export interface ReadStreamOptions {
+  start?: number;
+  end?: number;
+}
+
+/** 写流选项：打开模式——w 覆盖（默认）/ a 追加 / wx 排他创建（已存在报错）。 */
+export interface WriteStreamOptions {
+  flags?: 'w' | 'a' | 'wx';
+}
 
 /** 文件读流：read() 一次返回一块（默认 1 MiB），null = EOF；可 for await。 */
 export interface ReadStream {

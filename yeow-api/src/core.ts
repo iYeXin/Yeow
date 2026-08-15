@@ -55,7 +55,7 @@ export { assets, read as assetsRead, readSync as assetsReadSync,
     extractDir as assetsExtractDir, extractDirSync as assetsExtractDirSync } from './assets.js';
 export { path } from './path.js';
 export { createReadStream, createWriteStream } from './fs.js';
-export type { ReadStream, WriteStream } from './fs.js';
+export type { ReadStream, WriteStream, ReadStreamOptions, WriteStreamOptions } from './fs.js';
 export { listen, respond, close, request, requestSync } from './http.js';
 export type { RespondOptions } from './http.js';
 export { logError } from './log-error.js';

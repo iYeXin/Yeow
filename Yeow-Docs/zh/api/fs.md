@@ -151,6 +151,35 @@ await w.write(chunk);                               // 等到写入完成（显�
 await w.end();                                      // 冲刷缓冲并关闭
 ```
 
+### 选项
+
+```ts
+createReadStream(path, options?: ReadStreamOptions): Promise<ReadStream>
+createWriteStream(path, options?: WriteStreamOptions): Promise<WriteStream>
+
+interface ReadStreamOptions { start?: number; end?: number }   // 字节偏移区间（start 含、end 含；缺省 = 全文件）
+interface WriteStreamOptions { flags?: 'w' | 'a' | 'wx' }      // 打开模式
+```
+
+```ts
+// 只读文件的第 100..199 字节（如日志尾部、分片读取）
+const r = await createReadStream('log.txt', { start: 100, end: 199 });
+
+// 追加模式（等效 appendFile 的流式版）
+const w = await createWriteStream('events.log', { flags: 'a' });
+await w.write(line);
+await w.end();
+
+// 排他创建：文件已存在则创建失败（err）——适合"仅首次写入"的初始化场景
+const init = await createWriteStream('state.json', { flags: 'wx' });
+```
+
+| `flags` | 行为 |
+|---|---|
+| `'w'`（默认） | 覆盖（不存在则创建） |
+| `'a'` | 追加（不存在则创建） |
+| `'wx'` | 排他创建（已存在报错） |
+
 ### ReadStream
 
 ```ts

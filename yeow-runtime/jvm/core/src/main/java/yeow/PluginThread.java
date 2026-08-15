@@ -673,7 +673,12 @@ public class PluginThread implements Runnable, PluginEntity {
                 case "openRead" -> {
                     var path = resolvePath(base, p.get("path").getAsString(), false);
                     if (!Files.isRegularFile(path)) throw new IllegalArgumentException("not a file: " + path);
-                    var id = newHandle("fr", new yeow.util.FileStreams.Reader(path));
+                    // 常用选项：start/end 字节偏移（start 含、end 含；缺省 = 全文件）
+                    long start = p.has("start") ? p.get("start").getAsLong() : 0;
+                    long end = p.has("end") ? p.get("end").getAsLong() : -1;
+                    if (start < 0) throw new IllegalArgumentException("start must be >= 0");
+                    if (end >= 0 && end < start) throw new IllegalArgumentException("end must be >= start");
+                    var id = newHandle("fr", new yeow.util.FileStreams.Reader(path, start, end));
                     yield gson.toJson(Map.of("id", id, "size", Files.size(path)));
                 }
                 case "read" -> {
@@ -686,7 +691,9 @@ public class PluginThread implements Runnable, PluginEntity {
                 case "openWrite" -> {
                     var path = resolvePath(base, p.get("path").getAsString());
                     assertNotRuntimeDir(path);
-                    yield gson.toJson(Map.of("id", newHandle("fw", new yeow.util.FileStreams.Writer(path))));
+                    // 常用选项：flags——w 覆盖（默认）/ a 追加 / wx 排他创建（已存在报错）
+                    var flags = p.has("flags") ? p.get("flags").getAsString() : "w";
+                    yield gson.toJson(Map.of("id", newHandle("fw", new yeow.util.FileStreams.Writer(path, flags))));
                 }
                 case "write" -> {
                     var h = handle("fw", p, yeow.util.FileStreams.Writer.class);

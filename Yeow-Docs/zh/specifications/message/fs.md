@@ -123,9 +123,9 @@ Base64 编码的二进制读写。
 
 | 操作 | 请求 | 返回 | 说明 |
 |---|---|---|---|
-| `openRead` | `{ path }` | `{ "id", "size" }` | 打开读句柄（`size` = 文件字节数）；非文件 → err |
+| `openRead` | `{ path, start?, end? }` | `{ "id", "size" }` | 打开读句柄（`size` = 文件字节数）；非文件 → err。`start`/`end` 为字节偏移区间（start 含、end 含；缺省 = 全文件；`end < start` → err） |
 | `read` | `{ id, maxBytes? }` | `{ "data": <b64> }` 或 `{ "eof": true }` | 读取一块；EOF 返回 `{eof: true}` |
-| `openWrite` | `{ path }` | `{ "id" }` | 打开写句柄（覆盖创建，父目录自动创建） |
+| `openWrite` | `{ path, flags? }` | `{ "id" }` | 打开写句柄（父目录自动创建）。`flags`：`w` 覆盖（默认）/ `a` 追加 / `wx` 排他创建（已存在 → err）；未知 flags → err |
 | `write` | `{ id, data: <b64> }` | `"true"` | 写入一块（已入缓冲即返回） |
 | `end` | `{ id }` | `"true"` | 冲刷缓冲并关闭写句柄 |
 | `close` | `{ id }` | `"true"` | 关闭任意句柄 |
