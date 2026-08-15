@@ -115,7 +115,7 @@ onLoad(async () => {
 ```
 
 - 版本更新后 assets 内容变化但数据目录已有旧文件时，可自行加入版本标记比对（如提取后写入 `fs.writeFileSync('web/.version', version)`，检测时比对）决定是否重新提取
-- 也可以不经提取直接响应：`assetsReadBase64` + `bodyBase64`（见[二进制响应](#二进制响应base64)）——适合每次读包、文件较小、无需被其他插件/工具访问的场景
+- 也可以不经提取直接响应：`assetsRead(path, 'base64')` + `bodyBase64`（见[二进制响应](#二进制响应base64)）——适合每次读包、文件较小、无需被其他插件/工具访问的场景
 
 ### 打包资源挂载（mountAssets）
 
@@ -135,13 +135,13 @@ app.mountAssets(getAssetsPath('web'), '/static');   // 带 URL 前缀
 - `dir` 应使用 `getAssetsPath()` 获取（构建期注入命名空间 id），不要硬编码
 - 与 `mount` 相同的路径穿越防护与 Content-Type 推断
 - **性能略差但可接受**：Zip 支持读取单个文件——每次请求从 .zip 解压目标文件；适合**小文件 / 低频访问**（如页面、图标、小脚本）
-- **大文件或高频访问**请用 `mount`（先检测 + 提取到数据目录），或缓存 `assetsReadBase64` 结果
+- **大文件或高频访问**请用 `mount`（先检测 + 提取到数据目录），或缓存 `assetsRead(path, 'base64')` 结果
 
 - `dir`：插件数据目录下的目录（可带尾 `/`）；`prefix`：URL 前缀（默认 `/`）
 - 支持常见类型（html/css/js/json/svg/png/jpg/gif/webp/woff2/zip/pdf/wasm 等），未知扩展名回退 `application/octet-stream`
 - **路径穿越防护**：含 `..` 段的请求路径被拒绝（继续后续层 → 404）
 - 文件不存在时继续后续层（可被后续路由/404 接管）
-- 静态文件建议放入 `assets/` 打包（`assetsReadBase64` + 缓存）或挂载由服主放入数据目录的文件（`fs` 通道 plugin 级免权限）
+- 静态文件建议放入 `assets/` 打包（`assetsRead(path, 'base64')` + 缓存）或挂载由服主放入数据目录的文件（`fs` 通道 plugin 级免权限）
 
 路由 handler 接收 `RouteRequest` 对象：
 
@@ -232,7 +232,7 @@ close(serverId);
 
 ```js
 import { createServer } from 'yeow-server';
-import { assetsReadBase64 } from 'yeow-api';
+import { assetsRead } from 'yeow-api';
 
 let cachedPack = null;   // 缓存：每次请求都从 .zip 内解压读取较耗时
 
@@ -240,7 +240,7 @@ const app = createServer(17835);
 
 app.get('/resourcepack', async (req) => {
     if (!cachedPack) {
-        cachedPack = await assetsReadBase64('pack/resourcepack.zip');   // 首次读取并缓存
+        cachedPack = await assetsRead('pack/resourcepack.zip', 'base64');   // 首次读取并缓存
     }
     return {
         bodyBase64: cachedPack,
@@ -254,7 +254,7 @@ app.get('/resourcepack', async (req) => {
 // 客户端/玩家下载: http://<服务器>:17835/resourcepack
 ```
 
-> **缓存提示**：`assetsReadBase64` 每次调用都会从插件包（.zip）中解压读取目标文件——如果资源包不大，建议**缓存**读取结果（如上面的 `cachedPack`）。
+> **缓存提示**：`assetsRead(path, 'base64')` 每次调用都会从插件包（.zip）中解压读取目标文件——如果资源包不大，建议**缓存**读取结果（如上面的 `cachedPack`）。
 
 > **端口告知**：HTTP 监听端口需**插件作者自行保证可用**（未被占用、服务器防火墙放行）——请在插件文档/说明中**告知服主监听的端口号**，由服主配置防火墙与转发。
 
@@ -262,18 +262,18 @@ app.get('/resourcepack', async (req) => {
 
 ```js
 import { createServer } from 'yeow-server';
-import { assetsReadBase64, Player, fs, eventOn } from 'yeow-api';
+import { assetsRead, Player, fs, eventOn } from 'yeow-api';
 
 // ① 暴露资源包下载 URL（见上例，缓存 base64）
 const app = createServer(17835);
 app.get('/resourcepack', async (req) => {
-    if (!cachedPack) cachedPack = await assetsReadBase64('pack/resourcepack.zip');
+    if (!cachedPack) cachedPack = await assetsRead('pack/resourcepack.zip', 'base64');
     return { bodyBase64: cachedPack, headers: { 'content-type': 'application/zip' } };
 });
 
 // ② 公网地址由服主在插件数据目录配置（plugins/<插件名>/config.json）
 //    { "publicUrl": "https://mc.example.com:17835" }   ← 服主填写公网可达的 IP/域名 + 端口
-const cfg = JSON.parse(fs.readFileSync('config.json'));
+const cfg = JSON.parse(fs.readFileSync('config.json', 'utf8'));
 
 // ③ 玩家加入时发送资源包（url 指向上面暴露的下载地址）
 eventOn('playerJoin', async (e) => {

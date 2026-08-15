@@ -666,6 +666,7 @@ public class PluginThread implements Runnable, PluginEntity {
                 case "list" -> { var path = resolvePath(base, p.get("path").getAsString(), false); try (var s = Files.list(path)) { yield gson.toJson(s.map(Path::toString).toList()); } }
                 case "readBase64" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(Files.readAllBytes(path)))); }
                 case "writeBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.write(path, Base64.getDecoder().decode(p.get("data").getAsString())); yield "true"; }
+                case "appendBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.write(path, Base64.getDecoder().decode(p.get("data").getAsString()), StandardOpenOption.CREATE, StandardOpenOption.APPEND); yield "true"; }
                 case "systemPaths" -> {
                     // 仅 outer 级：返回常用系统路径（桌面/临时目录/用户主目录）
                     if (!"outer".equals(level)) throw new IllegalArgumentException("systemPaths is outer-level only");

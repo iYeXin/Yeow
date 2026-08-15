@@ -43,16 +43,15 @@ export {
 export type { TpsInfo } from './server.js';
 export {
     fs,
-    readFile, readFileSync, readFileBase64, readFileBase64Sync,
-    writeFile, writeFileSync, writeFileBase64, writeFileBase64Sync,
+    readFile, readFileSync,
+    writeFile, writeFileSync,
     appendFile, appendFileSync,
     exists, existsSync, stat, statSync,
     isDirectory, isDirectorySync,
     deleteFile, deleteFileSync, mkdir, mkdirSync, list, listSync,
 } from './fs.js';
-export type { FileStat } from './fs.js';
+export type { FileStat, FsEncoding, FsData, ReadFileOptions, WriteFileOptions } from './fs.js';
 export { assets, read as assetsRead, readSync as assetsReadSync,
-    readBase64 as assetsReadBase64, readBase64Sync as assetsReadBase64Sync,
     extract as assetsExtract, extractSync as assetsExtractSync,
     extractDir as assetsExtractDir, extractDirSync as assetsExtractDirSync } from './assets.js';
 export { path } from './path.js';

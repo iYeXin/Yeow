@@ -32,10 +32,10 @@ yeow-image/
     "types": "./src/index.ts",
     "files": ["src/", "assets/"],
     "peerDependencies": {
-        "yeow-api": "^0.3.0"
+        "yeow-api": "^0.4.0"
     },
     "devDependencies": {
-        "yeow-api": "^0.3.0"
+        "yeow-api": "^0.4.0"
     },
     "license": "MIT"
 }
@@ -65,7 +65,7 @@ npm install --save-dev yeow-api
 **版本策略（两个范围、各司其职，不必相同）**：
 
 - `devDependencies` = **开发目标版本**——你开发/类型检查时用的版本，可窄
-- `peerDependencies` = **兼容的最宽范围**——npm 7+ 在范围不重叠时会为消费端**另装一份 yeow-api**（死重且困惑工具链）；宽范围避免重复安装。只用了各版本共有 API 的老包可写 `^0.2.57 || ^0.3.0`；依赖包源码会被使用者的 `tsc --noEmit`（构建时 typecheck）检查，只要包只用范围内版本都有的 API，宽范围天然安全
+- `peerDependencies` = **兼容的最宽范围**——npm 7+ 在范围不重叠时会为消费端**另装一份 yeow-api**（死重且困惑工具链）；宽范围避免重复安装。只用了各版本共有 API 的老包可写 `^0.3.0 || ^0.4.0`；依赖包源码会被使用者的 `tsc --noEmit`（构建时 typecheck）检查，只要包只用范围内版本都有的 API，宽范围天然安全
 
 ---
 
@@ -335,7 +335,7 @@ assets/
 // 主插件 package.json
 {
     "dependencies": {
-        "yeow-api": "^0.3.0",
+        "yeow-api": "^0.4.0",
         "yeow-image": "^0.0.1"   // 示例
     }
 }

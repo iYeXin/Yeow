@@ -1,3 +1,5 @@
+import type { FsEncoding, ReadFileOptions } from './fs.js';
+
 function _sendAssets(payload: Record<string, unknown>): unknown {
   const r = $send('assets', payload);
   if (r == null) return undefined;
@@ -15,21 +17,43 @@ function _sendAssetsAsync(payload: Record<string, unknown>): Promise<unknown> {
   });
 }
 
-export async function read(path: string): Promise<string> {
-  const r = await _sendAssetsAsync({ t: 'read', p: { path } }) as { data: string };
-  return r.data;
-}
-export function readSync(path: string): string {
-  return (_sendAssets({ t: 'read', p: { path } }) as { data: string }).data;
+/** 归一化 encoding 参数（与 fs 一致：缺省 = Uint8Array；utf8/base64 → 字符串）。 */
+function _encoding(options?: FsEncoding | ReadFileOptions): FsEncoding | undefined {
+  if (options == null) return undefined;
+  const e = typeof options === 'string' ? options : options.encoding;
+  if (e != null && e !== 'utf8' && e !== 'base64') {
+    throw new Error('Unsupported encoding: ' + String(e));
+  }
+  return e;
 }
 
-export async function readBase64(path: string): Promise<string> {
-  const r = await _sendAssetsAsync({ t: 'readBase64', p: { path } }) as { data: string };
-  return r.data;
-}
-export function readBase64Sync(path: string): string {
-  return (_sendAssets({ t: 'readBase64', p: { path } }) as { data: string }).data;
-}
+// 与 fs.readFile 相同语义：默认返回 Uint8Array；显式 utf8/base64 返回字符串。
+type AssetsReadFn = {
+  (path: string): Promise<Uint8Array>;
+  (path: string, options: FsEncoding | (ReadFileOptions & { encoding: FsEncoding })): Promise<string>;
+  (path: string, options: ReadFileOptions): Promise<Uint8Array | string>;
+};
+type AssetsReadSyncFn = {
+  (path: string): Uint8Array;
+  (path: string, options: FsEncoding | (ReadFileOptions & { encoding: FsEncoding })): string;
+  (path: string, options: ReadFileOptions): Uint8Array | string;
+};
+
+const readImpl = async (path: string, options?: FsEncoding | ReadFileOptions): Promise<Uint8Array | string> => {
+  const enc = _encoding(options);
+  const r = await _sendAssetsAsync({ t: enc === 'utf8' ? 'read' : 'readBase64', p: { path } }) as { data: string };
+  if (enc === 'utf8' || enc === 'base64') return r.data;
+  return Uint8Array.fromBase64(r.data);
+};
+const readSyncImpl = (path: string, options?: FsEncoding | ReadFileOptions): Uint8Array | string => {
+  const enc = _encoding(options);
+  const r = _sendAssets({ t: enc === 'utf8' ? 'read' : 'readBase64', p: { path } }) as { data: string };
+  if (enc === 'utf8' || enc === 'base64') return r.data;
+  return Uint8Array.fromBase64(r.data);
+};
+
+export const read = readImpl as AssetsReadFn;
+export const readSync = readSyncImpl as AssetsReadSyncFn;
 
 export async function extract(path: string, dest?: string): Promise<string> {
   const p: Record<string, unknown> = { path };
@@ -55,4 +79,4 @@ export function extractDirSync(path: string, dest?: string): string {
   return (_sendAssets({ t: 'extractDir', p }) as { path: string }).path;
 }
 
-export const assets = { read, readSync, readBase64, readBase64Sync, extract, extractSync, extractDir, extractDirSync };
+export const assets = { read, readSync, extract, extractSync, extractDir, extractDirSync };

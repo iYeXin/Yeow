@@ -64,23 +64,22 @@ getAssetsPath('native/win/modules/moduleA.js') // → "assets/<id>/native/win/mo
 
 > **⚠ 路径必须通过 `getAssetsPath()` 获取**：即使文件不哈希改名，路径前缀 `assets/<id>/` 也是构建期生成的（id 每次构建可能变化）——硬编码原始路径或 `assets/...` 字面量在运行时**找不到文件**。所有 assets API 的 `path` 参数都应传入 `getAssetsPath()` 的返回值。
 
-## assets.read(path) / assets.readSync(path)
+## assets.read(path, options?) / assets.readSync(path, options?)
 
-读取资产文件为 UTF-8 字符串。
-
-```ts
-assets.read(getAssetsPath('template.txt')): Promise<string>
-assets.readSync(getAssetsPath('template.txt')): string
-```
-
-## assets.readBase64(path) / assets.readBase64Sync(path)
-
-读取资产文件为 Base64 编码字符串。
+读取资产文件。与 `fs.readFile` 相同语义：**默认返回二进制 `Uint8Array`**，显式指定编码后返回字符串。
 
 ```ts
-assets.readBase64(getAssetsPath('image.png')): Promise<string>
-assets.readBase64Sync(getAssetsPath('image.png')): string
+assets.read(getAssetsPath('image.png')): Promise<Uint8Array>
+assets.readSync(getAssetsPath('image.png')): Uint8Array
+
+assets.read(getAssetsPath('template.txt'), 'utf8'): Promise<string>
+assets.readSync(getAssetsPath('template.txt'), { encoding: 'utf8' }): string
+
+assets.read(getAssetsPath('blob.bin'), 'base64'): Promise<string>
+assets.readSync(getAssetsPath('blob.bin'), 'base64'): string
 ```
+
+`options` 可为 `'utf8' | 'base64'` 或 `{ encoding: 'utf8' | 'base64' }`。底层协议仍使用 `assets:read`（文本）与 `assets:readBase64`（二进制 Base64 承载）节点。
 
 ## assets.extract(path, dest?) / assets.extractSync(path, dest?)
 
@@ -93,7 +92,7 @@ assets.extractSync(getAssetsPath('config.json')): string
 
 返回解压后的目标路径（**相对服务器根目录**，如 `plugins/<插件名>/assets/config.json`；配合 `fs.outer.getServerPath()` 可拼出绝对路径）。
 
-> **权限**：`assets:extract` 默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明 `"assets:extract"`。`assets.read` / `assets.readBase64` 默认允许。
+> **权限**：`assets:extract` 默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明 `"assets:extract"`。`assets.read` 默认允许。
 
 ## assets.extractDir(path, dest?) / assets.extractDirSync(path, dest?)
 
@@ -114,8 +113,11 @@ assets.extractDirSync(getAssetsPath('native/')): string
 import { getAssetsPath } from 'yeow-dev';
 import { assets } from 'yeow-api';
 
-// 读取配置（路径经 getAssetsPath 解析）
-const config = assetsReadSync(getAssetsPath('config.yml'));
+// 读取配置（路径经 getAssetsPath 解析；文本需显式 utf8）
+const config = assetsReadSync(getAssetsPath('config.yml'), 'utf8');
+
+// 二进制读取（默认 Uint8Array）
+const icon = assetsReadSync(getAssetsPath('icon.png'));
 
 // 解压资源到文件系统
 await assets.extract(getAssetsPath('icon.png'));

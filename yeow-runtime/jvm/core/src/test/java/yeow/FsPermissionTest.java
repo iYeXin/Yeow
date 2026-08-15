@@ -57,6 +57,7 @@ class FsPermissionTest {
         var pt = pt(Set.of());
         assertNull(check(pt, "fs", "plugin.readFile"));
         assertNull(check(pt, "fs", "plugin.writeFile"));
+        assertNull(check(pt, "fs", "plugin.appendBase64"));
     }
 
     @Test
@@ -71,6 +72,7 @@ class FsPermissionTest {
         var pt = pt(Set.of("fs:server.*"));
         assertNull(check(pt, "fs", "server.readFile"));
         assertNull(check(pt, "fs", "server.writeFile"));
+        assertNull(check(pt, "fs", "server.appendBase64"));
         assertNotNull(check(pt, "fs", "outer.readFile"));
     }
 
@@ -79,6 +81,7 @@ class FsPermissionTest {
         var pt = pt(Set.of("fs:server.readFile"));
         assertNull(check(pt, "fs", "server.readFile"));
         assertNotNull(check(pt, "fs", "server.writeFile"));
+        assertNotNull(check(pt, "fs", "server.appendBase64"));
     }
 
     @Test

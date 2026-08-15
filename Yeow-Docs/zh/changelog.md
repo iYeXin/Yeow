@@ -6,6 +6,41 @@
 
 ## 2026-08-15
 
+### yeow-fflate 0.3.0：ZipReader（list / stat / 单文件读取）
+
+- **新增 `ZipReader`**：构造时只解析 ZIP 中央目录（含 Zip64），`list()` / `stat(name)` / `has(name)` 提供条目元数据（name、compression、size、originalSize、crc、mtime、attrs），`read(name, options?)` / `readSync` 只解压目标文件
+- **编码语义与 fs 一致**：单文件读取默认 `Uint8Array`；`'utf8'` / `'base64'` 返回字符串；不存在条目返回 null
+- 实现：`src/async.ts` 复用 core 的中央目录解析工具，Base64 输出用纯 JS 编码器（无 btoa/Buffer 依赖）；`verify.mjs` 新增 7 项检查，总计 **44 项 ALL PASS**
+- 版本：**yeow-fflate 0.2.1 → 0.3.0**（peer `yeow-api ^0.4.0` 不变）
+
+### fs API：二进制优先（Node 风格编码）+ 移除 Base64 专用 API
+
+- **readFile 默认返回 `Uint8Array`**：`fs.readFile(path)` / `fs.readFileSync(path)` 返回原始字节（底层 `readBase64` 承载，JS 侧 `Uint8Array.fromBase64` 解码）；显式 `'utf8'` / `'base64'`（或 `{ encoding }`）才返回字符串——utf8 走文本节点，base64 直接返回协议 Base64 串。**兼容性破坏**：原先默认返回字符串的 `readFile` 调用需加 `'utf8'`（类似 Node `fs.readFile`）
+- **writeFile / appendFile 统一数据形态**：`data: string | Uint8Array`——字符串默认按 UTF-8 写入；`{ encoding: 'base64' }`（或 `'base64'`）时把字符串视为 Base64 编码的二进制数据解码后写入；`Uint8Array` 始终写原始字节（encoding 选项忽略）
+- **新增 fs 协议节点 `appendBase64`**：二进制追加（Base64 解码 + `CREATE,APPEND`，含运行时目录写保护与 server/outer 权限模型）——API 层 `appendFile(bytes)` / `appendFile(str, 'base64')` 走此节点
+- **移除 Base64 专用 API（破坏性）**：`readFileBase64` / `readFileBase64Sync` / `writeFileBase64` / `writeFileBase64Sync` 从 yeow-api 公共导出移除——二进制直接用 `readFile` / `writeFile`（Uint8Array）；显式 Base64 字符串用 `readFile(path, 'base64')` / `writeFile(path, str, 'base64')`
+- **读流编码固定于创建时**：`createReadStream(path, { encoding?: 'utf8' | 'base64' })`——缺省返回 `ReadStream<Uint8Array>`，指定编码返回 `ReadStream<string>`；**运行时不支持修改**（无 setEncoding）。UTF-8 模式跨块保留不完整的多字节序列（chunk 边界字符不截断），EOF 时冲刷（非法序列替换为 U+FFFD）；base64 模式逐块返回 Base64 字符串
+- **写流与 writeFile 同语义**：`createWriteStream(path, { flags?, encoding? })`——字符串 chunk 默认 UTF-8、`base64` 先解码后写字节；`Uint8Array` chunk 原始字节；`WriteStream.encoding` 只读（创建时固定）
+- 权限：`appendBase64` 纳入 fs 节点权限模型（`fs:plugin.appendBase64` 免声明；`fs:server.appendBase64` / `fs:outer.appendBase64` 需声明，整组/通道通配照常覆盖）；`FsPermissionTest` 补充用例
+- 实现：`yeow-api/src/fs.ts` 重写（移除 4 个 Base64 API；新增 `FsEncoding` / `FsData` / `ReadFileOptions` / `WriteFileOptions` 类型；UTF-8 流式解码器）；core `PluginThread.handleFs` 新增 `appendBase64`；模板内置 `yeow-runtime-0.2.0.jar` 已重新构建并同步
+- 文档：api/fs.md（重写编码语义与流示例）、specifications/message/fs.md（`appendBase64` + 运行时目录保护清单）、api/http-server.md 示例更新
+- 关联包：`yeow-server` 静态挂载改用 `fs.readFile(filePath, 'base64')`（原 `fs.readFileBase64` 已移除）
+
+### assets.read 合并：默认 Uint8Array + 显式编码（与 fs.readFile 同语义）
+
+- **移除 `assets.readBase64` / `assets.readBase64Sync`（破坏性）**：assets 只保留 `read` / `readSync`（`extract` / `extractDir` 系列不变）
+- **`assets.read` 默认返回 `Uint8Array`**：`'utf8'` 返回文本、`'base64'` 返回 Base64 字符串——选项形式与 `fs.readFile` 一致（`'utf8' | 'base64'` 或 `{ encoding }`）
+- 协议层不变：`assets:read`（UTF-8 文本）与 `assets:readBase64`（二进制 Base64 承载）节点继续保留；yeow-api 顶层别名只保留 `assetsRead` / `assetsReadSync`
+- 关联：`yeow-server` 的 `mountAssets` 与 api/http-server.md、api/assets.md 示例改用 `assetsRead(path, 'base64')` / `assets.read(path, 'utf8')`
+
+### 版本升级（0.4.0）
+
+- **yeow-api 0.3.10 → 0.4.0** / **create-yeow 0.3.10 → 0.4.0** / **yeow-command 0.1.0 → 0.1.1** / **yeow-server 0.1.0 → 0.1.1** / **yeow-fflate 0.2.1 → 0.3.0**（独立包 peer 依赖范围同步 `yeow-api ^0.4.0`）
+- 内容：fs 二进制优先 + Node 风格编码、移除 fs Base64 专用 API、assets.read 合并、`appendBase64` 协议节点、读/写流编码创建时固定
+- 破坏性变更：`fs.readFile` 默认返回 `Uint8Array`；`readFileBase64` / `writeFileBase64` 移除；`assets.readBase64` 移除（改用 `assets.read(path, 'base64')`）
+- 模板依赖：`yeow-api ^0.4.0`
+- 运行时：模板内置 `yeow-runtime-0.2.0.jar` 已同步（含 `appendBase64`）
+
 ### 流式 API：文件流 + 分块 gzip；util 上限可配置；http 回调修复
 
 - **util 上限配置化**：`config.yml` 新增 `util` 段（`max-input-bytes` / `max-output-bytes`，默认均 **256 MiB**，按原始字节计）——替代原先硬编码的 64 MiB base64 / 256 MiB 输出
