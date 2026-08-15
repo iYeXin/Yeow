@@ -82,13 +82,6 @@
 - `basename`/`dirname` 原为 POSIX 实现（仅 `/`）——Windows 上 fs 通道返回 `\` 路径时 `basename` 返回整串（如 `proj list` 显示完整路径）
 - 修复：按 `/` 与 `\` 双分隔符切分（`extname` 基于 basename 自动受益）；`join` 保持 `/` 连接（Windows API 同样接受正斜杠）
 
-### 版本升级（0.3.6 / 0.1.26）
-
-- **yeow-api 0.3.5 → 0.3.6** / **create-yeow 0.3.5 → 0.3.6** / **yeow-utils 0.1.25 → 0.1.26**
-- 内容：流式文件读写 + 分块 gzip（Gzip 命名空间）、util 上限配置化、http 回调修复、CommandBuilder enum 匹配修复、path 双分隔符兼容、旧 gzip 导出移除（破坏性：用 `Gzip.*`）
-- 运行时内容更新：模板内置 `yeow-runtime-0.2.0.jar`（含 util 通道、调度器/事件桥/Profile 修复、流句柄）
-- 模板依赖范围 `^0.3.0` / `^0.1.21` caret 自动覆盖，无需改动
-
 ---
 
 ## 2026-08-13
