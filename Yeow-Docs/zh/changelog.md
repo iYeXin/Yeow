@@ -60,19 +60,6 @@
 - 实现：`WindowMetrics` 新增 `virtualPlugins` 集合（WindowCollector 在记录 ping 时按 `PluginEntity.isVirtual()` 标记）；`HeartbeatTimeoutDetector` 跳过；`DetectorTest` 增补用例（虚拟插件无 pong/慢响应均不告警，真实插件仍告警）
 - 文档：runtime-warning.md heartbeat.timeout 节补充说明
 
-### 流式 API：文件流 + 分块 gzip；util 上限可配置；http 回调修复
-
-- **util 上限配置化**：`config.yml` 新增 `util` 段（`max-input-bytes` / `max-output-bytes`，默认均 **256 MiB**，按原始字节计）——替代原先硬编码的 64 MiB base64 / 256 MiB 输出
-- **流式文件读写**（fs 通道，`plugin/server/outer` 三段均可用）：`createReadStream` / `createWriteStream`——有状态句柄（`openRead/openWrite → read/write ×n → end/close`），运行时缓冲 256 KiB 降低跨线程往返开销；**背压 = 显式响应**（每操作 await 结果后才发起下一块）；`ReadStream` 支持 `for await`
-- **Gzip 命名空间**（util.ts 重构）：`Gzip.compress/compressSync/decompress/decompressSync`（迁移原顶层方法）+ `Gzip.createCompressor()` / `Gzip.createDecompressor()`（**分块输入压缩/解压**，管道式 `write×n → finish`；非 syncFlush，拼接输出与一次性压缩字节级一致）；**旧顶层导出已移除**（破坏性变更：`gzipCompress` 等 → `Gzip.*`）
-- **流句柄生命周期**：per-plugin 注册表，卸载/热重载自动关闭（gzip 压缩/解压 + 文件读写）
-- **http server 回调丢失修复**：`getRequestBody().readAllBytes()` 对无 Content-Length 的 keep-alive 请求（如普通 GET）永久阻塞（未定义长度流等 EOF）→ 回调永不投递且 io 线程被占死；改为仅当 `Content-Length > 0` 或 chunked 时读 body，处理异常加日志
-- **util 通道输入校验修复**：`encode.utf8` 的 `data` 是明文文本（非 base64 承载）——输入上限校验曾对所有操作统一按 base64 解码，导致 `stringToBytes` 对含非 base64 字符的文本报错（`Illegal base64 character`）；改为文本按 UTF-8 字节数校验、二进制操作按 base64 解码校验
-- **HTTP 服务器权限文档**：`http:listen` / `http:respond` 均默认拒绝——漏声明 `http:respond` 时服务器可启动、回调可达但响应被拒 → 请求挂起超时（假阳性排查结论）；api/http-server.md 与 permissions.md 补充节点表与症状说明
-- 实现：core `yeow/util/{GzipCompressor,GzipDecompressor,FileStreams}.java`（可单测）+ `PluginThread` 流操作；`UtilCodecTest` 新增 4 用例（分块往返/单块与一次性一致/空输入/穿插空块）
-- **流选项扩展**：`createReadStream(path, { start?, end? })`——字节偏移区间（start 含、end 含，如日志尾部/分片读取）；`createWriteStream(path, { flags? })`——`w` 覆盖（默认）/ `a` 追加 / `wx` 排他创建（已存在报错）；`FileStreamsTest` 新增 5 用例（全文件/偏移区间/越界/覆盖+追加/排他创建）
-- 文档：api/util.md（重写）、api/fs.md（流式节）、specifications/message/{util,fs}.md、operations.md；站点侧边栏加入 Util 页
-
 ### CommandBuilder 重载匹配校验 enum 值（yeow-utils 0.1.25）
 
 - `match` 此前只数 token 数、不校验 enum 值——`action+name`（2 token）重载并列时先注册者胜：`/proj info test` 会被先注册的 `paste <name>` 吃掉
@@ -83,10 +70,27 @@
 - `basename`/`dirname` 原为 POSIX 实现（仅 `/`）——Windows 上 fs 通道返回 `\` 路径时 `basename` 返回整串（如 `proj list` 显示完整路径）
 - 修复：按 `/` 与 `\` 双分隔符切分（`extname` 基于 basename 自动受益）；`join` 保持 `/` 连接（Windows API 同样接受正斜杠）
 
-### 版本升级（0.3.7 / 0.1.27）
+---
 
-- **yeow-api 0.3.6 → 0.3.7** / **create-yeow 0.3.6 → 0.3.7** / **yeow-utils 0.1.26 → 0.1.27**
-- 内容：流式文件读写 + 分块 gzip（Gzip 命名空间）、util 上限配置化、http 回调修复、`encode.utf8` 输入校验修复（文本非 base64）、http 权限文档（listen/respond）、CommandBuilder enum 匹配修复、path 双分隔符兼容、旧 gzip 导出移除（破坏性：用 `Gzip.*`）
+## 2026-08-15
+
+### 流式 API：文件流 + 分块 gzip；util 上限可配置；http 回调修复
+
+- **util 上限配置化**：`config.yml` 新增 `util` 段（`max-input-bytes` / `max-output-bytes`，默认均 **256 MiB**，按原始字节计）——替代原先硬编码的 64 MiB base64 / 256 MiB 输出
+- **流式文件读写**（fs 通道，`plugin/server/outer` 三段均可用）：`createReadStream` / `createWriteStream`——有状态句柄（`openRead/openWrite → read/write ×n → end/close`），运行时缓冲 256 KiB 降低跨线程往返开销；**背压 = 显式响应**（每操作 await 结果后才发起下一块）；`ReadStream` 支持 `for await`
+- **Gzip 命名空间**（util.ts 重构）：`Gzip.compress/compressSync/decompress/decompressSync`（迁移原顶层方法）+ `Gzip.createCompressor()` / `Gzip.createDecompressor()`（**分块输入压缩/解压**，管道式 `write×n → finish`；非 syncFlush，拼接输出与一次性压缩字节级一致）；**旧顶层导出已移除**（破坏性变更：`gzipCompress` 等 → `Gzip.*`）
+- **流句柄生命周期**：per-plugin 注册表，卸载/热重载自动关闭（gzip 压缩/解压 + 文件读写）
+- **http server 回调丢失修复**：`getRequestBody().readAllBytes()` 对无 Content-Length 的 keep-alive 请求（如普通 GET）永久阻塞（未定义长度流等 EOF）→ 回调永不投递且 io 线程被占死；改为仅当 `Content-Length > 0` 或 chunked 时读 body，处理异常加日志
+- **util 通道输入校验修复**：`encode.utf8` 的 `data` 是明文文本（非 base64 承载）——输入上限校验曾对所有操作统一按 base64 解码，导致 `stringToBytes` 对含非 base64 字符的文本报错（`Illegal base64 character`）；改为文本按 UTF-8 字节数校验、二进制操作按 base64 解码校验
+- **HTTP 服务器权限文档**：`http:listen` / `http:respond` 均默认拒绝——漏声明 `http:respond` 时服务器可启动、回调可达但响应被拒 → 请求挂起超时（假阳性排查结论）；api/http-server.md 与 permissions.md 补充节点表与症状说明
+- **流选项扩展**：`createReadStream(path, { start?, end? })`——字节偏移区间（start 含、end 含，如日志尾部/分片读取）；`createWriteStream(path, { flags? })`——`w` 覆盖（默认）/ `a` 追加 / `wx` 排他创建（已存在报错）；`FileStreamsTest` 新增 5 用例（全文件/偏移区间/越界/覆盖+追加/排他创建）
+- 实现：core `yeow/util/{GzipCompressor,GzipDecompressor,FileStreams}.java`（可单测）+ `PluginThread` 流操作；`UtilCodecTest` 新增 4 用例（分块往返/单块与一次性一致/空输入/穿插空块）
+- 文档：api/util.md（重写）、api/fs.md（流式节）、specifications/message/{util,fs}.md、operations.md；站点侧边栏加入 Util 页
+
+### 版本升级（0.3.8 / 0.1.28）
+
+- **yeow-api 0.3.7 → 0.3.8** / **create-yeow 0.3.7 → 0.3.8** / **yeow-utils 0.1.27 → 0.1.28**
+- 内容：流式文件读写（含 start/end 偏移、flags 选项）+ 分块 gzip（Gzip 命名空间）、util 上限配置化、http 回调修复、`encode.utf8` 输入校验修复（文本非 base64）、http 权限文档（listen/respond）、旧 gzip 导出移除（破坏性：用 `Gzip.*`）
 - 运行时内容更新：模板内置 `yeow-runtime-0.2.0.jar`（含 util 通道、调度器/事件桥/Profile 修复、流句柄、util 校验修复）
 - 模板依赖范围 `^0.3.0` / `^0.1.21` caret 自动覆盖，无需改动
 
