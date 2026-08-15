@@ -112,4 +112,4 @@ export {
     bytesToString, bytesToStringAsync,
     Gzip,
 } from './util.js';
-export type { GzipCompressor, GzipDecompressor } from './util.js';
+export type { GzipCompressor, GzipDecompressor, GzipCompressOptions, GzipDecompressOptions } from './util.js';

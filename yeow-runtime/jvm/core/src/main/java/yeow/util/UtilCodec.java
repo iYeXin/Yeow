@@ -54,6 +54,56 @@ public final class UtilCodec {
         }
     }
 
+    /**
+     * 原始 deflate 压缩（无 GZIP 头/尾/CRC；对应 {@link java.util.zip.Deflater} nowrap）。
+     * level：0-9，-1 = 默认级别。
+     */
+    public static byte[] deflate(byte[] in, int level) throws IOException {
+        var def = new java.util.zip.Deflater(level, true); // nowrap
+        try {
+            def.setInput(in);
+            def.finish();
+            var out = new java.io.ByteArrayOutputStream(Math.max(64, in.length / 2));
+            var buf = new byte[8192];
+            while (!def.finished()) {
+                int n = def.deflate(buf);
+                if (n == 0) break; // 防御
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } finally {
+            def.end();
+        }
+    }
+
+    /**
+     * 原始 deflate 解压（无 GZIP 头/尾/CRC 校验；对应 {@link java.util.zip.Inflater} nowrap）。
+     * 输出上限 maxOutBytes（防压缩炸弹）；deflate 流无完整性校验——截断静默结束，调用方负责完整性。
+     */
+    public static byte[] inflate(byte[] in, int maxOutBytes) throws IOException {
+        var inf = new java.util.zip.Inflater(true); // nowrap
+        try {
+            inf.setInput(in);
+            var out = new java.io.ByteArrayOutputStream(Math.min(Math.max(64, in.length * 4), maxOutBytes));
+            var buf = new byte[8192];
+            while (!inf.finished()) {
+                int n = inf.inflate(buf);
+                if (n == 0) {
+                    if (inf.finished() || inf.needsInput()) break; // 输入耗尽（截断/正常结束）
+                    if (inf.needsDictionary()) throw new IOException("deflate needs dictionary");
+                    break;
+                }
+                if (out.size() + n > maxOutBytes) throw new IOException("inflate output exceeds " + maxOutBytes + " bytes");
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } catch (java.util.zip.DataFormatException e) {
+            throw new IOException("invalid deflate data: " + e.getMessage(), e);
+        } finally {
+            inf.end();
+        }
+    }
+
     /** UTF-8 字符串 → 字节。 */
     public static byte[] utf8(String s) {
         return s.getBytes(StandardCharsets.UTF_8);

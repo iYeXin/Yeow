@@ -15,13 +15,26 @@ import java.util.zip.GZIPInputStream;
  */
 public final class GzipDecompressor implements AutoCloseable {
     private final ChunkInput in = new ChunkInput();
-    private GZIPInputStream gz; // 懒创建：构造时输入流为空，GZIPInputStream 会立即读头 → EOF
+    private final boolean raw;
+    private java.io.InputStream gz; // 懒创建：构造时输入流为空（GZIPInputStream 会立即读头 → EOF）
     private boolean finished = false;
 
-    public GzipDecompressor() {}
+    /** 兼容构造：gzip 模式（raw=false）。 */
+    public GzipDecompressor() {
+        this(false);
+    }
 
-    private GZIPInputStream gz() throws IOException {
-        if (gz == null) gz = new GZIPInputStream(in);
+    /** @param raw true = 原始 deflate（无 GZIP 头/尾/CRC 校验） */
+    public GzipDecompressor(boolean raw) {
+        this.raw = raw;
+    }
+
+    private java.io.InputStream gz() throws IOException {
+        if (gz == null) {
+            gz = raw
+                ? new java.util.zip.InflaterInputStream(in, new java.util.zip.Inflater(true))
+                : new GZIPInputStream(in);
+        }
         return gz;
     }
 

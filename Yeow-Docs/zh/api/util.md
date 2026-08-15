@@ -18,23 +18,41 @@ util:
 
 ## 一次性 gzip
 
-### Gzip.compress(data, level?) / Gzip.compressSync(data, level?)
+### Gzip.compress(data, options?) / Gzip.compressSync(data, options?)
 
-压缩。`data` 为 `Uint8Array`（字节）或 `string`（视为 UTF-8 文本）。`level` 0-9（默认引擎默认级别）。
+压缩。`data` 为 `Uint8Array`（字节）或 `string`（视为 UTF-8 文本）。
 
 ```ts
-Gzip.compress(data: Uint8Array | string, level?: number): Promise<Uint8Array>
-Gzip.compressSync(data: Uint8Array | string, level?: number): Uint8Array
+Gzip.compress(data: Uint8Array | string, options?: number | GzipCompressOptions): Promise<Uint8Array>
+Gzip.compressSync(data: Uint8Array | string, options?: number | GzipCompressOptions): Uint8Array
+
+interface GzipCompressOptions {
+  level?: number;  // 0-9（默认引擎默认级别）
+  raw?: boolean;   // true = 原始 deflate（无 GZIP 头/尾/CRC）
+}
 ```
 
-### Gzip.decompress(data) / Gzip.decompressSync(data)
+数字 `level` 简写仍可用：`Gzip.compress(data, 6)` ≡ `Gzip.compress(data, { level: 6 })`。
+
+```ts
+const packed = await Gzip.compress(buf, { level: 9 });
+const rawPacked = await Gzip.compress(buf, { raw: true });  // 原始 deflate 流
+```
+
+### Gzip.decompress(data, options?) / Gzip.decompressSync(data, options?)
 
 解压。非 GZIP 数据报错；输出超过 `util.max-output-bytes`（默认 256 MiB）报错。
 
 ```ts
-Gzip.decompress(data: Uint8Array | string): Promise<Uint8Array>
-Gzip.decompressSync(data: Uint8Array | string): Uint8Array
+Gzip.decompress(data: Uint8Array | string, options?: GzipDecompressOptions): Promise<Uint8Array>
+Gzip.decompressSync(data: Uint8Array | string, options?: GzipDecompressOptions): Uint8Array
+
+interface GzipDecompressOptions {
+  raw?: boolean;   // true = 原始 deflate（无 GZIP 头/尾/CRC 校验）
+}
 ```
+
+> **raw deflate 注意**：原始 deflate 流**无完整性校验**（无 CRC/长度）——截断的数据会静默解出部分结果，调用方需自行保证数据完整（如外部校验和）。`raw` 压缩输出**不能**用非 raw 的 `decompress` 解，反之亦然（会报 invalid deflate data / 非 GZIP 数据）。
 
 ## 流式 gzip（分块输入）
 
@@ -47,9 +65,14 @@ Gzip.decompressSync(data: Uint8Array | string): Uint8Array
 ### Gzip.createCompressor(options?) → GzipCompressor
 
 ```ts
+Gzip.createCompressor(options?: GzipCompressOptions): Promise<GzipCompressor>
+// options.raw = true → 原始 deflate 流（分块）
+```
+
+```ts
 interface GzipCompressor {
   write(chunk: Uint8Array | string): Promise<Uint8Array>;  // 该块的压缩输出（可能为空）
-  finish(): Promise<Uint8Array>;                            // 剩余输出（含 GZIP 尾）
+  finish(): Promise<Uint8Array>;                            // 剩余输出（gzip 含 GZIP 尾 / raw 为 deflate 流尾）
   close(): Promise<void>;
 }
 ```
@@ -64,7 +87,12 @@ await comp.close();
 
 > 流式（非 syncFlush）压缩的拼接输出与一次性 `Gzip.compress` **字节级一致**。
 
-### Gzip.createDecompressor() → GzipDecompressor
+### Gzip.createDecompressor(options?) → GzipDecompressor
+
+```ts
+Gzip.createDecompressor(options?: GzipDecompressOptions): Promise<GzipDecompressor>
+// options.raw = true → 原始 deflate 流（分块）
+```
 
 ```ts
 interface GzipDecompressor {

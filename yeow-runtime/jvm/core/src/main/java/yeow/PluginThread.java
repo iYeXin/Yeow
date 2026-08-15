@@ -1019,11 +1019,18 @@ public class PluginThread implements Runnable, PluginEntity {
                     var level = p.has("level") ? p.get("level").getAsInt() : -1;
                     if (level < 0 || level > 9) throw new IllegalArgumentException("level must be 0-9");
                     var raw = Base64.getDecoder().decode(p.get("data").getAsString());
-                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.gzip(raw, level))));
+                    // raw=true：原始 deflate（无 GZIP 头/尾/CRC）
+                    var out = p.has("raw") && p.get("raw").getAsBoolean()
+                        ? yeow.util.UtilCodec.deflate(raw, level)
+                        : yeow.util.UtilCodec.gzip(raw, level);
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(out)));
                 }
                 case "gzip.decompress" -> {
                     var raw = Base64.getDecoder().decode(p.get("data").getAsString());
-                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.gunzip(raw, maxOutput))));
+                    var out = p.has("raw") && p.get("raw").getAsBoolean()
+                        ? yeow.util.UtilCodec.inflate(raw, maxOutput)
+                        : yeow.util.UtilCodec.gunzip(raw, maxOutput);
+                    yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(out)));
                 }
                 // 字符串 → 字节（b64 承载）
                 case "encode.utf8" -> gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(yeow.util.UtilCodec.utf8(p.get("data").getAsString()))));
@@ -1036,7 +1043,8 @@ public class PluginThread implements Runnable, PluginEntity {
                 case "gzip.compressor.create" -> {
                     var level = p.has("level") ? p.get("level").getAsInt() : -1;
                     if (level < 0 || level > 9) throw new IllegalArgumentException("level must be 0-9");
-                    yield gson.toJson(Map.of("id", newHandle("gc", new yeow.util.GzipCompressor(level))));
+                    var raw = p.has("raw") && p.get("raw").getAsBoolean();
+                    yield gson.toJson(Map.of("id", newHandle("gc", new yeow.util.GzipCompressor(level, raw))));
                 }
                 case "gzip.compressor.write" -> {
                     var h = handle("gc", p, yeow.util.GzipCompressor.class);
@@ -1049,7 +1057,10 @@ public class PluginThread implements Runnable, PluginEntity {
                     yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(out)));
                 }
                 case "gzip.compressor.close" -> { closeHandle(p); yield "true"; }
-                case "gzip.decompressor.create" -> gson.toJson(Map.of("id", newHandle("gd", new yeow.util.GzipDecompressor())));
+                case "gzip.decompressor.create" -> {
+                    var raw = p.has("raw") && p.get("raw").getAsBoolean();
+                    yield gson.toJson(Map.of("id", newHandle("gd", new yeow.util.GzipDecompressor(raw))));
+                }
                 case "gzip.decompressor.write" -> {
                     var h = handle("gd", p, yeow.util.GzipDecompressor.class);
                     var out = h.write(Base64.getDecoder().decode(p.get("data").getAsString()));

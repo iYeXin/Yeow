@@ -17,6 +17,7 @@
 - **HTTP 服务器权限文档**：`http:listen` / `http:respond` 均默认拒绝——漏声明 `http:respond` 时服务器可启动、回调可达但响应被拒 → 请求挂起超时（假阳性排查结论）；api/http-server.md 与 permissions.md 补充节点表与症状说明
 - **流选项扩展**：`createReadStream(path, { start?, end? })`——字节偏移区间（start 含、end 含，如日志尾部/分片读取）；`createWriteStream(path, { flags? })`——`w` 覆盖（默认）/ `a` 追加 / `wx` 排他创建（已存在报错）；`FileStreamsTest` 新增 5 用例（全文件/偏移区间/越界/覆盖+追加/排他创建）
 - **fs.stat**：`fs.stat(path)` / `fs.statSync(path)`（三段 + 顶层导出）——`{ isFile, isDirectory, size, mtimeMs, ctimeMs }`（`Files.readAttributes` 一次取全；路径不存在报错）
+- **Gzip 原始 deflate（raw）选项**：`Gzip.compress/decompress`（含 Sync）与 `createCompressor/createDecompressor` 新增 `{ raw?: boolean }`——true 时操作**原始 deflate 流**（无 GZIP 头/尾/CRC，对应 `Deflater`/`Inflater` nowrap；raw 无完整性校验，截断静默结束）；`level` 数字简写兼容（`Gzip.compress(data, 6)` 仍可用）；`UtilCodecTest` 新增 5 用例（raw 往返/各级别/无 GZIP 头且与 gzip 互不兼容/输出上限/流式 raw 与一次性一致）
 - 实现：core `yeow/util/{GzipCompressor,GzipDecompressor,FileStreams}.java`（可单测）+ `PluginThread` 流操作；`UtilCodecTest` 新增 4 用例（分块往返/单块与一次性一致/空输入/穿插空块）
 - 文档：api/util.md（重写）、api/fs.md（流式节）、specifications/message/{util,fs}.md、operations.md；站点侧边栏加入 Util 页
 

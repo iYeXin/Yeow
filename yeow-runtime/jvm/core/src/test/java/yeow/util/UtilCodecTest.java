@@ -156,4 +156,68 @@ class UtilCodecTest {
         d.close();
         assertArrayEquals(data, out.toByteArray());
     }
+
+    // ── 原始 deflate（raw）────────────────────────────────────────
+
+    @Test
+    void deflateRoundTrip() throws IOException {
+        var data = repeat("raw deflate 原始 ", 5000);
+        var packed = UtilCodec.deflate(data, 6);
+        assertTrue(packed.length < data.length, "compressible data must shrink");
+        assertArrayEquals(data, UtilCodec.inflate(packed, 1 << 20));
+    }
+
+    @Test
+    void deflateLevels() throws IOException {
+        var data = new byte[2048];
+        new Random(3).nextBytes(data);
+        for (int level = 0; level <= 9; level++) {
+            assertArrayEquals(data, UtilCodec.inflate(UtilCodec.deflate(data, level), 1 << 20), "level=" + level);
+        }
+    }
+
+    @Test
+    void deflateHasNoGzipHeader() throws IOException {
+        var packed = UtilCodec.deflate("x".repeat(100).getBytes(StandardCharsets.UTF_8), 6);
+        // 无 GZIP 魔数 1f 8b——raw deflate 不应被 gunzip 接受
+        assertFalse(packed.length >= 2 && (packed[0] & 0xff) == 0x1f && (packed[1] & 0xff) == 0x8b);
+        assertThrows(IOException.class, () -> UtilCodec.gunzip(packed, 1 << 20));
+        // gzip 数据也不能被 raw inflate 解出（抛 invalid block type）
+        var gz = UtilCodec.gzip("y".repeat(100).getBytes(StandardCharsets.UTF_8), 6);
+        assertThrows(IOException.class, () -> UtilCodec.inflate(gz, 1 << 20));
+    }
+
+    @Test
+    void deflateInflateOutputLimit() throws IOException {
+        var data = new byte[512 * 1024];
+        new Random(9).nextBytes(data);
+        var packed = UtilCodec.deflate(data, 1);
+        assertThrows(IOException.class, () -> UtilCodec.inflate(packed, data.length / 2));
+        assertArrayEquals(data, UtilCodec.inflate(packed, data.length));
+    }
+
+    @Test
+    void gzipStreamRawRoundTrip() throws IOException {
+        var data = repeat("stream raw deflate 流式 ", 5000);
+        // 流式 raw 压缩
+        var c = new GzipCompressor(6, true);
+        var packed = new java.io.ByteArrayOutputStream();
+        for (int off = 0; off < data.length; off += 8192) {
+            packed.write(c.write(java.util.Arrays.copyOfRange(data, off, Math.min(data.length, off + 8192))));
+        }
+        packed.write(c.finish());
+        c.close();
+        // 与一次性 raw 压缩一致
+        assertArrayEquals(UtilCodec.deflate(data, 6), packed.toByteArray());
+        // 流式 raw 解压
+        var d = new GzipDecompressor(true);
+        var out = new java.io.ByteArrayOutputStream();
+        var compressed = packed.toByteArray();
+        for (int off = 0; off < compressed.length; off += 2048) {
+            out.write(d.write(java.util.Arrays.copyOfRange(compressed, off, Math.min(compressed.length, off + 2048))));
+        }
+        out.write(d.finish());
+        d.close();
+        assertArrayEquals(data, out.toByteArray());
+    }
 }

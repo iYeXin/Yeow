@@ -16,14 +16,26 @@ import java.util.zip.GZIPOutputStream;
  */
 public final class GzipCompressor implements AutoCloseable {
     private final ByteArrayOutputStream buf = new ByteArrayOutputStream(64 * 1024);
-    private final GZIPOutputStream gz;
+    private final java.io.OutputStream gz;
+    private final boolean raw;
     private boolean finished = false;
 
-    /** @param level 0-9；-1 = Deflater 默认级别 */
+    /** 兼容构造：gzip 模式（raw=false）。 */
     public GzipCompressor(int level) throws IOException {
-        this.gz = new GZIPOutputStream(buf) {
-            { def.setLevel(level); }
-        };
+        this(level, false);
+    }
+
+    /**
+     * @param level 0-9；-1 = Deflater 默认级别
+     * @param raw   true = 原始 deflate（无 GZIP 头/尾/CRC）
+     */
+    public GzipCompressor(int level, boolean raw) throws IOException {
+        this.raw = raw;
+        this.gz = raw
+            ? new java.util.zip.DeflaterOutputStream(buf, new java.util.zip.Deflater(level, true))
+            : new GZIPOutputStream(buf) {
+                { def.setLevel(level); }
+            };
     }
 
     /** 压缩一块输入，返回输出块（可能为空；调用方决定块大小——建议 ≥256 KiB 摊销跨线程往返）。 */
@@ -37,11 +49,11 @@ public final class GzipCompressor implements AutoCloseable {
         return out;
     }
 
-    /** 结束压缩：返回剩余输出（含 GZIP 尾）；此后 write 不可再调用。 */
+    /** 结束压缩：返回剩余输出（gzip 含 GZIP 尾；raw 为 deflate 流尾）；此后 write 不可再调用。 */
     public byte[] finish() throws IOException {
         if (finished) return new byte[0];
         finished = true;
-        gz.finish();
+        gz.close(); // DeflaterOutputStream.close 写剩余 + end；GZIPOutputStream.close 写 GZIP 尾
         var out = buf.toByteArray();
         buf.reset();
         return out;

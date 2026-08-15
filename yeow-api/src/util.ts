@@ -73,28 +73,48 @@ export interface GzipDecompressor {
   close(): Promise<void>;
 }
 
+/** 压缩选项：level 0-9（默认引擎默认级别）；raw = 原始 deflate（无 GZIP 头/尾/CRC）。 */
+export interface GzipCompressOptions {
+  level?: number;
+  raw?: boolean;
+}
+
+/** 解压选项：raw = 原始 deflate（无 GZIP 头/尾/CRC 校验）。 */
+export interface GzipDecompressOptions {
+  raw?: boolean;
+}
+
+/** 兼容旧式数字 level 参数：Gzip.compress(data, 6) 仍可用。 */
+type LevelArg = number | GzipCompressOptions | undefined;
+
+function normalizeOptions(o?: LevelArg): GzipCompressOptions {
+  return typeof o === 'number' ? { level: o } : (o ?? {});
+}
+
 export const Gzip = {
-  /** 一次性 gzip 压缩（level 0-9，默认引擎默认级别）。输入 string 视为 UTF-8 文本。 */
-  compress(data: Uint8Array | string, level?: number): Promise<Uint8Array> {
-    return sendAsync<{ data: string }>('gzip.compress', { data: toB64(data), level })
+  /** 一次性压缩（level 0-9；raw=true 输出原始 deflate 流）。输入 string 视为 UTF-8 文本。 */
+  compress(data: Uint8Array | string, options?: LevelArg): Promise<Uint8Array> {
+    const o = normalizeOptions(options);
+    return sendAsync<{ data: string }>('gzip.compress', { data: toB64(data), level: o.level, raw: o.raw })
       .then((r) => Uint8Array.fromBase64(r.data));
   },
-  /** 一次性 gzip 压缩（同步版）。 */
-  compressSync(data: Uint8Array | string, level?: number): Uint8Array {
-    return Uint8Array.fromBase64(send<{ data: string }>('gzip.compress', { data: toB64(data), level }).data);
+  /** 一次性压缩（同步版）。 */
+  compressSync(data: Uint8Array | string, options?: LevelArg): Uint8Array {
+    const o = normalizeOptions(options);
+    return Uint8Array.fromBase64(send<{ data: string }>('gzip.compress', { data: toB64(data), level: o.level, raw: o.raw }).data);
   },
-  /** 一次性 gzip 解压（输出上限 256 MiB，超限报错——防压缩炸弹；上限可在 config.yml util 段调整）。 */
-  decompress(data: Uint8Array | string): Promise<Uint8Array> {
-    return sendAsync<{ data: string }>('gzip.decompress', { data: toB64(data) })
+  /** 一次性解压（输出上限 256 MiB，超限报错——防压缩炸弹；上限可在 config.yml util 段调整）。 */
+  decompress(data: Uint8Array | string, options?: GzipDecompressOptions): Promise<Uint8Array> {
+    return sendAsync<{ data: string }>('gzip.decompress', { data: toB64(data), raw: options?.raw })
       .then((r) => Uint8Array.fromBase64(r.data));
   },
-  /** 一次性 gzip 解压（同步版）。 */
-  decompressSync(data: Uint8Array | string): Uint8Array {
-    return Uint8Array.fromBase64(send<{ data: string }>('gzip.decompress', { data: toB64(data) }).data);
+  /** 一次性解压（同步版）。 */
+  decompressSync(data: Uint8Array | string, options?: GzipDecompressOptions): Uint8Array {
+    return Uint8Array.fromBase64(send<{ data: string }>('gzip.decompress', { data: toB64(data), raw: options?.raw }).data);
   },
   /** 创建分块压缩器（流式管道）：create → write×n → finish → close。 */
-  async createCompressor(options?: { level?: number }): Promise<GzipCompressor> {
-    const r = await sendAsync<{ id: string }>('gzip.compressor.create', { level: options?.level });
+  async createCompressor(options?: GzipCompressOptions): Promise<GzipCompressor> {
+    const r = await sendAsync<{ id: string }>('gzip.compressor.create', { level: options?.level, raw: options?.raw });
     let closed = false;
     const check = () => { if (closed) throw new Error('compressor closed'); };
     return {
@@ -116,8 +136,8 @@ export const Gzip = {
     };
   },
   /** 创建分块解压器（流式管道）：create → write×n → finish → close。 */
-  async createDecompressor(): Promise<GzipDecompressor> {
-    const r = await sendAsync<{ id: string }>('gzip.decompressor.create', {});
+  async createDecompressor(options?: GzipDecompressOptions): Promise<GzipDecompressor> {
+    const r = await sendAsync<{ id: string }>('gzip.decompressor.create', { raw: options?.raw });
     let closed = false;
     const check = () => { if (closed) throw new Error('decompressor closed'); };
     return {

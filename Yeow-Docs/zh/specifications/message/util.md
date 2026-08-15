@@ -15,16 +15,18 @@
 
 ### `gzip.compress`
 
-- 请求：`{ "t": "gzip.compress", "p": { "data": "<base64>", "level": 0-9 } }`
+- 请求：`{ "t": "gzip.compress", "p": { "data": "<base64>", "level": 0-9, "raw": <bool> } }`
   - `level` 可选（0-9，默认 -1 = Deflater 默认级别；0 = 仅存储）
+  - `raw` 可选（默认 false）——true = **原始 deflate**（无 GZIP 头/尾/CRC）
 - 返回：`{ "data": "<base64>" }`（压缩后字节）
 - 错误：`level` 越界 → `{ "err": "level must be 0-9" }`
 
 ### `gzip.decompress`
 
-- 请求：`{ "t": "gzip.decompress", "p": { "data": "<base64>" } }`
+- 请求：`{ "t": "gzip.decompress", "p": { "data": "<base64>", "raw": <bool> } }`
+  - `raw` 可选（默认 false）——true = 原始 deflate 解压（无 CRC/长度校验；截断静默结束）
 - 返回：`{ "data": "<base64>" }`（解压后字节）
-- 错误：非 GZIP 数据 / CRC 失败 → `{ "err": ... }`；输出超过 `util.max-output-bytes` → `{ "err": "gunzip output exceeds ..." }`
+- 错误：非 GZIP 数据 / CRC 失败 → `{ "err": ... }`；raw 数据格式错误 → `{ "err": "invalid deflate data: ..." }`；输出超过 `util.max-output-bytes` → `{ "err": "gunzip output exceeds ..." }`
 
 ### `encode.utf8`（字符串 → 字节）
 
@@ -44,9 +46,9 @@
 
 | 操作 | 请求 | 返回 |
 |---|---|---|
-| `gzip.compressor.create` | `{ level?: 0-9 }` | `{ "id" }` |
+| `gzip.compressor.create` | `{ level?: 0-9, raw?: bool }` | `{ "id" }` |
 | `gzip.compressor.write` | `{ id, data: <b64> }` | `{ "data": <b64> }`（该块压缩输出，可能为空） |
-| `gzip.compressor.finish` | `{ id }` | `{ "data": <b64> }`（剩余输出，含 GZIP 尾） |
+| `gzip.compressor.finish` | `{ id }` | `{ "data": <b64> }`（剩余输出；gzip 含 GZIP 尾，raw 为 deflate 流尾） |
 | `gzip.compressor.close` | `{ id }` | `"true"` |
 
 流式（非 syncFlush）拼接输出与一次性 `gzip.compress` **字节级一致**（syncFlush 会在块边界插入 7 字节 flush marker，不使用）。
@@ -55,9 +57,9 @@
 
 | 操作 | 请求 | 返回 |
 |---|---|---|
-| `gzip.decompressor.create` | `{}` | `{ "id" }` |
+| `gzip.decompressor.create` | `{ raw?: bool }` | `{ "id" }` |
 | `gzip.decompressor.write` | `{ id, data: <b64> }` | `{ "data": <b64> }`（该块可解出的输出，可能为空） |
-| `gzip.decompressor.finish` | `{ id }` | `{ "data": <b64> }`（标记输入结束，读至 GZIP 流 EOF；数据不完整 → err） |
+| `gzip.decompressor.finish` | `{ id }` | `{ "data": <b64> }`（标记输入结束，读至流 EOF；gzip 数据不完整 → err；raw 无校验） |
 | `gzip.decompressor.close` | `{ id }` | `"true"` |
 
 流句柄 per-plugin 管理：未知/已关闭句柄 → `{ "err": "unknown gc/gd handle: ..." }`；插件卸载/热重载时运行时自动关闭全部句柄。
