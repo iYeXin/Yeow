@@ -20,11 +20,11 @@
 - 实现：core `yeow/util/{GzipCompressor,GzipDecompressor,FileStreams}.java`（可单测）+ `PluginThread` 流操作；`UtilCodecTest` 新增 4 用例（分块往返/单块与一次性一致/空输入/穿插空块）
 - 文档：api/util.md（重写）、api/fs.md（流式节）、specifications/message/{util,fs}.md、operations.md；站点侧边栏加入 Util 页
 
-### 版本升级（0.3.8 / 0.1.28）
+### 版本升级（0.3.9 / 0.1.29）
 
-- **yeow-api 0.3.7 → 0.3.8** / **create-yeow 0.3.7 → 0.3.8** / **yeow-utils 0.1.27 → 0.1.28**
-- 内容：流式文件读写（含 start/end 偏移、flags 选项）+ 分块 gzip（Gzip 命名空间）、util 上限配置化、http 回调修复、`encode.utf8` 输入校验修复（文本非 base64）、http 权限文档（listen/respond）、旧 gzip 导出移除（破坏性：用 `Gzip.*`）
-- 运行时内容更新：模板内置 `yeow-runtime-0.2.0.jar`（含 util 通道、调度器/事件桥/Profile 修复、流句柄、util 校验修复）
+- **yeow-api 0.3.8 → 0.3.9** / **create-yeow 0.3.8 → 0.3.9** / **yeow-utils 0.1.28 → 0.1.29**
+- 内容：流式文件读写（含 start/end 偏移、flags 选项、**fs.stat**）+ 分块 gzip（Gzip 命名空间）、util 上限配置化、http 回调修复、`encode.utf8` 输入校验修复（文本非 base64）、http 权限文档（listen/respond）、旧 gzip 导出移除（破坏性：用 `Gzip.*`）
+- 运行时内容更新：模板内置 `yeow-runtime-0.2.0.jar`（含 util 通道、调度器/事件桥/Profile 修复、流句柄、util 校验修复、fs.stat）
 - 模板依赖范围 `^0.3.0` / `^0.1.21` caret 自动覆盖，无需改动
 
 ---
