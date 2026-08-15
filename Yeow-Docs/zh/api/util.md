@@ -6,6 +6,8 @@ import { Gzip, stringToBytes, bytesToString } from 'yeow-api';
 
 util 模块提供 **gzip 压缩/解压**（一次性 + 流式分块）与 **UTF-8 字符串 ↔ 字节** 转换。输入输出一律为 `Uint8Array` / `string`——**不暴露 base64**（底层经 util 通道以 base64 承载，引擎原生转换）。
 
+> 如需使用 **ZIP** 压缩/解压能力（本模块为单流 gzip，不含 ZIP 容器），参考 [yeow-fflate](https://www.npmjs.com/package/yeow-fflate)。
+
 ## 大小上限（可配置）
 
 单次输入/解压输出上限默认 **256 MiB**（原始字节），可在 `plugins/Yeow/runtime/config.yml` 调整：

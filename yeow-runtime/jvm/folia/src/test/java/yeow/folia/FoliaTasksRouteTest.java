@@ -120,6 +120,14 @@ class FoliaTasksRouteTest {
     }
 
     @Test
+    void advancementForcedGlobal() {
+        var o = new JsonObject();
+        o.addProperty("uuid", "abc-123");
+        assertEquals(TargetKey.GLOBAL, marker("advancement.grant", o));
+        assertEquals(TargetKey.GLOBAL, marker("advancement.getProgress", o));
+    }
+
+    @Test
     void globalTaskTypesGoGlobal() {
         assertEquals(TargetKey.GLOBAL, marker("server.broadcast", p("message", "hi")));
         assertEquals(TargetKey.GLOBAL, marker("material.isSolid", p("type", "stone")));

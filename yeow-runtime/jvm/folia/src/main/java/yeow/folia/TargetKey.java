@@ -7,7 +7,7 @@ import org.bukkit.entity.Entity;
 import java.util.UUID;
 
 /**
- * 任务路由目标 key 工具：key 由 {@link FoliaTasks#targetOf} 生成（提交期/投递期/驻留标记），
+ * 任务路由目标 key 工具：key 由 {@link FoliaTasks#getScheduler} 生成（提交期/投递期/驻留标记），
  * 解析（实体/世界+坐标）的唯一实现点——调度器驻留与投递共用，避免各处重复解析。
  *
  * **归属判断**：日常路径用 {@link FoliaTasks#ownedHere}（按任务类型直接基于参数判定，

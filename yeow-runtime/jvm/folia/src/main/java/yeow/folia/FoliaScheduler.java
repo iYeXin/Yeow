@@ -32,7 +32,8 @@ import java.util.logging.Logger;
  *   等待下一个任务抢占）——A/B 路径执行前都尝试抢占标记（热点跟随最近任务目标）；
  *   实体下线/世界卸载的过期驻留权自动清理
  * - **事件/补全模式**：计数非零时 cycle 退出；事件线程作为临时调度器（drainForPlugins：
- *   不迁移、取事件插件任务 + 当前区域归属的其他插件任务，对齐 Paper 事件期间不冻结他人）
+ *   不迁移、只取本事件订阅插件的任务（纯 L 方案，依据是插件 JS 单线程支点）；其他插件
+ *   任务等待事件结束后的 cycle 恢复（延迟有界 ≤ 事件超时）
  * - **优先级**：取件规则 = 始终优先更高优先级（HIGH → NORMAL → LOW，各池 FIFO）；
  *   高频 NORMAL 经**提交时自动降级**为 LOW（Paper 同款滑动窗口，防交互洪泛）；
  *   **LOW 饿死保护**：LOW 池非空且超过 LOW_STARVATION_GUARD_NS（1s）未取过 LOW 时
@@ -90,6 +91,10 @@ public class FoliaScheduler implements TaskScheduler {
     private volatile boolean cycleRunning = false;
     /** 调度器驻留区域目标 key（"uuid:x"/"world:y"/null=无主可争抢）。 */
     private volatile String schedRegion = null;
+    /** cycle 世代号：每次 dispatchCycle 实际启动时自增（cycleLock 保护）。 */
+    private long cycleEpoch = 0;
+    /** 当前生效的 cycle 世代；-1 = 无。旧循环的 finishCycle 只有世代匹配时才能收尾。 */
+    private long activeCycleEpoch = -1;
     /** 已投递未完成的任务数（就地执行不占用）。 */
     private final java.util.concurrent.atomic.AtomicInteger inflight = new java.util.concurrent.atomic.AtomicInteger();
     /** 预算窗口起点（物理时间）。 */
@@ -189,7 +194,8 @@ public class FoliaScheduler implements TaskScheduler {
                     && System.nanoTime() - cycleLastActiveNs > CYCLE_STALE_NS
                     && System.nanoTime() - lastCycleRecoveryNs > CYCLE_STALE_NS) {
                 // 看门狗：cycle 应运行但超阈值无活动（region 调度器投递被静默丢弃等）→ 强制重启。
-                // 长任务误触发无害：恢复投递与在跑 cycle 在同一 region 线程上串行执行，收敛。
+                // 长任务误触发无害：恢复投递与在跑 cycle 在同一 region 线程上串行执行，收敛；
+                // 若恢复 cycle 抢先启动，它将认领新世代，旧循环的 finishCycle 不再覆盖状态。
                 lastCycleRecoveryNs = System.nanoTime();
                 if (DBG) LOG.warning("[sched] cycle stalled, force restart region=" + schedRegion);
                 runCycleOn(schedRegion);
@@ -213,6 +219,7 @@ public class FoliaScheduler implements TaskScheduler {
         inflights.clear();
         synchronized (cycleLock) {
             cycleRunning = false;
+            activeCycleEpoch = -1;
             schedRegion = null;
             cycleLock.notifyAll();
         }
@@ -329,8 +336,15 @@ public class FoliaScheduler implements TaskScheduler {
      * → 让出驻留标记**（不主动让位，等待下一个任务的抢占）；任务处理统一走 {@link #processTask}。
      */
     private void dispatchCycle() {
+        // 启动即认领当前世代：看门狗可能在同一线程排队了恢复用 cycle，旧循环收尾时
+        // 世代已过期 → finishCycle 不覆盖新循环状态（防双 cycle 状态互相踩踏）。
+        long epoch;
+        synchronized (cycleLock) {
+            epoch = ++cycleEpoch;
+            activeCycleEpoch = epoch;
+        }
         if (DBG) LOG.info("[sched] cycle start thread=" + Thread.currentThread().getName()
-            + " schedRegion=" + schedRegion);
+            + " epoch=" + epoch + " schedRegion=" + schedRegion);
         try {
             long idleSince = 0; // 空闲等待起点（0 = 队列非空状态）
             int foreignCount = 0;
@@ -373,20 +387,28 @@ public class FoliaScheduler implements TaskScheduler {
         } catch (Exception e) {
             LOG.warning("[Yeow] scheduler cycle error: " + e.getMessage());
         } finally {
-            finishCycle();
+            finishCycle(epoch);
         }
     }
 
     /**
-     * 循环退出收尾（cycleLock 内）：释放驻留权（等 wake 恢复），或预算尽时保持占位
+     * 循环退出收尾（cycleLock 内）：仅当前 cycle 世代（{@code epoch == activeCycleEpoch}）
+     * 可收尾——看门狗恢复的更新 cycle 已认领世代时，旧循环直接退出、不改任何状态。
+     * 否则：释放驻留权（等 wake 恢复），或预算尽时保持占位
      * 并 **pending 重启**——每 tick 定时任务在下一个 tick 边界重启（等待 ≈ 窗口剩余
      * 时间，典型 ~30ms；周期任务与 tick 对齐，无需 runDelayed 的整 tick 等待）。
      * 竞态兜底：空闲退出窗口内新任务入队且预算未耗尽 → **立即重启**，防止丢失唤醒
      * （否则任务滞留直到 10s 同步超时）。
      */
-    private void finishCycle() {
+    private void finishCycle(long epoch) {
         boolean immediateRestart = false;
         synchronized (cycleLock) {
+            // 看门狗已启动更新的 cycle：本循环属旧世代，状态归新循环管理，不得覆盖。
+            if (epoch != activeCycleEpoch) {
+                if (DBG) LOG.info("[sched] cycle exit: stale epoch=" + epoch
+                    + " (active=" + activeCycleEpoch + ")");
+                return;
+            }
             if (!running || eventModeCount.get() > 0 || inflight.get() >= maxInflight || queueEmpty()) {
                 // 事件模式 / in-flight 满（等 complete 唤醒）/ 队列空（等 submit 唤醒）
                 cycleRunning = false;
@@ -684,19 +706,38 @@ public class FoliaScheduler implements TaskScheduler {
     /** 事件自旋取任务（纯 L：只取事件插件任务，任意目标；与通用 pollAny 互斥：queueLock）。 */
     private PendingTask pollForSpin(java.util.Set<String> pluginNames) {
         synchronized (queueLock) {
+            // LOW 饿死保护（与 pollAny 同口径）：LOW 池非空且距上次取 LOW ≥ 1s 时，
+            // 先尝试取事件插件在 LOW 池中的任务；无匹配再走常规 HIGH → NORMAL → LOW。
+            if (!lowPool.isEmpty() && System.nanoTime() - lastLowPickNs >= LOW_STARVATION_GUARD_NS) {
+                var low = pollMatching(lowPool, pluginNames);
+                if (low != null) {
+                    lastLowPickNs = System.nanoTime();
+                    return low;
+                }
+            }
             for (var pool : java.util.List.of(highPool, normalPool, lowPool)) {
-                var it = pool.iterator();
-                while (it.hasNext()) {
-                    var t = it.next();
-                    if (!pluginNames.contains(t.pluginName())) continue;
-                    // 排队超时的同步任务：调用方已放弃，补 err 并移除，不得执行
-                    if (staleSyncTask(t)) { it.remove(); errStale(t); continue; }
-                    it.remove();
+                var t = pollMatching(pool, pluginNames);
+                if (t != null) {
+                    if (pool == lowPool) lastLowPickNs = System.nanoTime();
                     return t;
                 }
             }
             return null;
         }
+    }
+
+    /** 在单个池内扫描并取出第一个匹配插件名的任务（排队超时的同步任务补 err 并移除）。 */
+    private PendingTask pollMatching(ConcurrentLinkedQueue<PendingTask> pool, java.util.Set<String> pluginNames) {
+        var it = pool.iterator();
+        while (it.hasNext()) {
+            var t = it.next();
+            if (!pluginNames.contains(t.pluginName())) continue;
+            // 排队超时的同步任务：调用方已放弃，补 err 并移除，不得执行
+            if (staleSyncTask(t)) { it.remove(); errStale(t); continue; }
+            it.remove();
+            return t;
+        }
+        return null;
     }
 
     // ── 插件清理 ───────────────────────────────────────────────────

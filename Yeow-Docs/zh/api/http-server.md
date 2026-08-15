@@ -1,10 +1,10 @@
 # HTTP 服务器 API
 
-`yeow-utils` 提供高层 `createServer`，`yeow-api` 提供底层 `listen`/`respond`/`close`。
+[yeow-server](https://www.npmjs.com/package/yeow-server)（npm）提供高层 `createServer`，`yeow-api` 提供底层 `listen`/`respond`/`close`。
 
 ```js
-import { createServer } from 'yeow-utils';
-import type { Server, RouteRequest } from 'yeow-utils';
+import { createServer } from 'yeow-server';
+import type { Server, RouteRequest } from 'yeow-server';
 ```
 
 > **权限**：http 通道**整个默认拒绝**——需在 `yeow.config.json` 的 `permissions` 中声明 `"http:*"`，或按节点声明：
@@ -53,7 +53,7 @@ server.close()                  // 关闭服务器
 ### 中间件（洋葱模型）
 
 ```js
-import { createServer } from 'yeow-utils';
+import { createServer } from 'yeow-server';
 
 const app = createServer(8080);
 
@@ -85,7 +85,7 @@ app.get('/api/data', (req) => ({ ok: true }));   // 自动 JSON 序列化 → {"
 `mount(dir, prefix?)` 把**插件数据目录**（`plugins/<插件名>/`）下的目录挂载为静态文件服务（base64 二进制传输 + Content-Type 按扩展名推断）：
 
 ```js
-import { createServer } from 'yeow-utils';
+import { createServer } from 'yeow-server';
 
 const app = createServer(8080);
 
@@ -98,7 +98,7 @@ app.get('/api/data', () => ({ body: 'ok' }));
 **检测 + 自动提取（从资源到文件系统）**：静态文件通常打包在 `assets/`（.zip 内），`mount` 读取的是数据目录——首次启动时检测数据目录缺失则自动从 `assets` 提取，之后直接挂载：
 
 ```js
-import { createServer } from 'yeow-utils';
+import { createServer } from 'yeow-server';
 import { fs, assetsExtractDir } from 'yeow-api';
 
 onLoad(async () => {
@@ -122,7 +122,7 @@ onLoad(async () => {
 `mountAssets(dir, prefix?)` 把**打包资源**（assets，.zip 内）直接挂载为静态文件服务——**无需提取到磁盘**，每次请求从 .zip 读取单个文件：
 
 ```js
-import { createServer } from 'yeow-utils';
+import { createServer } from 'yeow-server';
 import { getAssetsPath } from 'yeow-dev';   // 构建期虚拟模块
 
 const app = createServer(8080);
@@ -228,10 +228,10 @@ close(serverId);
 
 `respond` 支持 `bodyBase64`——base64 编码的**二进制**响应体（与 `body` 互斥，优先）。典型场景：从 `assets` 读取资源包等二进制文件并暴露下载 URL。
 
-**推荐使用 `yeow-utils` 的 `createServer`**（路由 + 自动响应）：
+**推荐使用 `yeow-server` 的 `createServer`**（路由 + 自动响应）：
 
 ```js
-import { createServer } from 'yeow-utils';
+import { createServer } from 'yeow-server';
 import { assetsReadBase64 } from 'yeow-api';
 
 let cachedPack = null;   // 缓存：每次请求都从 .zip 内解压读取较耗时
@@ -261,7 +261,7 @@ app.get('/resourcepack', async (req) => {
 ### 完整闭环：资源包下载并发送给玩家
 
 ```js
-import { createServer } from 'yeow-utils';
+import { createServer } from 'yeow-server';
 import { assetsReadBase64, Player, fs, eventOn } from 'yeow-api';
 
 // ① 暴露资源包下载 URL（见上例，缓存 base64）

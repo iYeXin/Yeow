@@ -4,7 +4,7 @@ Yeow 插件可以把共享逻辑和资源封装为 npm 包，供其他插件复�
 
 - 封装 Service（三类包：SDK / JS 服务 / 原生服务，见下文「[封装 Service 的包（三种类型）](#封装-service-的包三种类型)」）
 - 封装 Native Service（如 `yeow-image` 打包 `image-svc.exe` + 注册/调用逻辑）
-- 共享工具函数（如 `yeow-utils`）
+- 共享工具函数（如 `yeow-command`、`yeow-server`）
 - 共享配置模板、资源文件
 
 ---

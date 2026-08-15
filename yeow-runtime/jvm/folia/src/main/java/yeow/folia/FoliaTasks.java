@@ -36,7 +36,7 @@ import java.util.UUID;
  *
  * **路由与归属：按任务类型家族成对编写**（与执行器 {@link #doExecute} 并列）：
  * <ul>
- *   <li>{@link #targetOf} — 提交期/投递期的**目标 key**（驻留标记、wake 抢占、dispatchAsync 路由）</li>
+ *   <li>{@link #getScheduler} — 提交期/投递期的**目标 key**（驻留标记、wake 抢占、B 路径投递路由）</li>
  *   <li>{@link #ownedHere} — 执行期**当前线程归属判断**（就地执行 / 驻留让出）——直接基于
  *       原始参数判定，不经 key 反推（key 是有损编码，反推会丢失任务类型语义）</li>
  * </ul>
@@ -45,11 +45,9 @@ import java.util.UUID;
  *
  * 执行入口：
  * <ul>
- *   <li>{@link #executeAsync} — 非阻塞入口（调度循环 / 事件自旋泵共用）：归属由调用方
- *       预计算（local）——目标在当前线程 → 就地执行并立即回调；否则经 Folia 调度器
- *       投递（不等待），结果由目标线程回调。</li>
- *   <li>{@link #execute} — 阻塞入口（dispatchAsync 投递后的目标线程用）：调用方已保证
- *       当前线程为目标线程，直接执行，零判断。</li>
+ *   <li>{@link #getScheduler} — 调度器零认知契约：返回驻留标记与惰性投递闭包，
+ *       由调度循环 / 事件自旋泵据此走 A 路径（就地执行）或 B 路径（异步投递）</li>
+ *   <li>{@link #execute} — 任务本体：调用方已保证当前线程为目标线程，直接执行，零判断</li>
  * </ul>
  */
 public class FoliaTasks {
@@ -120,7 +118,7 @@ public class FoliaTasks {
         }
     }
 
-    /** 直接执行（dispatchAsync 投递后的目标线程使用；调用方已保证归属）。 */
+    /** 直接执行（B 路径投递后的目标线程使用；调用方已保证归属）。 */
     public static Object execute(String taskType, JsonObject params) throws Exception {
         return doExecute(taskType, params);
     }
@@ -153,10 +151,9 @@ public class FoliaTasks {
             if (id == null || id.isEmpty()) return global(taskType, params);
             return new DispatchTarget("uuid:" + id, finish -> dispatchEntity(id, taskType, params, finish));
         }
-        // 实体家族（player/entity/potion/pdc-uuid/advancement/bossbar 玩家操作）：
+        // 实体家族（player/entity/potion/pdc-uuid/bossbar 玩家操作）：
         // 目标 = 实体/玩家所在 region
         if (taskType.startsWith("player.") || taskType.startsWith("entity.") || taskType.startsWith("potion.")
-                || taskType.startsWith("advancement.")
                 || taskType.equals("bossbar.addPlayer") || taskType.equals("bossbar.removePlayer")
                 || (taskType.startsWith("pdc.") && params.has("uuid") && !params.get("uuid").isJsonNull())) {
             var id = params.has("uuid") ? params.get("uuid").getAsString()
@@ -280,23 +277,26 @@ public class FoliaTasks {
     private static FoliaRuntime rt() { return scheduler.runtime(); }
 
     /**
-     * 当前线程归属判断（**按任务类型家族独立编写**，与 {@link #targetOf} 成对、与执行器并列）。
+     * 当前线程归属判断（**按任务类型家族独立编写**，与 {@link #getScheduler} 成对、与执行器并列）。
      * **直接基于原始参数判定**——不经 key 反推（key 是有损编码：坐标截断、c 前缀、
      * name/world 双形态，反推会丢失任务类型语义）。捕获 AsyncCatcher 拦截异常视为
      * "非本 region"；全局类/未知任务恒 false。调度器据连续两次 false 让出驻留。
      */
     public static boolean ownedHere(String taskType, JsonObject params) {
         if (params == null) return false;
+        // advancement 家族：getScheduler 强制 GLOBAL（Bukkit.getAdvancement 受 AsyncCatcher
+        // 全局线程约束）——ownedHere 必须同步恒 false。否则 cycle 驻留在目标实体 region
+        // 时会走 A 路径在 region 线程就地执行，触发 AsyncCatcher 拦截而失败。
+        if (taskType.startsWith("advancement.")) return false;
         // inventory 家族（统一三寻址）：uuid → 实体归属；world+x+y+z → 方块归属；id 寻址恒 false（GLOBAL）
         if (taskType.startsWith("inventory.")) {
             if (params != null && params.has("uuid") && !params.get("uuid").isJsonNull()) return entityOwnedHere(params);
             if (params != null && params.has("world") && params.has("x") && params.has("z")) return worldOwnedHere(taskType, params);
             return false;
         }
-        // 实体家族（player/entity/potion/pdc-uuid/advancement/bossbar 玩家操作）：
+        // 实体家族（player/entity/potion/pdc-uuid/bossbar 玩家操作）：
         // 归属 = 目标实体所在 region
         if (taskType.startsWith("player.") || taskType.startsWith("entity.") || taskType.startsWith("potion.")
-                || taskType.startsWith("advancement.")
                 || taskType.equals("bossbar.addPlayer") || taskType.equals("bossbar.removePlayer")
                 || (taskType.startsWith("pdc.") && params.has("uuid") && !params.get("uuid").isJsonNull())) {
             return entityOwnedHere(params);
@@ -363,7 +363,7 @@ public class FoliaTasks {
             }
             return worldChunkOwnedHere(name, 0, 0);
         }
-        // world.get* 可携带 name 参数（无 world 键，与 targetOf 分支对应）
+        // world.get* 可携带 name 参数（无 world 键，与 getScheduler 分支对应）
         if (taskType.startsWith("world.get") && p.has("name") && !p.get("name").getAsString().isEmpty()) {
             return worldChunkOwnedHere(p.get("name").getAsString(), 0, 0);
         }

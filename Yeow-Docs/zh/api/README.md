@@ -44,7 +44,7 @@
 | 文档 | 说明 |
 |------|------|
 | ⭐ [Event](event.md) | 事件订阅：`eventOn` / `eventOff` |
-| ⭐ [Command](command.md) | 命令注册 + Tab 补全（含 `yeow-utils` 重载式命令） |
+| ⭐ [Command](command.md) | 命令注册 + Tab 补全（含 `yeow-command` 重载式命令） |
 
 ## 物品
 
@@ -58,7 +58,7 @@
 |------|------|
 | ⭐ [Service](service.md) | 插件间/原生服务：注册、请求、订阅 |
 | [HTTP](http.md) | 底层 HTTP 客户端 |
-| [HTTP Server](http-server.md) | HTTP 服务端（`yeow-utils` `createServer`） |
+| [HTTP Server](http-server.md) | HTTP 服务端（`yeow-server` `createServer`） |
 
 ## 多线程
 

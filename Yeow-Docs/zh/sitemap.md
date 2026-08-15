@@ -52,11 +52,11 @@
 | Advancement | `https://yexin.wiki/yeow/v1/api/advancement` | 进度：授予/撤销、进度查询、判据授予/撤销                                                                                                                                         |
 | Recipe      | `https://yexin.wiki/yeow/v1/api/recipe`      | 配方：有序/无序合成、熔炉/高炉/烟熏/营火；添加/移除/按产物查询                                                                                                                   |
 | Event       | `https://yexin.wiki/yeow/v1/api/event`       | 事件订阅：`eventOn`/`eventOff`、自动/手动模式（取消、回写）、全事件字段表、消息（Message 对象）                                                                                  |
-| Command     | `https://yexin.wiki/yeow/v1/api/command`     | 命令注册 + Tab 补全（含 yeow-utils 重载式命令 Command.create 与模式化参数）                                                                                                      |
+| Command     | `https://yexin.wiki/yeow/v1/api/command`     | 命令注册 + Tab 补全（含 yeow-command 重载式命令 Command.create 与模式化参数）                                                                                                      |
 | ItemStack   | `https://yexin.wiki/yeow/v1/api/item`        | 物品纯数据描述符：type/amount/meta（显示名/附魔/耐久/染色/药水/头颅/属性修饰符）；构造工具（create/clone/equals）；值语义（快照，不绑定真实物品）                                |
 | Service     | `https://yexin.wiki/yeow/v1/api/service`     | 插件间服务（registerService/request/subscribe/publish）与原生服务（registerNativeService，spawn 子进程 + TCP 通信）                                                              |
 | HTTP        | `https://yexin.wiki/yeow/v1/api/http`        | 底层 HTTP 客户端：request（异步）/requestSync（同步阻塞）/fetch                                                                                                                  |
-| HTTP Server | `https://yexin.wiki/yeow/v1/api/http-server` | 高层 `createServer`（yeow-utils）：洋葱中间件、路由、mount/mountAssets 静态挂载、二进制响应（bodyBase64）、返回对象自动 JSON、资源包下载闭环                                     |
+| HTTP Server | `https://yexin.wiki/yeow/v1/api/http-server` | 高层 `createServer`（yeow-server）：洋葱中间件、路由、mount/mountAssets 静态挂载、二进制响应（bodyBase64）、返回对象自动 JSON、资源包下载闭环                                     |
 | Worker      | `https://yexin.wiki/yeow/v1/api/worker`      | 虚拟插件（独立线程）：createWorker（仅注册）/load/unload/reload、双向 postMessage、Worker 侧 onMessage/postMessage；共享数据目录/权限、禁嵌套、/yeow 不覆盖                      |
 | FS          | `https://yexin.wiki/yeow/v1/api/fs`          | 文件系统：plugin/server/outer 三级（路径安全）、读写/追加/二进制、目录操作、systemPaths、path 工具                                                                               |
 | Assets      | `https://yexin.wiki/yeow/v1/api/assets`      | 打包资源：`getAssetsPath`（yeow-dev，构建期注入命名空间）+ 读取/解压（单文件与目录）                                                                                             |

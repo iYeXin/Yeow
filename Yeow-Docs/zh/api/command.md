@@ -76,10 +76,12 @@ registerCommand('hello', {
 });
 ```
 
-## yeow-utils 重载式命令
+## yeow-command 重载式命令
+
+[yeow-command](https://www.npmjs.com/package/yeow-command)（npm）提供类型化重载式命令构建器：
 
 ```js
-import { Command, CommandSchema } from 'yeow-utils';
+import { Command, CommandSchema } from 'yeow-command';
 ```
 
 `Command.create(name, options?)` 创建命令 builder，`.add()` 添加重载，`Command.register(cmd)` 注册。
