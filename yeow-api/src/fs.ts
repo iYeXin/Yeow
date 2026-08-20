@@ -1,6 +1,6 @@
 type FsLevel = 'plugin' | 'server' | 'outer';
 
-import { stringToBytes, bytesToString } from './util.js';
+import { stringToBytesSync, bytesToStringSync } from './util.js';
 
 /** 文件编码：utf8 = 文本；base64 = 将字符串视为 Base64 编码的二进制数据。 */
 export type FsEncoding = 'utf8' | 'base64';
@@ -53,7 +53,7 @@ function _makeUtf8StreamDecoder() {
     if ((b & 0xE0) === 0xC0) return 2;
     if ((b & 0xF0) === 0xE0) return 3;
     if ((b & 0xF8) === 0xF0) return 4;
-    return 1; // 非法起始字节：交给 bytesToString 以替换字符处理
+    return 1; // 非法起始字节：交给 bytesToStringSync 以替换字符处理
   };
 
   return {
@@ -84,12 +84,12 @@ function _makeUtf8StreamDecoder() {
 
       pending = cut === buf.length ? new Uint8Array(0) : buf.slice(cut);
       const complete = cut === buf.length ? buf : buf.subarray(0, cut);
-      return complete.length ? bytesToString(complete) : null;
+      return complete.length ? bytesToStringSync(complete) : null;
     },
     /** EOF：把剩余的不完整序列交给 Java 解码（通常产出 U+FFFD）。 */
     flush(): string | null {
       if (!pending.length) return null;
-      const s = bytesToString(pending);
+      const s = bytesToStringSync(pending);
       pending = new Uint8Array(0);
       return s;
     },
@@ -394,7 +394,7 @@ function _makeWriteStream(
   const check = () => { if (closed) throw new Error('write stream closed'); };
   const toBytes = (chunk: Uint8Array | string): Uint8Array => {
     if (typeof chunk !== 'string') return chunk; // Uint8Array 始终按原始字节写入
-    return encoding === 'base64' ? Uint8Array.fromBase64(chunk) : stringToBytes(chunk);
+    return encoding === 'base64' ? Uint8Array.fromBase64(chunk) : stringToBytesSync(chunk);
   };
   return {
     encoding,

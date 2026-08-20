@@ -3,6 +3,7 @@ import type { TaskOptions } from './task.js';
 import { Location, LocationData } from './location.js';
 import { Block } from './block.js';
 import type { BlockState } from './block.js';
+import type { ItemStack } from './item.js';
 import { Chunk, ChunkData } from './chunk.js';
 
 interface WorldData {
@@ -103,13 +104,22 @@ export class World {
   setBorderDamage(amount?: number, buffer?: number, options?: TaskOptions): Promise<boolean> {
     return post<boolean>('world.setBorderDamage', { world: this.name, amount, buffer }, options);
   }
+  setBorderDamageSync(amount?: number, buffer?: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.setBorderDamage', { world: this.name, amount, buffer }, options);
+  }
   /** 边界警告（distance 方块距离；time 秒）。 */
   setBorderWarning(distance?: number, time?: number, options?: TaskOptions): Promise<boolean> {
     return post<boolean>('world.setBorderWarning', { world: this.name, distance, time }, options);
   }
+  setBorderWarningSync(distance?: number, time?: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.setBorderWarning', { world: this.name, distance, time }, options);
+  }
   /** 边界平滑移动（from → to，seconds 秒）。 */
   setBorderMoving(from: number, to: number, seconds: number, options?: TaskOptions): Promise<boolean> {
     return post<boolean>('world.setBorderMoving', { world: this.name, from, to, seconds }, options);
+  }
+  setBorderMovingSync(from: number, to: number, seconds: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.setBorderMoving', { world: this.name, from, to, seconds }, options);
   }
   getChunkAt(x: number, z: number, options?: TaskOptions): Promise<Chunk> {
     return post<ChunkData>('world.getChunkAt', { world: this.name, x, z }, options).then((d) => Chunk.from(d));
@@ -122,6 +132,12 @@ export class World {
   }
   isChunkLoadedSync(x: number, z: number, options?: TaskOptions): boolean {
     return call<boolean>('world.isChunkLoaded', { world: this.name, x, z }, options);
+  }
+  isChunkGenerated(x: number, z: number, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('world.isChunkGenerated', { world: this.name, x, z }, options);
+  }
+  isChunkGeneratedSync(x: number, z: number, options?: TaskOptions): boolean {
+    return call<boolean>('world.isChunkGenerated', { world: this.name, x, z }, options);
   }
   loadChunk(x: number, z: number, options?: TaskOptions): Promise<boolean> {
     return post<boolean>('world.loadChunk', { world: this.name, x, z }, options);
@@ -211,11 +227,16 @@ export class World {
   getNearbyEntitiesSync(x: number, y: number, z: number, radius: number, options?: TaskOptions): string[] {
     return call<string[]>('world.getNearbyEntities', { world: this.name, x, y, z, radius }, options);
   }
-  dropItem(x: number, y: number, z: number, itemType: string, amount?: number, options?: TaskOptions): Promise<void> {
-    return post('world.dropItem', { world: this.name, x, y, z, itemType, amount }, options);
+  /** 在指定位置掉落物品（`item` 为 ItemStack 数据快照或材质名字符串；字符串时可用 `amount` 指定数量——旧式参数兼容）。 */
+  dropItem(x: number, y: number, z: number, item: ItemStack | string, amount?: number, options?: TaskOptions): Promise<void> {
+    const it: Record<string, unknown> = typeof item === 'string' ? { type: item } : { ...item };
+    if (typeof item === 'string' && amount !== undefined) it.amount = amount;
+    return post('world.dropItem', { world: this.name, x, y, z, item: it }, options);
   }
-  dropItemSync(x: number, y: number, z: number, itemType: string, amount?: number, options?: TaskOptions): void {
-    call('world.dropItem', { world: this.name, x, y, z, itemType, amount }, options);
+  dropItemSync(x: number, y: number, z: number, item: ItemStack | string, amount?: number, options?: TaskOptions): void {
+    const it: Record<string, unknown> = typeof item === 'string' ? { type: item } : { ...item };
+    if (typeof item === 'string' && amount !== undefined) it.amount = amount;
+    call('world.dropItem', { world: this.name, x, y, z, item: it }, options);
   }
   strikeLightning(x: number, y: number, z: number, options?: TaskOptions): Promise<void> {
     return post('world.strikeLightning', { world: this.name, x, y, z }, options);

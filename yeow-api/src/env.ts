@@ -12,6 +12,8 @@ export interface EnvInfo {
   yeow: { platform: string; version: string };
   /** epoch 微秒时间戳。 */
   now: number;
+  /** 插件数据目录路径（如 `plugins/my-plugin`；Worker 中为主插件目录）。 */
+  pluginDir: string;
 }
 
 /** 获取运行时环境信息（同步；含微秒时间戳）。 */

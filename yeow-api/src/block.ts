@@ -9,15 +9,16 @@ import {
   keysBlock as pdcKeys, getAllBlock as pdcGetAll,
 } from './pdc.js';
 
-/** 方块状态（Minecraft 原版键值对枚举，值统一为字符串）。 */
+/** 方块状态（Minecraft 原版键值对枚举；值为字符串 / 数字 / 布尔——按原版语义保留类型）。 */
 export interface BlockState {
-  [key: string]: string;
+  [key: string]: string | number | boolean;
 }
 
 /**
  * Block —— 方块数据描述符 + 可选的世界位置（location）。
  * 对应 Minecraft 原版的方块概念：类型 + 方块状态（键值对枚举，如
- * `facing`、`waterlogged`、`level` 等，值统一为字符串）。
+ * `facing`、`waterlogged`、`level` 等；值按原版语义保留类型——布尔 `waterlogged: false`、
+ * 数字 `level: 8`、枚举串 `facing: "north"`）。
  *
  * **静态数据语义**：`type` / `state` / `location` 均为**获取时刻的快照**，
  * 之后世界变化不会自动更新；需要最新状态请重新调用 `world.getBlock`。
@@ -58,8 +59,6 @@ export class Block {
 
   isSolid(options?: TaskOptions): Promise<boolean> { return Material.isSolid(this.type, options); }
   isSolidSync(options?: TaskOptions): boolean { return Material.isSolidSync(this.type, options); }
-  isLiquid(options?: TaskOptions): Promise<boolean> { return Material.isLiquid(this.type, options); }
-  isLiquidSync(options?: TaskOptions): boolean { return Material.isLiquidSync(this.type, options); }
   isAir(options?: TaskOptions): Promise<boolean> { return Material.isAir(this.type, options); }
   isAirSync(options?: TaskOptions): boolean { return Material.isAirSync(this.type, options); }
 

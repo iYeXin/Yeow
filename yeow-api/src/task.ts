@@ -73,12 +73,23 @@ export interface BatchTask {
   priority?: 'high' | 'normal' | 'low';
 }
 
-/** 同步批量：阻塞直到全部任务完成，返回结果数组（顺序对应 tasks；单个任务失败时对应项为 `{err}` 对象）。 */
+/** 同步批量：阻塞直到全部任务完成，返回结果数组（顺序对应 tasks；单个任务失败时对应项为 `{err}` 对象——与单任务 call/post 抛 Error 不同，批量保留部分结果）。 */
 export function callBatch(tasks: BatchTask[]): unknown[] {
   if (tasks.length === 0) return [];
   const r = $send('task', { tasks });
   if (r == null) return [];
-  if ((r as any)?.err) throw new Error((r as any).err);
+  if ((r as any)?.err) {
+    // 与 call/post 对齐的错误上下文（type/task/Java 堆栈）
+    const errObj = r as any;
+    const msg = errObj.type ? `[${errObj.type}] ${errObj.err}` : errObj.err;
+    const e = new Error(msg);
+    if (errObj.stack) {
+      e.stack += '\n    --- runtime executer error(for reference) ---\n' + errObj.stack;
+    }
+    (e as any).javaType = errObj.type || null;
+    (e as any).taskType = errObj.task || null;
+    throw e;
+  }
   return r as unknown[];
 }
 

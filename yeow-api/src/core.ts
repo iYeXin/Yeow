@@ -1,7 +1,7 @@
 /// <reference path="global.d.ts" />
 /// <reference path="yeow-dev.d.ts" />
 
-export { call, callBatch, postBatch } from './task.js';
+export { call, post, callBatch, postBatch } from './task.js';
 export type { BatchTask } from './task.js';
 export { Location } from './location.js';
 export { Player } from './player.js';
@@ -57,43 +57,27 @@ export { assets, read as assetsRead, readSync as assetsReadSync,
 export { path } from './path.js';
 export { createReadStream, createWriteStream } from './fs.js';
 export type { ReadStream, WriteStream, ReadStreamOptions, WriteStreamOptions } from './fs.js';
-export { listen, respond, close, request, requestSync } from './http.js';
-export type { RespondOptions } from './http.js';
+export { listen, respond, close, request } from './http.js';
+export type { RespondOptions, RequestOptions, HttpResponse } from './http.js';
 export { logError } from './log-error.js';
 export { InstanceId, BossBarHandle, InventoryHandle } from './instance-id.js';
 export { ItemStack } from './item.js';
 export type { ItemMeta, PotionEffectData, AttributeModifierData } from './item.js';
 export type { PotionEffect } from './potion.js';
-export { addPotionEffect, removePotionEffect, clearPotionEffects, getActivePotionEffects } from './potion.js';
-export { playSound, stopSound, stopAllSounds } from './sound.js';
+export { playSound } from './sound.js';
 export type { ParticleOptions } from './particle.js';
 export { spawnParticle } from './particle.js';
+export type { PlayerTarget, LivingTarget, EntityTarget } from './target.js';
+export type { AdvancementProgress } from './advancement.js';
+export { BossBar } from './bossbar.js';
+export type { BossBarOptions } from './bossbar.js';
+export { Scoreboard, Objective, Team } from './scoreboard.js';
+export type { ObjectiveInfo, TeamInfo } from './scoreboard.js';
 export { get as pdcGet, set as pdcSet, has as pdcHas, remove as pdcRemove, keys as pdcKeys, getAll as pdcGetAll,
     getRaw as pdcGetRaw, setRaw as pdcSetRaw, getAllRaw as pdcGetAllRaw,
     getBlock as pdcGetBlock, setBlock as pdcSetBlock, hasBlock as pdcHasBlock, removeBlock as pdcRemoveBlock,
     keysBlock as pdcKeysBlock, getAllBlock as pdcGetAllBlock, getBlockRaw as pdcGetBlockRaw, setBlockRaw as pdcSetBlockRaw, getAllBlockRaw as pdcGetAllBlockRaw } from './pdc.js';
-export { createBossBar, destroy as destroyBossBar,
-    setTitle as setBossBarTitle, setProgress as setBossBarProgress,
-    setColor as setBossBarColor, setStyle as setBossBarStyle,
-    setVisible as setBossBarVisible, addPlayer as addBossBarPlayer,
-    removePlayer as removeBossBarPlayer, removeAll as removeAllBossBarPlayers,
-    addFlag as addBossBarFlag, removeFlag as removeBossBarFlag } from './bossbar.js';
-export type { BossBarOptions } from './bossbar.js';
-export type { AdvancementProgress } from './advancement.js';
-export { grant as grantAdvancement, revoke as revokeAdvancement,
-    getProgress as getAdvancementProgress, awardCriteria, revokeCriteria } from './advancement.js';
 export { add as addRecipe, remove as removeRecipe, getForItem as getRecipesForItem } from './recipe.js';
-export type {
-    ObjectiveInfo, TeamInfo,
-} from './scoreboard.js';
-export { createBoard as createScoreboard, deleteBoard as deleteScoreboard,
-    createObjective, deleteObjective, getObjectives,
-    setObjectiveDisplay, getScore, setScore, resetScore,
-    createTeam, deleteTeam, getTeam, getTeams,
-    setTeamDisplayName, setTeamPrefix, setTeamSuffix, setTeamColor,
-    setTeamFriendlyFire, setTeamSeeInvisible, setTeamOption,
-    teamAddEntry, teamRemoveEntry, teamGetEntries,
-    setPlayerBoard } from './scoreboard.js';
 export { Material, getMaterials, getBlocks, getItems } from './material.js';
 export type { MaterialInfo } from './material.js';
 export { registerService, registerNativeService, request as serviceRequest, subscribe as serviceSubscribe, publish as servicePublish } from './service.js';
@@ -107,8 +91,8 @@ export type { Permission, PermissionOptions, PermissionDefault } from './permiss
 export { createWorker, Worker, onMessage, postMessage } from './worker.js';
 export type { WorkerOptions } from './worker.js';
 export {
-    stringToBytes, stringToBytesAsync,
-    bytesToString, bytesToStringAsync,
+    stringToBytes, stringToBytesSync,
+    bytesToString, bytesToStringSync,
     Gzip,
 } from './util.js';
 export type { GzipCompressor, GzipDecompressor, GzipCompressOptions, GzipDecompressOptions } from './util.js';

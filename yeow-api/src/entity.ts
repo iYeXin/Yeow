@@ -1,6 +1,7 @@
 import { call, post } from './task.js';
 import type { TaskOptions } from './task.js';
 import { Location, LocationData } from './location.js';
+import type { PotionEffect } from './potion.js';
 
 export interface BoundingBox {
   minX: number;
@@ -113,6 +114,15 @@ export class Entity {
 }
 
 export class LivingEntity extends Entity {
+  /** 按 uuid 查找活体实体（返回 LivingEntity；目标非活体/不存在返回 null）。 */
+  static get(uuid: string, options?: TaskOptions): Promise<LivingEntity | null> {
+    return post<{ uuid: string }>('entity.get', { uuid }, options).then((d) => (d ? new LivingEntity(d.uuid) : null));
+  }
+  static getSync(uuid: string, options?: TaskOptions): LivingEntity | null {
+    const d = call<{ uuid: string }>('entity.get', { uuid }, options);
+    return d ? new LivingEntity(d.uuid) : null;
+  }
+
   get health(): number { return call<number>('entity.getHealth', { uuid: this.uuid }); }
   set health(v: number) { call('entity.setHealth', { uuid: this.uuid, value: v }); }
   getHealth(options?: TaskOptions): Promise<number> { return post<number>('entity.getHealth', { uuid: this.uuid }, options); }
@@ -141,5 +151,39 @@ export class LivingEntity extends Entity {
   }
   setTargetSync(target: { targetUuid: string } | { world: string; x: number; y: number; z: number; speed?: number }, options?: TaskOptions): boolean {
     return call<boolean>('entity.setTarget', { uuid: this.uuid, ...target }, options);
+  }
+
+  // ── 药水效果（实体级；Player 经继承自动获得） ──
+
+  /** 添加药水效果。 */
+  addPotionEffect(effect: PotionEffect, options?: TaskOptions): Promise<void> {
+    return post('entity.addPotionEffect', { uuid: this.uuid, ...effect }, options);
+  }
+  addPotionEffectSync(effect: PotionEffect, options?: TaskOptions): void {
+    call('entity.addPotionEffect', { uuid: this.uuid, ...effect }, options);
+  }
+
+  /** 移除指定类型的药水效果。 */
+  removePotionEffect(type: string, options?: TaskOptions): Promise<void> {
+    return post('entity.removePotionEffect', { uuid: this.uuid, type }, options);
+  }
+  removePotionEffectSync(type: string, options?: TaskOptions): void {
+    call('entity.removePotionEffect', { uuid: this.uuid, type }, options);
+  }
+
+  /** 清除全部药水效果。 */
+  clearPotionEffects(options?: TaskOptions): Promise<void> {
+    return post('entity.clearPotionEffects', { uuid: this.uuid }, options);
+  }
+  clearPotionEffectsSync(options?: TaskOptions): void {
+    call('entity.clearPotionEffects', { uuid: this.uuid }, options);
+  }
+
+  /** 当前生效的药水效果列表（与输入同结构）。 */
+  getActivePotionEffects(options?: TaskOptions): Promise<PotionEffect[]> {
+    return post<PotionEffect[]>('entity.getActivePotionEffects', { uuid: this.uuid }, options);
+  }
+  getActivePotionEffectsSync(options?: TaskOptions): PotionEffect[] {
+    return call<PotionEffect[]>('entity.getActivePotionEffects', { uuid: this.uuid }, options);
   }
 }

@@ -37,7 +37,7 @@ export async function getItems(options?: TaskOptions): Promise<string[]> {
 
 /**
  * Material —— 材料级静态判断对象（不依赖坐标/状态）。
- * 基于方块类型（material）判断其固有属性：固体/液体/空气。
+ * 基于方块类型（material）判断其固有属性：固体/空气。
  */
 export const Material = {
   /** 是否为固体方块（基于类型，状态不影响）。 */
@@ -48,19 +48,19 @@ export const Material = {
     return call<boolean>('material.isSolid', { type }, options);
   },
 
-  /** 是否为液体（水 / 熔岩）。 */
-  isLiquid(type: string, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('material.isLiquid', { type }, options);
-  },
-  isLiquidSync(type: string, options?: TaskOptions): boolean {
-    return call<boolean>('material.isLiquid', { type }, options);
-  },
-
   /** 是否为空气（空方块）。 */
   isAir(type: string, options?: TaskOptions): Promise<boolean> {
     return post<boolean>('material.isAir', { type }, options);
   },
   isAirSync(type: string, options?: TaskOptions): boolean {
     return call<boolean>('material.isAir', { type }, options);
+  },
+
+  /** 最大耐久（非耐用品返回 0；未知类型抛错）。 */
+  getMaxDurability(type: string, options?: TaskOptions): Promise<number> {
+    return post<number>('material.getMaxDurability', { type }, options);
+  },
+  getMaxDurabilitySync(type: string, options?: TaskOptions): number {
+    return call<number>('material.getMaxDurability', { type }, options);
   },
 };

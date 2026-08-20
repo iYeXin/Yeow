@@ -55,18 +55,19 @@ const readSyncImpl = (path: string, options?: FsEncoding | ReadFileOptions): Uin
 export const read = readImpl as AssetsReadFn;
 export const readSync = readSyncImpl as AssetsReadSyncFn;
 
-export async function extract(path: string, dest?: string): Promise<string> {
-  const p: Record<string, unknown> = { path };
-  if (dest) p.dest = dest;
-  const r = await _sendAssetsAsync({ t: 'extract', p }) as { path: string };
+/**
+ * 解压单文件资产到磁盘。**`dest` 必填**，基于插件数据目录（`plugins/<插件名>/`）计算，
+ * 最终目标必须位于插件目录内。返回解压后的相对服务器根目录路径。
+ */
+export async function extract(path: string, dest: string): Promise<string> {
+  const r = await _sendAssetsAsync({ t: 'extract', p: { path, dest } }) as { path: string };
   return r.path;
 }
-export function extractSync(path: string, dest?: string): string {
-  const p: Record<string, unknown> = { path };
-  if (dest) p.dest = dest;
-  return (_sendAssets({ t: 'extract', p }) as { path: string }).path;
+export function extractSync(path: string, dest: string): string {
+  return (_sendAssets({ t: 'extract', p: { path, dest } }) as { path: string }).path;
 }
 
+/** 解压目录树到磁盘。`dest` 可选（默认 `assets/<path>`），基于插件数据目录计算并限定其内。 */
 export async function extractDir(path: string, dest?: string): Promise<string> {
   const p: Record<string, unknown> = { path };
   if (dest) p.dest = dest;

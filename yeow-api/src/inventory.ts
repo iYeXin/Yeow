@@ -2,6 +2,8 @@ import { call, post } from './task.js';
 import type { TaskOptions } from './task.js';
 import type { ItemStack } from './item.js';
 import { InstanceId } from './instance-id.js';
+import { resolveUuid } from './target.js';
+import type { PlayerTarget } from './target.js';
 
 /**
  * Inventory —— 统一容器抽象，三种持有者：
@@ -141,9 +143,9 @@ export class Inventory {
 
   // ── 自定义 Inventory 专属 ─────────────────────────────────────────
 
-  /** 为玩家打开（自定义 Inventory）。 */
-  open(uuid: string, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('inventory.open', { ...this.address(), uuid }, options);
+  /** 为玩家打开（自定义 Inventory；接受 `Player` 对象或 uuid）。 */
+  open(player: PlayerTarget, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('inventory.open', { ...this.address(), uuid: resolveUuid(player) }, options);
   }
 
   /** 关闭所有查看者（自定义 Inventory）。 */
@@ -151,9 +153,9 @@ export class Inventory {
     return post<boolean>('inventory.close', this.address(), options);
   }
 
-  /** 仅关闭指定玩家（自定义 Inventory）。 */
-  closePlayer(uuid: string, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('inventory.closePlayer', { ...this.address(), uuid }, options);
+  /** 仅关闭指定玩家（自定义 Inventory；接受 `Player` 对象或 uuid）。 */
+  closePlayer(player: PlayerTarget, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('inventory.closePlayer', { ...this.address(), uuid: resolveUuid(player) }, options);
   }
 
   /** 当前查看者 uuid 列表（自定义 Inventory）。 */

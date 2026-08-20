@@ -31,25 +31,25 @@ function toB64(data: Uint8Array | string): string {
     : data.toBase64();
 }
 
-// ── 字符串 ↔ 字节（UTF-8）────────────────────────────────────────
+// ── 字符串 ↔ 字节（UTF-8；默认异步，同步加 Sync 后缀）──────────────
 
 /** UTF-8 字符串 → 字节（同步）。 */
-export function stringToBytes(text: string): Uint8Array {
+export function stringToBytesSync(text: string): Uint8Array {
   return Uint8Array.fromBase64(send<{ data: string }>('encode.utf8', { data: text }).data);
 }
 
 /** 字节 → UTF-8 字符串（同步；非法序列替换为 U+FFFD，不抛错）。 */
-export function bytesToString(bytes: Uint8Array): string {
+export function bytesToStringSync(bytes: Uint8Array): string {
   return send<{ data: string }>('decode.utf8', { data: bytes.toBase64() }).data;
 }
 
-/** UTF-8 字符串 → 字节（异步，ioExecutor 执行）。 */
-export function stringToBytesAsync(text: string): Promise<Uint8Array> {
+/** UTF-8 字符串 → 字节（异步，ioExecutor 执行；默认）。 */
+export function stringToBytes(text: string): Promise<Uint8Array> {
   return sendAsync<{ data: string }>('encode.utf8', { data: text }).then((r) => Uint8Array.fromBase64(r.data));
 }
 
-/** 字节 → UTF-8 字符串（异步）。 */
-export function bytesToStringAsync(bytes: Uint8Array): Promise<string> {
+/** 字节 → UTF-8 字符串（异步；非法序列替换为 U+FFFD）。 */
+export function bytesToString(bytes: Uint8Array): Promise<string> {
   return sendAsync<{ data: string }>('decode.utf8', { data: bytes.toBase64() }).then((r) => r.data);
 }
 

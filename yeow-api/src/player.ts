@@ -1,9 +1,12 @@
 import { call, post } from './task.js';
 import type { TaskOptions } from './task.js';
+import { LivingEntity } from './entity.js';
 import { Location, LocationData } from './location.js';
 import type { ItemStack } from './item.js';
+import { Block } from './block.js';
 import type { Message } from './message.js';
 import type { Permission } from './permission.js';
+import type { AdvancementProgress } from './advancement.js';
 import { Inventory } from './inventory.js';
 import {
   get as pdcGet, set as pdcSet, has as pdcHas, remove as pdcRemove,
@@ -15,7 +18,7 @@ interface PlayerData {
   name: string;
 }
 
-export class Player {
+export class Player extends LivingEntity {
   static get(identifier: string, options?: TaskOptions): Promise<Player | null> {
     return post<PlayerData>('player.get', { identifier }, options).then((d) => (d ? new Player(d.uuid, d.name) : null));
   }
@@ -30,7 +33,10 @@ export class Player {
     return call<PlayerData[]>('player.getAll', {}, options).map((r) => new Player(r.uuid, r.name));
   }
 
-  constructor(public readonly uuid: string, private _name?: string) {}
+  // uuid 由 Entity 基类持有（readonly）；本类扩展玩家特有字段。
+  constructor(uuid: string, private _name?: string) {
+    super(uuid);
+  }
 
   /** 玩家名。未提供时首次访问惰性同步获取并缓存（仅一次往返）。 */
   get name(): string {
@@ -79,7 +85,7 @@ export class Player {
   isOpAsync(options?: TaskOptions): Promise<boolean> { return post<boolean>('player.isOp', { uuid: this.uuid }, options); }
 
   get online(): boolean { return call<boolean>('player.isOnline', { uuid: this.uuid }); }
-  getOnline(options?: TaskOptions): Promise<boolean> { return post<boolean>('player.isOnline', { uuid: this.uuid }, options); }
+  isOnlineAsync(options?: TaskOptions): Promise<boolean> { return post<boolean>('player.isOnline', { uuid: this.uuid }, options); }
 
   get isFlying(): boolean { return call<boolean>('player.isFlying', { uuid: this.uuid }); }
   set isFlying(v: boolean) { call('player.setFlying', { uuid: this.uuid, value: v }); }
@@ -152,6 +158,20 @@ export class Player {
   playSoundSync(sound: string, volume?: number, pitch?: number, options?: TaskOptions): void {
     call('player.playSound', { uuid: this.uuid, sound, volume, pitch }, options);
   }
+  /** 停止播放指定音效。 */
+  stopSound(sound: string, options?: TaskOptions): Promise<void> {
+    return post('player.stopSound', { uuid: this.uuid, sound }, options);
+  }
+  stopSoundSync(sound: string, options?: TaskOptions): void {
+    call('player.stopSound', { uuid: this.uuid, sound }, options);
+  }
+  /** 停止该玩家所有音效。 */
+  stopAllSounds(options?: TaskOptions): Promise<void> {
+    return post('player.stopAllSounds', { uuid: this.uuid }, options);
+  }
+  stopAllSoundsSync(options?: TaskOptions): void {
+    call('player.stopAllSounds', { uuid: this.uuid }, options);
+  }
   giveExp(amount: number, options?: TaskOptions): Promise<void> { return post('player.giveExp', { uuid: this.uuid, amount }, options); }
   giveExpSync(amount: number, options?: TaskOptions): void { call('player.giveExp', { uuid: this.uuid, amount }, options); }
   /** 检查权限（经 Yeow 权限检查：`permissionCheck` 事件优先，无处理时回退 Bukkit）。node 可为权限节点对象。 */
@@ -168,8 +188,64 @@ export class Player {
   performCommandSync(cmd: string, options?: TaskOptions): boolean {
     return call<boolean>('player.performCommand', { uuid: this.uuid, command: cmd.replace(/^\//, '') }, options);
   }
+  /** 授予进度全部条件。 */
+  grantAdvancement(key: string, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('advancement.grant', { uuid: this.uuid, key }, options);
+  }
+  grantAdvancementSync(key: string, options?: TaskOptions): boolean {
+    return call<boolean>('advancement.grant', { uuid: this.uuid, key }, options);
+  }
+  /** 撤销进度全部条件。 */
+  revokeAdvancement(key: string, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('advancement.revoke', { uuid: this.uuid, key }, options);
+  }
+  revokeAdvancementSync(key: string, options?: TaskOptions): boolean {
+    return call<boolean>('advancement.revoke', { uuid: this.uuid, key }, options);
+  }
+  /** 查询进度完成情况。 */
+  getAdvancementProgress(key: string, options?: TaskOptions): Promise<AdvancementProgress | null> {
+    return post<AdvancementProgress | null>('advancement.getProgress', { uuid: this.uuid, key }, options);
+  }
+  getAdvancementProgressSync(key: string, options?: TaskOptions): AdvancementProgress | null {
+    return call<AdvancementProgress | null>('advancement.getProgress', { uuid: this.uuid, key }, options);
+  }
+  /** 授予进度单个条件。 */
+  awardCriteria(key: string, criteria: string, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('advancement.awardCriteria', { uuid: this.uuid, key, criteria }, options);
+  }
+  awardCriteriaSync(key: string, criteria: string, options?: TaskOptions): boolean {
+    return call<boolean>('advancement.awardCriteria', { uuid: this.uuid, key, criteria }, options);
+  }
+  /** 撤销进度单个条件。 */
+  revokeCriteria(key: string, criteria: string, options?: TaskOptions): Promise<boolean> {
+    return post<boolean>('advancement.revokeCriteria', { uuid: this.uuid, key, criteria }, options);
+  }
+  revokeCriteriaSync(key: string, criteria: string, options?: TaskOptions): boolean {
+    return call<boolean>('advancement.revokeCriteria', { uuid: this.uuid, key, criteria }, options);
+  }
   teleport(loc: Location, options?: TaskOptions): Promise<void> { return post('player.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
   teleportSync(loc: Location, options?: TaskOptions): void { call('player.teleport', { uuid: this.uuid, ...loc.toObject() }, options); }
+  /** 向玩家发送假方块变化（仅客户端视觉，不改变真实世界）。block 为 Block 对象或字符串（同 world.setBlock，字符串无状态）。 */
+  sendBlockChange(location: Location, block: Block | string, options?: TaskOptions): Promise<void> {
+    const p: Record<string, unknown> = { uuid: this.uuid, ...location.toObject() };
+    if (typeof block === 'string') {
+      p.blockType = block;
+    } else {
+      p.blockType = block.type;
+      if (block.state && Object.keys(block.state).length > 0) p.state = block.state;
+    }
+    return post('player.sendBlockChange', p, options);
+  }
+  sendBlockChangeSync(location: Location, block: Block | string, options?: TaskOptions): void {
+    const p: Record<string, unknown> = { uuid: this.uuid, ...location.toObject() };
+    if (typeof block === 'string') {
+      p.blockType = block;
+    } else {
+      p.blockType = block.type;
+      if (block.state && Object.keys(block.state).length > 0) p.state = block.state;
+    }
+    call('player.sendBlockChange', p, options);
+  }
   sendActionBar(message: string | Message, options?: TaskOptions): Promise<void> { return post('player.sendActionBar', { uuid: this.uuid, message }, options); }
   sendActionBarSync(message: string | Message, options?: TaskOptions): void { call('player.sendActionBar', { uuid: this.uuid, message }, options); }
   sendResourcePack(url: string, hash?: string, prompt?: string | Message, force?: boolean, options?: TaskOptions): Promise<void> {
@@ -212,14 +288,6 @@ export class Player {
   }
   setPlayerListNameSync(name: string | null, options?: TaskOptions): boolean {
     return call<boolean>('player.setPlayerListName', { uuid: this.uuid, name }, options);
-  }
-
-  /** 设置客户端世界边界（传 null 重置为服务端边界；centerX/centerZ 可选，指定边界中心）。 */
-  setBorder(size: number | null, centerX?: number, centerZ?: number, options?: TaskOptions): Promise<boolean> {
-    return post<boolean>('player.setBorder', { uuid: this.uuid, size, centerX, centerZ }, options);
-  }
-  setBorderSync(size: number | null, centerX?: number, centerZ?: number, options?: TaskOptions): boolean {
-    return call<boolean>('player.setBorder', { uuid: this.uuid, size, centerX, centerZ }, options);
   }
 
   // ── PDC（玩家持久数据） ──

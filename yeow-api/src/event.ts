@@ -1,6 +1,7 @@
 import { call } from './task.js';
 import { Player } from './player.js';
 import { Location } from './location.js';
+import type { ItemStack } from './item.js';
 import type { Message } from './message.js';
 
 // ── Event Data Interfaces ──────────────────────────────────────────
@@ -31,7 +32,7 @@ export interface PlayerInteractEvent {
   player: Player;
   action: string;
   material: string | null;
-  block: { x: number; y: number; z: number; type: string } | null;
+  block: { location: Location; type: string } | null;
   cancelled?: boolean;
 }
 export interface PlayerCommandEvent {
@@ -53,14 +54,12 @@ export interface PlayerRespawnEvent {
 }
 export interface PlayerDropItemEvent {
   player: Player;
-  itemType: string;
-  amount: number;
+  item: ItemStack;
   cancelled?: boolean;
 }
 export interface PlayerPickupItemEvent {
   player: Player;
-  itemType: string;
-  amount: number;
+  item: ItemStack;
   cancelled?: boolean;
 }
 export interface PlayerBucketFillEvent {
@@ -111,10 +110,7 @@ export interface EntityDeathEvent {
 export interface EntitySpawnEvent {
   entity: string;
   entityType: string;
-  x: number;
-  y: number;
-  z: number;
-  world: string;
+  location: Location;
   cancelled?: boolean;
 }
 export interface ProjectileLaunchEvent {
@@ -126,18 +122,14 @@ export interface ProjectileLaunchEvent {
 export interface BlockBreakEvent {
   player: Player;
   block: string;
-  x: number;
-  y: number;
-  z: number;
+  location: Location;
   cancelled?: boolean;
 }
 export interface BlockPlaceEvent {
   player: Player;
   block: string;
   blockAgainst: string;
-  x: number;
-  y: number;
-  z: number;
+  location: Location;
   cancelled?: boolean;
 }
 export interface InventoryOpenEvent {
@@ -177,7 +169,7 @@ export interface PlayerTeleportEvent {
 }
 export interface PlayerItemConsumeEvent {
   player: Player;
-  itemType: string;
+  item: ItemStack;
   cancelled?: boolean;
 }
 export interface PlayerAdvancementDoneEvent {
@@ -199,9 +191,7 @@ export interface PlayerToggleFlightEvent {
 export interface EntityExplodeEvent {
   entity: string;
   entityType: string;
-  x: number;
-  y: number;
-  z: number;
+  location: Location;
   blockCount: number;
   cancelled?: boolean;
 }
@@ -220,35 +210,27 @@ export interface ProjectileHitEvent {
   entity: string;
   projectileType: string;
   hitEntity: string | null;
-  hitBlock: { x: number; y: number; z: number; type: string } | null;
+  hitBlock: { location: Location; type: string } | null;
   cancelled?: boolean;
 }
 export interface BlockFadeEvent {
   block: string;
-  x: number;
-  y: number;
-  z: number;
+  location: Location;
   cancelled?: boolean;
 }
 export interface BlockGrowEvent {
   block: string;
-  x: number;
-  y: number;
-  z: number;
+  location: Location;
   cancelled?: boolean;
 }
 export interface BlockSpreadEvent {
   block: string;
-  x: number;
-  y: number;
-  z: number;
+  location: Location;
   cancelled?: boolean;
 }
 export interface BlockExplodeEvent {
   block: string;
-  x: number;
-  y: number;
-  z: number;
+  location: Location;
   cancelled?: boolean;
 }
 export interface ServerCommandEvent {
@@ -286,15 +268,11 @@ export interface InventoryClickEvent {
   isLeftClick: boolean;
   isRightClick: boolean;
   isShiftClick: boolean;
-  clickedItem: ItemData | null;
-  cursorItem: ItemData | null;
+  clickedItem: ItemStack | null;
+  cursorItem: ItemStack | null;
   /** 若点击发生在 Yeow 自定义 Inventory（Inventory.create 创建）：该 Inventory 的句柄 id（inventory.toString()）；否则缺省。 */
   inventoryId?: string;
   cancelled?: boolean;
-}
-interface ItemData {
-  type: string;
-  amount: number;
 }
 export interface PlayerResourcePackStatusEvent {
   player: Player;
@@ -382,6 +360,28 @@ function adaptEvent<K extends keyof EventMap>(type: K, data: RawEvent): { event:
   if (data.to) initial.to = loc(data.to as Record<string, unknown>);
   if (data.respawnLocation) initial.respawnLocation = loc(data.respawnLocation as Record<string, unknown>);
 
+  // 平铺坐标事件（entitySpawn / blockBreak 等）→ 统一 `location: Location`（与 from/to 同形；
+  // 原始 x/y/z/world 字段保留在事件对象上，兼容旧代码读取）。
+  if (typeof data.x === 'number' && typeof data.y === 'number' && typeof data.z === 'number') {
+    initial.location = loc(data);
+  }
+  // 嵌套方块坐标 → `{ location, type }`
+  if (type === 'playerInteract' && data.block && typeof data.block === 'object') {
+    const b = data.block as Record<string, unknown>;
+    initial.block = { type: b.type as string, location: loc(b) };
+  }
+  if (type === 'projectileHit' && data.hitBlock && typeof data.hitBlock === 'object') {
+    const b = data.hitBlock as Record<string, unknown>;
+    initial.hitBlock = { type: b.type as string, location: loc(b) };
+  }
+  // 物品事件字段统一为 ItemStack（{type, amount} 数据快照；原始 itemType/amount 保留）
+  if ((type === 'playerDropItem' || type === 'playerPickupItem') && data.itemType) {
+    initial.item = { type: data.itemType as string, amount: (data.amount as number) ?? 1 };
+  }
+  if (type === 'playerItemConsume' && data.itemType) {
+    initial.item = { type: data.itemType as string };
+  }
+
   // 修改收集：所有字段经 getter/setter——handler 直接赋值（e.xxx = ...）即记录为回写 mods。
   // cancelled 单独处理（仅可取消事件暴露；读取语义保持原状：未设置时返回 false）。
   const mods: Record<string, unknown> = {};
@@ -436,26 +436,42 @@ export function eventOn<K extends keyof EventMap>(
     const { event: wrapped, mods: mutatedMods } = adaptEvent(eventType, data);
     const eventId = data?._eventId;
 
-    if (manualRelease) {
-      const complete = (result?: Record<string, unknown>) => {
+    // 释放事件（event.complete）。处理器抛错时也必须释放——否则事件桥等待 complete
+    // 直到 5s 超时（EventBridge.timeoutMs），每次抛错都会卡住该事件并产生 event.timeout 噪音。
+    const release = (mods?: Record<string, unknown>) => {
+      try {
         $send('task', {
           type: 'event.complete',
-          params: { eventId, mods: result },
+          params: { eventId, mods },
           cb: '',
         });
-      };
-      (handler as ManualHandler<typeof eventType>)(wrapped, complete);
+      } catch { /* 桥故障：保留原始错误（若有），事件由 Java 侧超时兜底 */ }
+    };
+
+    if (manualRelease) {
+      const complete = (result?: Record<string, unknown>) => release(result);
+      try {
+        (handler as ManualHandler<typeof eventType>)(wrapped, complete);
+      } catch (e) {
+        release(); // 处理器同步抛错：立即释放（complete 幂等，重复调用无副作用）
+        throw e;
+      }
       return;
     }
 
-    const result = (handler as EventHandler<typeof eventType>)(wrapped);
-    // 回写合并：返回值（mods）优先合并，事件参数直接赋值（e.xxx = ...）覆盖之——
-    // 返回 Promise 时视为无修改（Promise 不展开），事件立即释放
-    const mods: Record<string, unknown> = {
-      ...(result && typeof result === 'object' ? result : {}),
-      ...mutatedMods,
-    };
-    $send('task', { type: 'event.complete', params: { eventId, mods }, cb: '' });
+    let result: unknown;
+    try {
+      result = (handler as EventHandler<typeof eventType>)(wrapped);
+    } finally {
+      // 回写合并：返回值（mods）优先合并，事件参数直接赋值（e.xxx = ...）覆盖之——
+      // 返回 Promise 时视为无修改（Promise 不展开），事件立即释放。
+      // finally 保证处理器抛错时也释放事件。
+      const mods: Record<string, unknown> = {
+        ...(result && typeof result === 'object' ? result : {}),
+        ...mutatedMods,
+      };
+      release(mods);
+    }
   }, { persistent: true });
 
   const gh = globalThis as any;
