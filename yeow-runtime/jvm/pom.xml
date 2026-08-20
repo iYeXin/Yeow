@@ -6,7 +6,7 @@
 
     <groupId>io.yeow</groupId>
     <artifactId>yeow-runtime-parent</artifactId>
-    <version>0.2.0</version>
+    <version>0.5.0</version>
     <packaging>pom</packaging>
 
     <name>Yeow Runtime Parent</name>
