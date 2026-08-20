@@ -11,7 +11,7 @@ public class PlayerTasks {
     public static Object get(JsonObject p) { var id = p.has("identifier") ? p.get("identifier").getAsString() : null; var pl = resolve(id); return pl != null ? Map.of("uuid",pl.getUniqueId().toString(),"name",pl.getName()) : null; }
     public static Object getAll() { return Bukkit.getOnlinePlayers().stream().map(x->Map.of("uuid",x.getUniqueId().toString(),"name",x.getName())).toList(); }
     public static Object getPing(JsonObject p) { return player(p).getPing(); }
-    public static Object getGamemode(JsonObject p) { return player(p).getGameMode().name(); }
+    public static Object getGamemode(JsonObject p) { return player(p).getGameMode().name().toLowerCase(); }
     public static Object setGamemode(JsonObject p) { player(p).setGameMode(GameMode.valueOf(p.get("value").getAsString().toUpperCase())); return true; }
     public static Object getHealth(JsonObject p) { return player(p).getHealth(); }
     public static Object setHealth(JsonObject p) { player(p).setHealth(p.get("value").getAsDouble()); return true; }
@@ -73,6 +73,13 @@ public class PlayerTasks {
         return r != null ? r : pl.hasPermission(node);
     }
     public static Object teleport(JsonObject p) { player(p).teleport(new Location(Bukkit.getWorld(p.get("world").getAsString()),p.get("x").getAsDouble(),p.get("y").getAsDouble(),p.get("z").getAsDouble(),(float)p.get("yaw").getAsDouble(),(float)p.get("pitch").getAsDouble())); return true; }
+    public static Object sendBlockChange(JsonObject p) {
+        var pl = player(p);
+        // world 省略时默认玩家所在世界
+        var world = p.has("world") && !p.get("world").isJsonNull() ? Bukkit.getWorld(p.get("world").getAsString()) : pl.getWorld();
+        pl.sendBlockChange(new Location(world, p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble()), blockData(p));
+        return true;
+    }
     public static Object sendActionBar(JsonObject p) { player(p).sendActionBar(TextUtil.parseMessage(p.get("message"))); return true; }
     public static Object sendResourcePack(JsonObject p) {
         var pl = player(p);
@@ -126,20 +133,22 @@ public class PlayerTasks {
         player(p).setPlayerListName(p.has("name") && !p.get("name").isJsonNull() ? p.get("name").getAsString() : null);
         return true;
     }
-    public static Object setBorder(JsonObject p) {
-        var pl = player(p);
-        try {
-            if (p.has("size") && !p.get("size").isJsonNull()) {
-                var border = Bukkit.createWorldBorder();
-                border.setCenter(0, 0);
-                border.setSize(p.get("size").getAsDouble());
-                if (p.has("centerX")) border.setCenter(p.get("centerX").getAsDouble(), p.has("centerZ") ? p.get("centerZ").getAsDouble() : 0);
-                pl.setWorldBorder(border);
-            } else {
-                pl.setWorldBorder(null); // 重置为服务端边界
+    /** blockType + state 解析（与 world.setBlock 同语义：blockType 宽松匹配，state 构建规范方块数据字符串）。 */
+    static org.bukkit.block.data.BlockData blockData(JsonObject p) {
+        var mat = Material.matchMaterial(p.get("blockType").getAsString());
+        if (mat == null) throw new IllegalArgumentException("Unknown block type: " + p.get("blockType").getAsString());
+        if (p.has("state") && p.get("state").isJsonObject() && p.getAsJsonObject("state").size() > 0) {
+            var sb = new StringBuilder(mat.getKey().toString()).append('[');
+            var first = true;
+            for (var e : p.getAsJsonObject("state").entrySet()) {
+                if (!first) sb.append(',');
+                sb.append(e.getKey()).append('=').append(e.getValue().getAsString());
+                first = false;
             }
-        } catch (Exception ignored) {}
-        return true;
+            sb.append(']');
+            return Bukkit.createBlockData(sb.toString());
+        }
+        return mat.createBlockData();
     }
     static Player player(JsonObject p) { var pl = Bukkit.getPlayer(UUID.fromString(p.get("uuid").getAsString())); if (pl == null) throw new IllegalArgumentException("Player not found"); return pl; }
     static Player resolve(String id) {

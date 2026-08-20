@@ -8,8 +8,23 @@ import org.bukkit.Color;
 import org.bukkit.Particle.DustOptions;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 
 public class ParticleTasks {
+
+    /**
+     * 粒子类型解析（值域附录 R1）：协议统一使用 minecraft 注册键（如 `minecraft:flame`）；
+     * 兼容旧式 Bukkit 枚举名（如 `FLAME`，大小写不敏感）。
+     */
+    static Particle particle(String s) {
+        var key = NamespacedKey.fromString(s);
+        if (key != null) {
+            var t = Registry.PARTICLE_TYPE.get(key);
+            if (t != null) return t;
+        }
+        return Particle.valueOf(s.toUpperCase());
+    }
 
     public static Object spawnParticle(JsonObject p) {
         var world = Bukkit.getWorld(p.get("world").getAsString());
@@ -25,7 +40,7 @@ public class ParticleTasks {
         var speed = p.has("speed") ? p.get("speed").getAsDouble() : 0.0;
         var force = p.has("force") && p.get("force").getAsBoolean();
 
-        var particle = Particle.valueOf(name.toUpperCase());
+        var particle = particle(name);
         var loc = new org.bukkit.Location(world, x, y, z);
 
         if (p.has("color")) {

@@ -7,7 +7,7 @@ import java.util.*;
 
 public class EntityTasks {
     public static Object get(JsonObject p) { var e = Bukkit.getEntity(UUID.fromString(p.get("uuid").getAsString())); return e != null ? Map.of("uuid", e.getUniqueId().toString()) : null; }
-    public static Object getType(JsonObject p) { return entity(p).getType().name(); }
+    public static Object getType(JsonObject p) { return entity(p).getType().getKey().toString(); }
     public static Object getName(JsonObject p) { return entity(p).getName(); }
     public static Object getCustomName(JsonObject p) { var n = entity(p).getCustomName(); return n != null ? n : ""; }
     public static Object setCustomName(JsonObject p) { entity(p).setCustomName(p.has("value") && !p.get("value").isJsonNull() ? p.get("value").getAsString() : null); return true; }

@@ -2,6 +2,8 @@ package yeow.task;
 
 import com.google.gson.JsonObject;
 import org.bukkit.Bukkit;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -14,9 +16,22 @@ public class PotionTasks {
         return le;
     }
 
+    /**
+     * 药水效果类型解析（值域附录 R1）：协议统一使用 minecraft 注册键（如 `minecraft:speed`，
+     * 与 getActivePotionEffects 输出一致）；兼容旧式 Bukkit 枚举名（如 `SPEED`，大小写不敏感）。
+     */
+    static PotionEffectType potionType(String s) {
+        var key = NamespacedKey.fromString(s);
+        if (key != null) {
+            var t = Registry.EFFECT.get(key);
+            if (t != null) return t;
+        }
+        return PotionEffectType.getByName(s.toUpperCase());
+    }
+
     public static Object addPotionEffect(JsonObject p) {
         var le = entity(p);
-        var type = PotionEffectType.getByName(p.get("type").getAsString().toUpperCase());
+        var type = potionType(p.get("type").getAsString());
         if (type == null) throw new IllegalArgumentException("Unknown potion effect type: " + p.get("type"));
         var duration = p.has("duration") ? p.get("duration").getAsInt() : 200;
         var amplifier = p.has("amplifier") ? p.get("amplifier").getAsInt() : 0;
@@ -29,7 +44,7 @@ public class PotionTasks {
 
     public static Object removePotionEffect(JsonObject p) {
         var le = entity(p);
-        var type = PotionEffectType.getByName(p.get("type").getAsString().toUpperCase());
+        var type = potionType(p.get("type").getAsString());
         if (type != null) le.removePotionEffect(type);
         return true;
     }
@@ -42,7 +57,7 @@ public class PotionTasks {
     public static Object getActivePotionEffects(JsonObject p) {
         return entity(p).getActivePotionEffects().stream().map(pe -> {
             var m = new LinkedHashMap<String, Object>();
-            m.put("type", pe.getType().getName().toLowerCase());
+            m.put("type", pe.getType().getKey().toString());
             m.put("duration", pe.getDuration());
             m.put("amplifier", pe.getAmplifier());
             m.put("ambient", pe.isAmbient());

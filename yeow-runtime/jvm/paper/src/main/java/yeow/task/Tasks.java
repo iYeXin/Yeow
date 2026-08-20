@@ -51,6 +51,7 @@ public class Tasks {
             case "player.hasPermission"-> PlayerTasks.hasPermission(p);
             case "player.performCommand" -> PlayerTasks.performCommand(p);
             case "player.teleport"     -> PlayerTasks.teleport(p);
+            case "player.sendBlockChange" -> PlayerTasks.sendBlockChange(p);
             case "player.sendActionBar" -> PlayerTasks.sendActionBar(p);
             case "player.sendResourcePack" -> PlayerTasks.sendResourcePack(p);
             case "player.isOnline"   -> PlayerTasks.isOnline(p);
@@ -60,7 +61,6 @@ public class Tasks {
             case "player.setItemInOffHand" -> PlayerTasks.setItemInOffHand(p);
             case "player.sendTabHeader" -> PlayerTasks.sendTabHeader(p);
             case "player.setPlayerListName" -> PlayerTasks.setPlayerListName(p);
-            case "player.setBorder" -> PlayerTasks.setBorder(p);
             // Command
             case "command.register"     -> CommandTasks.register(p);
             case "command.dispatch"     -> CommandTasks.dispatch(p);
@@ -143,6 +143,7 @@ public class Tasks {
             case "world.setBorderMoving" -> WorldTasks.setBorderMoving(p);
             case "world.getChunkAt"      -> WorldTasks.getChunkAt(p);
             case "world.isChunkLoaded"   -> WorldTasks.isChunkLoaded(p);
+            case "world.isChunkGenerated" -> WorldTasks.isChunkGenerated(p);
             case "world.loadChunk"       -> WorldTasks.loadChunk(p);
             case "world.unloadChunk"     -> WorldTasks.unloadChunk(p);
             case "world.getBlockLightLevel" -> WorldTasks.getBlockLightLevel(p);
@@ -167,8 +168,8 @@ public class Tasks {
             case "block.breakNaturally" -> BlockTasks.breakNaturally(p);
             // Material（材料级静态判断）
             case "material.isSolid"  -> MaterialTasks.isSolid(p);
-            case "material.isLiquid" -> MaterialTasks.isLiquid(p);
             case "material.isAir"    -> MaterialTasks.isAir(p);
+            case "material.getMaxDurability" -> MaterialTasks.getMaxDurability(p);
             // Inventory（统一三寻址：uuid 玩家 / world+xyz 容器方块 / id 自定义）
             case "inventory.create"    -> InventoryTasks.create(p);
             case "inventory.destroy"   -> InventoryTasks.destroy(p);

@@ -233,6 +233,19 @@ public class InventoryTasks {
 
     // ── ItemStack 工具（原 GuiTasks 迁入；buildItem/serializeItem/colorOf） ──
 
+    /**
+     * 属性类型解析（值域附录 R1）：协议统一使用 minecraft 注册键（如 `minecraft:attack_damage`，
+     * 与 serializeItem 输出一致）；兼容旧式 Bukkit 枚举名（如 `ATTACK_DAMAGE`，大小写不敏感）。
+     */
+    static org.bukkit.attribute.Attribute attribute(String s) {
+        var key = org.bukkit.NamespacedKey.fromString(s);
+        if (key != null) {
+            var t = org.bukkit.Registry.ATTRIBUTE.get(key);
+            if (t != null) return t;
+        }
+        try { return org.bukkit.attribute.Attribute.valueOf(s.toUpperCase()); } catch (Exception e) { return null; }
+    }
+
     static ItemStack buildItem(JsonObject p) {
         if (p == null || !p.has("type")) return new ItemStack(Material.AIR);
         var mat = Material.matchMaterial(p.get("type").getAsString());
@@ -280,7 +293,7 @@ public class InventoryTasks {
                 for (var el : m.getAsJsonArray("potionEffects")) {
                     try {
                         var eff = el.getAsJsonObject();
-                        var type = org.bukkit.potion.PotionEffectType.getByName(eff.get("type").getAsString().toUpperCase());
+                        var type = PotionTasks.potionType(eff.get("type").getAsString());
                         if (type == null) continue;
                         pm.addCustomEffect(new org.bukkit.potion.PotionEffect(type,
                             eff.has("duration") ? eff.get("duration").getAsInt() : 200,
@@ -309,7 +322,8 @@ public class InventoryTasks {
                 for (var el : m.getAsJsonArray("attributeModifiers")) {
                     try {
                         var am = el.getAsJsonObject();
-                        var attr = org.bukkit.attribute.Attribute.valueOf(am.get("attribute").getAsString().toUpperCase());
+                        var attr = attribute(am.get("attribute").getAsString());
+                        if (attr == null) continue;
                         var amt = am.get("amount").getAsDouble();
                         var op = org.bukkit.attribute.AttributeModifier.Operation.valueOf(am.get("operation").getAsString().toUpperCase());
                         var slot = am.has("slot") ? org.bukkit.inventory.EquipmentSlotGroup.getByName(am.get("slot").getAsString()) : null;
@@ -378,7 +392,7 @@ public class InventoryTasks {
                     var effs = new ArrayList<Object>();
                     for (var pe : pm.getCustomEffects()) {
                         var em = new LinkedHashMap<String, Object>();
-                        em.put("type", pe.getType().getName().toLowerCase());
+                        em.put("type", pe.getType().getKey().toString());
                         em.put("duration", pe.getDuration());
                         em.put("amplifier", pe.getAmplifier());
                         em.put("ambient", pe.isAmbient());
@@ -400,17 +414,21 @@ public class InventoryTasks {
                     metaMap.put("skullOwner", profile.getName());
                 }
             }
-            if (meta instanceof org.bukkit.inventory.meta.ItemMeta im && !im.getAttributeModifiers().isEmpty()) {
-                var mods = new ArrayList<Object>();
-                im.getAttributeModifiers().forEach((attr, mod) -> {
-                    var am = new LinkedHashMap<String, Object>();
-                    am.put("attribute", attr.getKey().toString());
-                    am.put("amount", mod.getAmount());
-                    am.put("operation", mod.getOperation().name().toLowerCase());
-                    if (mod.getSlotGroup() != null) am.put("slot", mod.getSlotGroup().toString());
-                    mods.add(am);
-                });
-                metaMap.put("attributeModifiers", mods);
+            if (meta instanceof org.bukkit.inventory.meta.ItemMeta im) {
+                // getAttributeModifiers() 在无属性修饰时可返回 null——须判空（否则 NPE）
+                var attrMods = im.getAttributeModifiers();
+                if (attrMods != null && !attrMods.isEmpty()) {
+                    var mods = new ArrayList<Object>();
+                    attrMods.forEach((attr, mod) -> {
+                        var am = new LinkedHashMap<String, Object>();
+                        am.put("attribute", attr.getKey().toString());
+                        am.put("amount", mod.getAmount());
+                        am.put("operation", mod.getOperation().name().toLowerCase());
+                        if (mod.getSlotGroup() != null) am.put("slot", mod.getSlotGroup().toString());
+                        mods.add(am);
+                    });
+                    metaMap.put("attributeModifiers", mods);
+                }
             }
             m.put("meta", metaMap);
         }

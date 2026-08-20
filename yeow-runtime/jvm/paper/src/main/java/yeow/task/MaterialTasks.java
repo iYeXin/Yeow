@@ -42,9 +42,9 @@ public class MaterialTasks {
         return Material.matchMaterial(p.get("type").getAsString()).isAir();
     }
 
-    /** Bukkit Material 无 isLiquid（1.13 起移除）：原版液体方块材质仅水与熔岩。 */
-    public static Object isLiquid(JsonObject p) {
-        var m = Material.matchMaterial(p.get("type").getAsString());
-        return m == Material.WATER || m == Material.LAVA;
+    public static Object getMaxDurability(JsonObject p) {
+        var mat = Material.matchMaterial(p.get("type").getAsString());
+        if (mat == null) throw new IllegalArgumentException("Unknown material: " + p.get("type").getAsString());
+        return mat.getMaxDurability();
     }
 }

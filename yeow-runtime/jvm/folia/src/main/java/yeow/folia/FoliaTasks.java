@@ -174,7 +174,7 @@ public class FoliaTasks {
             if (params.has("world") && !params.get("world").isJsonNull()) {
                 var name = params.get("world").getAsString();
                 // 区块坐标任务（chunk.* 快照 / loadChunk 类 / getChunkAt）：x/z 已是区块坐标，c 前缀标记
-                if (taskType.startsWith("chunk.") || taskType.equals("world.loadChunk") || taskType.equals("world.unloadChunk") || taskType.equals("world.isChunkLoaded") || taskType.equals("world.getChunkAt")) {
+                if (taskType.startsWith("chunk.") || taskType.equals("world.loadChunk") || taskType.equals("world.unloadChunk") || taskType.equals("world.isChunkLoaded") || taskType.equals("world.isChunkGenerated") || taskType.equals("world.getChunkAt")) {
                     var cx = params.get("x").getAsInt();
                     var cz = params.get("z").getAsInt();
                     return new DispatchTarget("world:" + name + ":c" + cx + ":c" + cz, finish -> dispatchWorld(name, cx, cz, taskType, params, finish));
@@ -355,7 +355,7 @@ public class FoliaTasks {
         if (p.has("world") && !p.get("world").isJsonNull()) {
             var name = p.get("world").getAsString();
             // 区块坐标任务（chunk.* 快照 / loadChunk 类 / getChunkAt）：x/z 已是区块坐标
-            if (taskType.startsWith("chunk.") || taskType.equals("world.loadChunk") || taskType.equals("world.unloadChunk") || taskType.equals("world.isChunkLoaded") || taskType.equals("world.getChunkAt")) {
+            if (taskType.startsWith("chunk.") || taskType.equals("world.loadChunk") || taskType.equals("world.unloadChunk") || taskType.equals("world.isChunkLoaded") || taskType.equals("world.isChunkGenerated") || taskType.equals("world.getChunkAt")) {
                 return worldChunkOwnedHere(name, p.get("x").getAsInt(), p.get("z").getAsInt());
             }
             if (p.has("x") && p.has("z")) {
@@ -399,7 +399,7 @@ public class FoliaTasks {
             case "player.getTotalExperience" -> player(p).getTotalExperience();
             case "player.giveExp" -> { player(p).giveExp(p.get("amount").getAsInt()); yield true; }
             case "player.getPing" -> player(p).getPing();
-            case "player.getGamemode" -> player(p).getGameMode().name();
+            case "player.getGamemode" -> player(p).getGameMode().name().toLowerCase();
             case "player.setGamemode" -> { player(p).setGameMode(GameMode.valueOf(p.get("value").getAsString().toUpperCase())); yield true; }
             case "player.getDisplayName" -> player(p).getDisplayName();
             case "player.setDisplayName" -> { player(p).setDisplayName(p.has("value") && !p.get("value").isJsonNull() ? p.get("value").getAsString() : null); yield true; }
@@ -423,6 +423,14 @@ public class FoliaTasks {
                 player(p).teleport(new Location(Bukkit.getWorld(p.get("world").getAsString()),
                     p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble(),
                     (float) p.get("yaw").getAsDouble(), (float) p.get("pitch").getAsDouble()));
+                yield true;
+            }
+            case "player.sendBlockChange" -> {
+                var pl = player(p);
+                // world 省略时默认玩家所在世界
+                var world = p.has("world") && !p.get("world").isJsonNull() ? Bukkit.getWorld(p.get("world").getAsString()) : pl.getWorld();
+                pl.sendBlockChange(new Location(world, p.get("x").getAsDouble(), p.get("y").getAsDouble(), p.get("z").getAsDouble()),
+                    blockData(p));
                 yield true;
             }
             case "player.sendMessage" -> { player(p).sendMessage(FoliaTextUtil.parse(p.get("message"))); yield true; }
@@ -486,21 +494,6 @@ public class FoliaTasks {
                 player(p).setPlayerListName(p.has("name") && !p.get("name").isJsonNull() ? p.get("name").getAsString() : null);
                 yield true;
             }
-            case "player.setBorder" -> {
-                var pl = player(p);
-                try {
-                    if (p.has("size") && !p.get("size").isJsonNull()) {
-                        var border = Bukkit.createWorldBorder();
-                        border.setCenter(0, 0);
-                        border.setSize(p.get("size").getAsDouble());
-                        if (p.has("centerX")) border.setCenter(p.get("centerX").getAsDouble(), p.has("centerZ") ? p.get("centerZ").getAsDouble() : 0);
-                        pl.setWorldBorder(border);
-                    } else {
-                        pl.setWorldBorder(null);
-                    }
-                } catch (Exception ignored) {}
-                yield true;
-            }
             case "player.getBedLocation" -> {
                 var l = player(p).getBedSpawnLocation();
                 yield l != null ? Map.of("x", l.getX(), "y", l.getY(), "z", l.getZ(), "yaw", (double) l.getYaw(), "pitch", (double) l.getPitch(), "world", l.getWorld().getName()) : null;
@@ -535,7 +528,7 @@ public class FoliaTasks {
                 var e = entityOrNull(p);
                 yield e != null ? Map.of("uuid", e.getUniqueId().toString()) : null;
             }
-            case "entity.getType" -> entity(p).getType().name();
+            case "entity.getType" -> entity(p).getType().getKey().toString();
             case "entity.getName" -> entity(p).getName();
             case "entity.getCustomName" -> { var n = entity(p).getCustomName(); yield n != null ? n : ""; }
             case "entity.setCustomName" -> { entity(p).setCustomName(p.has("value") && !p.get("value").isJsonNull() ? p.get("value").getAsString() : null); yield true; }
@@ -607,7 +600,7 @@ public class FoliaTasks {
             }
             // ── Potion ──────────────────────────────────────────────
             case "entity.addPotionEffect" -> {
-                var type = PotionEffectType.getByName(p.get("type").getAsString().toUpperCase());
+                var type = potionType(p.get("type").getAsString());
                 if (type == null) yield Map.of("err", "Unknown potion type: " + p.get("type").getAsString());
                 var effect = new PotionEffect(type,
                     p.has("duration") ? p.get("duration").getAsInt() : 200,
@@ -619,7 +612,7 @@ public class FoliaTasks {
                 yield true;
             }
             case "entity.removePotionEffect" -> {
-                var t = PotionEffectType.getByName(p.get("type").getAsString().toUpperCase());
+                var t = potionType(p.get("type").getAsString());
                 if (t != null) living(p).removePotionEffect(t);
                 yield true;
             }
@@ -627,7 +620,7 @@ public class FoliaTasks {
             case "entity.getActivePotionEffects" -> living(p).getActivePotionEffects().stream()
                 .map(pe -> {
                     var m = new LinkedHashMap<String, Object>();
-                    m.put("type", pe.getType().getName().toLowerCase());
+                    m.put("type", pe.getType().getKey().toString());
                     m.put("duration", pe.getDuration());
                     m.put("amplifier", pe.getAmplifier());
                     m.put("ambient", pe.isAmbient());
@@ -744,7 +737,11 @@ public class FoliaTasks {
                 }
                 yield left.values().stream().mapToInt(ItemStack::getAmount).sum();
             }
-            case "inventory.removeItem" -> { invOf(p).removeItem(itemFromObject(p.getAsJsonObject("item"))); yield true; }
+            case "inventory.removeItem" -> {
+                // 返回未移除数量（0 = 全部移除），与 Paper 一致
+                var left = invOf(p).removeItem(itemFromObject(p.getAsJsonObject("item")));
+                yield left.values().stream().mapToInt(ItemStack::getAmount).sum();
+            }
             // ── BossBar
             case "bossbar.create" -> {
                 var bb = Bukkit.createBossBar(FoliaTextUtil.toLegacy(FoliaTextUtil.parse(p.get("title"))),
@@ -1015,11 +1012,12 @@ public class FoliaTasks {
             }
             // ── Material（静态判断，全局） ───────────────────────────
             case "material.isSolid" -> Material.matchMaterial(p.get("type").getAsString()).isSolid();
-            case "material.isLiquid" -> {
-                var m = Material.matchMaterial(p.get("type").getAsString());
-                yield m == Material.WATER || m == Material.LAVA;
-            }
             case "material.isAir" -> Material.matchMaterial(p.get("type").getAsString()).isAir();
+            case "material.getMaxDurability" -> {
+                var mat = Material.matchMaterial(p.get("type").getAsString());
+                if (mat == null) throw new IllegalArgumentException("Unknown material: " + p.get("type").getAsString());
+                yield mat.getMaxDurability();
+            }
             case "server.getMaterials" -> Registry.MATERIAL.stream()
                 .map(m -> {
                     var o = new LinkedHashMap<String, Object>();
@@ -1072,7 +1070,7 @@ public class FoliaTasks {
             case "world.getSeed" -> world(p).getSeed();
             case "world.getEnvironment" -> world(p).getEnvironment().name();
             case "world.getWorldType" -> { try { yield world(p).getWorldType().name(); } catch (Exception e) { yield null; } }
-            case "world.getGameRules" -> java.util.Arrays.asList(world(p).getGameRules());
+            case "world.getGameRules" -> java.util.Arrays.stream(world(p).getGameRules()).map(FoliaTasks::gameRuleCamel).toList();
             case "world.getBorder" -> {
                 var b = world(p).getWorldBorder();
                 var m = new LinkedHashMap<String, Object>();
@@ -1106,6 +1104,7 @@ public class FoliaTasks {
                 yield true;
             }
             case "world.isChunkLoaded" -> world(p).isChunkLoaded(p.get("x").getAsInt(), p.get("z").getAsInt());
+            case "world.isChunkGenerated" -> world(p).isChunkGenerated(p.get("x").getAsInt(), p.get("z").getAsInt());
             case "world.loadChunk" -> { world(p).loadChunk(p.get("x").getAsInt(), p.get("z").getAsInt()); yield true; }
             case "world.unloadChunk" -> world(p).unloadChunk(p.get("x").getAsInt(), p.get("z").getAsInt());
             case "world.getChunkAt" -> {
@@ -1127,15 +1126,16 @@ public class FoliaTasks {
             case "world.getSkyLightLevel" -> world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt()).getLightFromSky();
             case "world.getBlock" -> {
                 var b = world(p).getBlockAt(p.get("x").getAsInt(), p.get("y").getAsInt(), p.get("z").getAsInt());
-                // BlockData.getAsString() → "minecraft:stone[waterlogged=true]"，拆分 type + state
+                // BlockData.getAsString() → "minecraft:stone[waterlogged=true,level=8]"，拆分 type + state；
+                // 键值层面保留类型：布尔/数字值输出为对应 JSON 类型（非全部字符串）
                 var str = b.getBlockData().getAsString();
-                var state = new LinkedHashMap<String, String>();
+                var state = new LinkedHashMap<String, Object>();
                 var lb = str.indexOf('[');
                 if (lb > 0) {
                     var inner = str.substring(lb + 1, str.indexOf(']'));
                     for (var kv : inner.split(",")) {
                         var parts = kv.split("=");
-                        if (parts.length == 2) state.put(parts[0].trim(), parts[1].trim());
+                        if (parts.length == 2) state.put(parts[0].trim(), stateValue(parts[1].trim()));
                     }
                     str = str.substring(0, lb);
                 }
@@ -1179,7 +1179,7 @@ public class FoliaTasks {
                     !p.has("breakBlocks") || p.get("breakBlocks").getAsBoolean());
                 yield true;
             }
-            case "world.spawnEntity" -> world(p).spawnEntity(loc(p), EntityType.valueOf(p.get("type").getAsString().toUpperCase())).getUniqueId().toString();
+            case "world.spawnEntity" -> world(p).spawnEntity(loc(p), entityTypeOf(p.get("type").getAsString())).getUniqueId().toString();
             case "world.spawnItem" -> {
                 // 与 Paper/规范一致：item 对象（{type, amount, meta?}）；兼容旧 itemType 字符串
                 ItemStack it;
@@ -1289,6 +1289,24 @@ public class FoliaTasks {
         return pl;
     }
 
+    /** blockType + state 解析（与 world.setBlock 同语义：blockType 宽松匹配，state 构建规范方块数据字符串）。 */
+    private static org.bukkit.block.data.BlockData blockData(JsonObject p) {
+        var mat = Material.matchMaterial(p.get("blockType").getAsString());
+        if (mat == null) throw new IllegalArgumentException("Unknown block type: " + p.get("blockType").getAsString());
+        if (p.has("state") && p.get("state").isJsonObject() && p.getAsJsonObject("state").size() > 0) {
+            var sb = new StringBuilder(mat.getKey().toString()).append('[');
+            var first = true;
+            for (var e : p.getAsJsonObject("state").entrySet()) {
+                if (!first) sb.append(',');
+                sb.append(e.getKey()).append('=').append(e.getValue().getAsString());
+                first = false;
+            }
+            sb.append(']');
+            return Bukkit.createBlockData(sb.toString());
+        }
+        return mat.createBlockData();
+    }
+
     private static Player playerOrNull(JsonObject p) {
         var id = p.has("uuid") ? p.get("uuid").getAsString() : (p.has("identifier") ? p.get("identifier").getAsString() : null);
         if (id == null) return null;
@@ -1349,25 +1367,108 @@ public class FoliaTasks {
     }
 
     private static ItemStack itemOf(JsonObject p) {
+        if (p.has("item") && p.get("item").isJsonObject()) return itemFromObject(p.getAsJsonObject("item")); // 统一物品对象（ItemStack 形状）
         var mat = Material.matchMaterial(p.get("itemType").getAsString());
         if (mat == null) throw new IllegalArgumentException("Unknown item: " + p.get("itemType").getAsString());
-        return new ItemStack(mat, p.has("amount") ? p.get("amount").getAsInt() : 1);
+        return new ItemStack(mat, p.has("amount") ? p.get("amount").getAsInt() : 1); // 旧式 itemType 兼容
+    }
+
+    /**
+     * 实体类型解析：协议统一使用 minecraft 键（如 `minecraft:zombie`，与 entity.getType 输出一致）；
+     * 兼容旧式 Bukkit 枚举名（如 `ZOMBIE`）。
+     */
+    private static EntityType entityTypeOf(String s) {
+        var key = NamespacedKey.fromString(s);
+        if (key != null) {
+            var t = Registry.ENTITY_TYPE.get(key);
+            if (t != null) return t;
+        }
+        return EntityType.valueOf(s.toUpperCase());
+    }
+
+    /**
+     * 药水效果类型解析（值域附录 R1）：协议统一使用 minecraft 注册键（如 `minecraft:speed`）；
+     * 兼容旧式 Bukkit 枚举名（如 `SPEED`，大小写不敏感）。
+     */
+    private static PotionEffectType potionType(String s) {
+        var key = NamespacedKey.fromString(s);
+        if (key != null) {
+            var t = Registry.EFFECT.get(key);
+            if (t != null) return t;
+        }
+        return PotionEffectType.getByName(s.toUpperCase());
+    }
+
+    /**
+     * 粒子类型解析（值域附录 R1）：协议统一使用 minecraft 注册键（如 `minecraft:flame`）；
+     * 兼容旧式 Bukkit 枚举名（如 `FLAME`，大小写不敏感）。
+     */
+    private static org.bukkit.Particle particleOf(String s) {
+        var key = NamespacedKey.fromString(s);
+        if (key != null) {
+            var t = Registry.PARTICLE_TYPE.get(key);
+            if (t != null) return t;
+        }
+        return org.bukkit.Particle.valueOf(s.toUpperCase());
+    }
+
+    /**
+     * 属性类型解析（值域附录 R1）：协议统一使用 minecraft 注册键（如 `minecraft:attack_damage`，
+     * 与 serializeItem 输出一致）；兼容旧式 Bukkit 枚举名（如 `ATTACK_DAMAGE`，大小写不敏感）。
+     */
+    private static org.bukkit.attribute.Attribute attributeOf(String s) {
+        var key = NamespacedKey.fromString(s);
+        if (key != null) {
+            var t = Registry.ATTRIBUTE.get(key);
+            if (t != null) return t;
+        }
+        try { return org.bukkit.attribute.Attribute.valueOf(s.toUpperCase()); } catch (Exception e) { return null; }
     }
 
     // ── GameRule（注册表，类加载时构建一次，避免逐调用反射） ─────────────
 
     @SuppressWarnings("rawtypes")
     private static final Map<String, org.bukkit.GameRule> GAME_RULES = new HashMap<>();
+    /** 归一化（去下划线 + 小写）→ GameRule：入参宽松，驼峰/大写/任意下划线均接受。 */
+    @SuppressWarnings("rawtypes")
+    private static final Map<String, org.bukkit.GameRule> GAME_RULE_BY_NORM = new HashMap<>();
     static {
         for (var f : org.bukkit.GameRule.class.getFields()) {
-            try { GAME_RULES.put(f.getName(), (org.bukkit.GameRule) f.get(null)); } catch (Exception ignored) {}
+            try {
+                var gr = (org.bukkit.GameRule) f.get(null);
+                GAME_RULES.put(f.getName(), gr);
+                GAME_RULE_BY_NORM.put(f.getName().replace("_", "").toLowerCase(java.util.Locale.ROOT), gr);
+            } catch (Exception ignored) {}
         }
     }
 
-    /** 规则名 → GameRule（忽略大小写，raw 类型以支持 setGameRule(r, JsonElement)）；未知规则返回 null。 */
+    /** 规则名 → GameRule（入参宽松：驼峰 keepInventory / UPPER_SNAKE KEEP_INVENTORY / 任意大小写与下划线）；未知规则返回 null。 */
     @SuppressWarnings("rawtypes")
     private static org.bukkit.GameRule gameRule(String name) {
-        return name == null ? null : GAME_RULES.get(name.toUpperCase());
+        return name == null ? null : GAME_RULE_BY_NORM.get(name.replace("_", "").toLowerCase(java.util.Locale.ROOT));
+    }
+
+    /** 方块状态值文本 → JSON 类型：`true`/`false` → 布尔；数字字面量 → 数字；否则字符串。 */
+    private static Object stateValue(String v) {
+        if ("true".equals(v)) return true;
+        if ("false".equals(v)) return false;
+        try {
+            if (v.matches("-?\\d+")) return Long.parseLong(v);
+            if (v.matches("-?\\d+\\.\\d+([eE][+-]?\\d+)?")) return Double.parseDouble(v);
+        } catch (Exception ignored) {}
+        return v;
+    }
+
+    /** UPPER_SNAKE → camelCase（如 DO_DAYLIGHT_CYCLE → doDaylightCycle）；R3 出参驼峰。 */
+    private static String gameRuleCamel(String upper) {
+        var parts = upper.toLowerCase(java.util.Locale.ROOT).split("_");
+        var sb = new StringBuilder(parts[0]);
+        for (int i = 1; i < parts.length; i++) {
+            var seg = parts[i];
+            if (seg.isEmpty()) continue;
+            sb.append(Character.toUpperCase(seg.charAt(0))).append(seg.substring(1));
+        }
+        return sb.toString();
     }
 
     // ── PDC ─────────────────────────────────────────────────────────
@@ -1419,7 +1520,7 @@ public class FoliaTasks {
 
     private static void spawnParticle(JsonObject p) {
         var world = world(p);
-        var particle = Particle.valueOf(p.get("particle").getAsString().toUpperCase());
+        var particle = particleOf(p.get("particle").getAsString());
         var count = p.has("count") ? p.get("count").getAsInt() : 1;
         var ox = p.has("offsetX") ? p.get("offsetX").getAsDouble() : 0.0;
         var oy = p.has("offsetY") ? p.get("offsetY").getAsDouble() : 0.0;
@@ -1494,7 +1595,7 @@ public class FoliaTasks {
                 for (var el : m.getAsJsonArray("potionEffects")) {
                     try {
                         var eff = el.getAsJsonObject();
-                        var type = org.bukkit.potion.PotionEffectType.getByName(eff.get("type").getAsString().toUpperCase());
+                        var type = potionType(eff.get("type").getAsString());
                         if (type == null) continue;
                         pm.addCustomEffect(new org.bukkit.potion.PotionEffect(type,
                             eff.has("duration") ? eff.get("duration").getAsInt() : 200,
@@ -1523,7 +1624,8 @@ public class FoliaTasks {
                 for (var el : m.getAsJsonArray("attributeModifiers")) {
                     try {
                         var am = el.getAsJsonObject();
-                        var attr = org.bukkit.attribute.Attribute.valueOf(am.get("attribute").getAsString().toUpperCase());
+                        var attr = attributeOf(am.get("attribute").getAsString());
+                        if (attr == null) continue;
                         var amt = am.get("amount").getAsDouble();
                         var op = org.bukkit.attribute.AttributeModifier.Operation.valueOf(am.get("operation").getAsString().toUpperCase());
                         var slot = am.has("slot") ? org.bukkit.inventory.EquipmentSlotGroup.getByName(am.get("slot").getAsString()) : null;
@@ -1620,7 +1722,7 @@ public class FoliaTasks {
                     var effs = new java.util.ArrayList<Object>();
                     for (var pe : pm.getCustomEffects()) {
                         var em = new LinkedHashMap<String, Object>();
-                        em.put("type", pe.getType().getName().toLowerCase());
+                        em.put("type", pe.getType().getKey().toString());
                         em.put("duration", pe.getDuration());
                         em.put("amplifier", pe.getAmplifier());
                         em.put("ambient", pe.isAmbient());
@@ -1642,17 +1744,21 @@ public class FoliaTasks {
                     metaMap.put("skullOwner", profile.getName());
                 }
             }
-            if (meta instanceof org.bukkit.inventory.meta.ItemMeta im && !im.getAttributeModifiers().isEmpty()) {
-                var mods = new java.util.ArrayList<Object>();
-                im.getAttributeModifiers().forEach((attr, mod) -> {
-                    var am = new LinkedHashMap<String, Object>();
-                    am.put("attribute", attr.getKey().toString());
-                    am.put("amount", mod.getAmount());
-                    am.put("operation", mod.getOperation().name().toLowerCase());
-                    if (mod.getSlotGroup() != null) am.put("slot", mod.getSlotGroup().toString());
-                    mods.add(am);
-                });
-                metaMap.put("attributeModifiers", mods);
+            if (meta instanceof org.bukkit.inventory.meta.ItemMeta im) {
+                // getAttributeModifiers() 在无属性修饰时可返回 null——须判空（否则 NPE）
+                var attrMods = im.getAttributeModifiers();
+                if (attrMods != null && !attrMods.isEmpty()) {
+                    var mods = new java.util.ArrayList<Object>();
+                    attrMods.forEach((attr, mod) -> {
+                        var am = new LinkedHashMap<String, Object>();
+                        am.put("attribute", attr.getKey().toString());
+                        am.put("amount", mod.getAmount());
+                        am.put("operation", mod.getOperation().name().toLowerCase());
+                        if (mod.getSlotGroup() != null) am.put("slot", mod.getSlotGroup().toString());
+                        mods.add(am);
+                    });
+                    metaMap.put("attributeModifiers", mods);
+                }
             }
             m.put("meta", metaMap);
         }
