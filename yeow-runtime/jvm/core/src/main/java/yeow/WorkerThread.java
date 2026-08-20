@@ -291,13 +291,16 @@ public class WorkerThread implements PluginEntity, Runnable {
                     }
                     return null;
                 }
-                // fs / assets / http：委托主插件（共享数据目录、权限、资源）
+                // fs / http：委托主插件（共享数据目录、权限、资源），权限检查随主插件
+                // assets：委托主插件但**不做权限拦截**（与主插件一致——解压限定在共享数据目录内）
                 if ("fs".equals(channel) || "assets".equals(channel) || "http".equals(channel)) {
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
-                    var denied = main.checkChannelPermissionPublic(channel, obj.has("t") ? obj.get("t").getAsString() : "");
-                    if (denied != null) {
-                        if (obj.has("cb")) { var cbId = obj.get("cb").getAsString(); queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",Map.of("err", denied)))); return null; }
-                        return gson.toJson(Map.of("err", denied));
+                    if (!"assets".equals(channel)) {
+                        var denied = main.checkChannelPermissionPublic(channel, obj.has("t") ? obj.get("t").getAsString() : "");
+                        if (denied != null) {
+                            if (obj.has("cb")) { var cbId = obj.get("cb").getAsString(); queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",Map.of("err", denied)))); return null; }
+                            return gson.toJson(Map.of("err", denied));
+                        }
                     }
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
@@ -328,6 +331,16 @@ public class WorkerThread implements PluginEntity, Runnable {
                     var dt = obj.get("t").getAsString();
                     if ("reportError".equals(dt)) { main.handleJSReportPublic(gson.toJson(obj.get("p")), name); }
                     else if ("pong".equals(dt)) { onPong(); }
+                    else if ("payload".equals(dt)) {
+                        // 任意载荷回显（基准测试）：与主插件同语义，Worker 线程本地处理
+                        var echo = obj.has("p") ? gson.toJson(obj.get("p")) : "null";
+                        if (obj.has("cb")) {
+                            var cbId = obj.get("cb").getAsString();
+                            queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r", main.toJsonValuePublic(echo))));
+                            return null;
+                        }
+                        return echo;
+                    }
                     return null;
                 }
                 if ("lifecycle".equals(channel)) {
@@ -336,10 +349,17 @@ public class WorkerThread implements PluginEntity, Runnable {
                     running = false; return null;
                 }
                 if ("log".equals(channel)) {
-                    var o = gson.fromJson(pld, JsonObject.class); log.info(o.has("message") ? o.get("message").getAsString() : pld); return null;
+                    var o = gson.fromJson(pld, JsonObject.class);
+                    var msg = o.has("message") ? o.get("message").getAsString() : pld;
+                    var level = o.has("level") ? o.get("level").getAsString() : "INFO";
+                    switch (level) {
+                        case "WARN" -> log.warning(msg);
+                        case "ERROR" -> log.severe(msg);
+                        default -> log.info(msg);
+                    }
+                    return null;
                 }
                 if ("env".equals(channel)) { return main.handleEnvPublic(); }
-                if ("dir".equals(channel)) { return main.getDataDirPublic(); }
                 return null;
             } catch (Exception ex) {
                 log.warning("[" + entityName + "] $_send err: " + ex.getMessage());

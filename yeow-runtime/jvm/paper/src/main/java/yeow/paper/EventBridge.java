@@ -394,6 +394,15 @@ public class EventBridge implements Listener {
                 var eventId = cbToDispatch.get(entry.getKey() + "\u0000" + cb);
                 var r = SyncCallbackHelper.waitFor(eventId, 0);
                 if (r instanceof Map<?,?> m) {
+                    // 通用事件字段回写（applyMods，与 dispatchSerial 一致的 setter 语义）：
+                    // 仅排除并发聚合专用字段（cancelled/motd/icon/maxPlayers/numPlayers）——
+                    // 它们由下方聚合逻辑单独处理（cancelled 按"任一取消即取消"、serverPing 按最后写入）。
+                    // 修复：并发模式此前不应用 applyMods → deathMessage/joinMessage/聊天 format 等
+                    // 字段回写全部静默失效。
+                    var mods = new java.util.HashMap<Object, Object>(m);
+                    mods.remove("cancelled"); mods.remove("motd"); mods.remove("icon");
+                    mods.remove("maxPlayers"); mods.remove("numPlayers");
+                    if (!mods.isEmpty()) applyMods(ev, mods);
                     if (Boolean.TRUE.equals(m.get("cancelled")))
                         cancelled = true;
                     if (m.containsKey("motd"))
@@ -560,7 +569,7 @@ public class EventBridge implements Listener {
             case "playerDeath":{ var e=(PlayerDeathEvent)ev; putP(m,e.getPlayer());
                 // 死亡消息：Message 对象--key/args 可翻译组件（如有）+ text 纯文本兜底，两者同时传递
                 m.put("deathMessage", componentToMessage(deathMessageComponent(e)));
-                m.put("deathType",e.getDamageSource()!=null?e.getDamageSource().getDamageType().getKey().getKey():"UNKNOWN"); break; }
+                m.put("deathType",e.getDamageSource()!=null?e.getDamageSource().getDamageType().getKey().toString():"UNKNOWN"); break; }
             case "playerRespawn":{ var e=(PlayerRespawnEvent)ev; putP(m,e.getPlayer()); m.put("respawnLocation",pos(e.getRespawnLocation())); break; }
             case "playerDropItem":{ var e=(PlayerDropItemEvent)ev; putP(m,e.getPlayer());
                 m.put("itemType",e.getItemDrop().getItemStack().getType().getKey().toString()); m.put("amount",e.getItemDrop().getItemStack().getAmount()); break; }
@@ -570,7 +579,7 @@ public class EventBridge implements Listener {
             case "playerBucketEmpty":{ var e=(PlayerBucketEmptyEvent)ev; putP(m,e.getPlayer()); m.put("bucket",e.getBucket().getKey().toString()); break; }
             case "playerExpChange":{ var e=(PlayerExpChangeEvent)ev; putP(m,e.getPlayer()); m.put("amount",e.getAmount()); break; }
             case "playerLevelChange":{ var e=(PlayerLevelChangeEvent)ev; putP(m,e.getPlayer()); m.put("oldLevel",e.getOldLevel()); m.put("newLevel",e.getNewLevel()); break; }
-            case "playerGameModeChange":{ var e=(PlayerGameModeChangeEvent)ev; putP(m,e.getPlayer()); m.put("newGameMode",e.getNewGameMode().name()); break; }
+            case "playerGameModeChange":{ var e=(PlayerGameModeChangeEvent)ev; putP(m,e.getPlayer()); m.put("newGameMode",e.getNewGameMode().name().toLowerCase()); break; }
             case "playerAdvancementDone":{ var e=(PlayerAdvancementDoneEvent)ev; putP(m,e.getPlayer()); m.put("advancement",e.getAdvancement().getKey().toString());
                 // 进度标题/描述：Paper 的 AdvancementDisplay 提供 Component（title()/description()）--
                 // 可翻译组件（{key,args,text}）或纯文本（{text}）
@@ -584,13 +593,13 @@ public class EventBridge implements Listener {
             case "playerToggleFlight":{ var e=(PlayerToggleFlightEvent)ev; putP(m,e.getPlayer()); m.put("flying",e.isFlying()); break; }
             case "foodLevelChange":{ var e=(FoodLevelChangeEvent)ev; putP(m,(org.bukkit.entity.Player)e.getEntity()); m.put("oldFoodLevel",e.getEntity().getFoodLevel()); m.put("newFoodLevel",e.getFoodLevel()); break; }
             case "entityDamage":{ var e=(EntityDamageEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString()); m.put("damage",e.getDamage());
-                m.put("cause",e.getCause().name()); m.put("entityType",e.getEntityType().name()); break; }
-            case "entityDeath":{ var e=(EntityDeathEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString()); m.put("entityType",e.getEntityType().name());
+                m.put("cause",e.getCause().name()); m.put("entityType",e.getEntityType().getKey().toString()); break; }
+            case "entityDeath":{ var e=(EntityDeathEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString()); m.put("entityType",e.getEntityType().getKey().toString());
                 m.put("entityName",e.getEntity().getName()); break; }
-            case "entitySpawn":{ var e=(EntitySpawnEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString()); m.put("entityType",e.getEntityType().name());
+            case "entitySpawn":{ var e=(EntitySpawnEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString()); m.put("entityType",e.getEntityType().getKey().toString());
                 var l=e.getLocation(); m.put("x",l.getX());m.put("y",l.getY());m.put("z",l.getZ());m.put("world",l.getWorld().getName()); break; }
             case "projectileLaunch":{ var e=(ProjectileLaunchEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString());
-                m.put("projectileType",e.getEntityType().name());
+                m.put("projectileType",e.getEntityType().getKey().toString());
                 if(e.getEntity().getShooter() instanceof org.bukkit.entity.LivingEntity ls) m.put("shooter",ls.getUniqueId().toString()); break; }
             case "blockBreak":{ var e=(BlockBreakEvent)ev; putP(m,e.getPlayer()); var b=e.getBlock(); m.put("block",b.getType().getKey().toString());
                 m.put("x",b.getX());m.put("y",b.getY());m.put("z",b.getZ()); break; }
@@ -610,14 +619,14 @@ public class EventBridge implements Listener {
             case "playerItemConsume":{ var e=(PlayerItemConsumeEvent)ev; putP(m,e.getPlayer());
                 m.put("itemType",e.getItem().getType().getKey().toString()); break; }
             case "entityExplode":{ var e=(EntityExplodeEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString());
-                m.put("entityType",e.getEntityType().name()); m.put("x",e.getLocation().getX()); m.put("y",e.getLocation().getY()); m.put("z",e.getLocation().getZ());
+                m.put("entityType",e.getEntityType().getKey().toString()); m.put("x",e.getLocation().getX()); m.put("y",e.getLocation().getY()); m.put("z",e.getLocation().getZ());
                 m.put("blockCount",e.blockList().size()); break; }
             case "entityRegainHealth":{ var e=(EntityRegainHealthEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString());
                 m.put("amount",e.getAmount()); m.put("reason",e.getRegainReason().name()); break; }
             case "entityTarget":{ var e=(EntityTargetLivingEntityEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString());
                 m.put("target",e.getTarget()!=null?e.getTarget().getUniqueId().toString():null); break; }
             case "projectileHit":{ var e=(ProjectileHitEvent)ev; m.put("entity",e.getEntity().getUniqueId().toString());
-                m.put("projectileType",e.getEntityType().name());
+                m.put("projectileType",e.getEntityType().getKey().toString());
                 m.put("hitEntity",e.getHitEntity()!=null?e.getHitEntity().getUniqueId().toString():null);
                 if(e.getHitBlock()!=null){var b=e.getHitBlock();m.put("hitBlock",Map.of("x",b.getX(),"y",b.getY(),"z",b.getZ(),"type",b.getType().getKey().toString()));} break; }
             case "blockFade":{ var e=(BlockFadeEvent)ev; var b=e.getBlock(); m.put("block",b.getType().getKey().toString());

@@ -46,7 +46,7 @@ public final class EventSlowDetector implements WarningDetector {
                         String.format(" 事件 %s 窗口内超时 %d 次（等待上限 %dms）。",
                             ev.eventType(), ev.timeouts(), cfg.callbackTimeoutEventMs()),
                         " 事件已被运行时强制释放，此前的取消/修改不生效。",
-                        " 建议：使用异步 handler 或手动 complete()；若事件处理器内是同步阻塞（如 requestSync 等同步 API），",
+                        " 建议：使用异步 handler 或手动 complete()；若事件处理器内是同步阻塞调用（同步 API 会阻塞 JS 线程），",
                         " 请检查 JS 线程是否存在长同步阻塞--阻塞期间事件/命令/回调均无法投递。" +
                         " 请改用异步 API（request/fetch）。")));
             }

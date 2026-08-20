@@ -54,11 +54,20 @@ public class RuntimeCore {
         this.approvals = new ApprovalStore(host.dataFolder());
         this.profiler = yeow.profile.Profiler.create(yeow.profile.ProfileConfig.from(config), host.dataFolder());
         // 调度器插桩（ProfileSink/BudgetScaler）由平台在构造其调度器时装配
+        // 引导脚本：polyfill.js（TextEncoder/TextDecoder/fetch 等纯 JS Polyfill）在前，
+        // init.js（桥闭包/回调注册表/消息循环）在后——单脚本顺序执行，共享同一脚本作用域。
         String code = null;
-        try (var is = RuntimeCore.class.getResourceAsStream("/js/init.js")) {
-            code = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        try {
+            String polyfill = null;
+            try (var is = RuntimeCore.class.getResourceAsStream("/js/polyfill.js")) {
+                if (is != null) polyfill = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            try (var is = RuntimeCore.class.getResourceAsStream("/js/init.js")) {
+                code = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            }
+            if (polyfill != null) code = polyfill + "\n" + code;
         } catch (Exception e) {
-            host.logger().warning("Failed to load init.js: " + e.getMessage());
+            host.logger().warning("Failed to load bootstrap scripts: " + e.getMessage());
         }
         this.initCode = code;
         if (devMode) connectDevWebSocket();

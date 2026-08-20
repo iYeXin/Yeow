@@ -292,7 +292,6 @@ public class PluginThread implements Runnable, PluginEntity {
 
     private void inject() {
         var g = ctx.getGlobalObject();
-        var dir = "plugins/" + name;
         ctx.evaluate("globalThis.__plugin = {name:'" + name.replace("'","\\'") + "',version:'',author:''};");
         ctx.evaluate("globalThis.$dev = " + devMode + ";");
 
@@ -352,12 +351,8 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     return handleHttp(pld);
                 } else if ("assets".equals(channel)) {
+                    // assets 通道不再做权限拦截（只读打包资源 / 解压被限定在本插件数据目录内，见 handleAssets）
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
-                    var denied = checkChannelPermission("assets", obj.has("t") ? obj.get("t").getAsString() : "");
-                    if (denied != null) {
-                        if (obj.has("cb")) { var cbId = obj.get("cb").getAsString(); queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",Map.of("err", denied)))); return null; }
-                        return gson.toJson(Map.of("err", denied));
-                    }
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
                         ioExecutor.submit(() -> { var result = handleAssets(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(result))); });
@@ -380,6 +375,17 @@ public class PluginThread implements Runnable, PluginEntity {
                     var dt = obj.get("t").getAsString();
                     if ("reportError".equals(dt)) { handleJSReport(gson.toJson(obj.get("p"))); }
                     else if ("pong".equals(dt)) { onPong(); }
+                    else if ("payload".equals(dt)) {
+                        // 任意载荷回显（基准测试/往返延迟测量）：内容即原样返回，零解释。
+                        // 同步（无 cb）直接返回原载荷 JSON；含 cb 时经回调异步回投。
+                        var echo = obj.has("p") ? gson.toJson(obj.get("p")) : "null";
+                        if (obj.has("cb")) {
+                            var cbId = obj.get("cb").getAsString();
+                            queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(echo)));
+                            return null;
+                        }
+                        return echo;
+                    }
                     else if ("command".equals(dt)) {
                         // 运行时内部测试节点（如性能基准）：**仅开发模式开放**（-Dyeow.dev=true，
                         // dev-server 默认启用）——生产环境拒绝。
@@ -400,7 +406,15 @@ public class PluginThread implements Runnable, PluginEntity {
                     if ("unloadDone".equals(lt)) { running = false; return null; }
                     running = false; return null;
                 } else if ("log".equals(channel)) {
-                    var o = gson.fromJson(pld, JsonObject.class); log.info(o.has("message") ? o.get("message").getAsString() : pld); return null;
+                    var o = gson.fromJson(pld, JsonObject.class);
+                    var msg = o.has("message") ? o.get("message").getAsString() : pld;
+                    var level = o.has("level") ? o.get("level").getAsString() : "INFO";
+                    switch (level) {
+                        case "WARN" -> log.warning(msg);
+                        case "ERROR" -> log.severe(msg);
+                        default -> log.info(msg);
+                    }
+                    return null;
                 } else if ("env".equals(channel)) { return handleEnv(); }
                 else if ("service".equals(channel)) {
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
@@ -408,7 +422,6 @@ public class PluginThread implements Runnable, PluginEntity {
                     if (denied != null) return gson.toJson(Map.of("err", denied));
                     return handleService(pld);
                 }
-                else if ("dir".equals(channel)) { return dir; }
                 else { return null; }
             } catch (Exception ex) {
                 log.warning("[" + name + "] $_send err: " + ex.getMessage());
@@ -429,7 +442,8 @@ public class PluginThread implements Runnable, PluginEntity {
      * 前缀 → 拒绝；否则默认允许。
      */
     private static final String[] DEFAULT_DENIED_NODES = {
-        "fs:server.", "fs:outer.", "http:", "service:registerNative", "assets:extract",
+        "fs:server.", "fs:outer.", "http:", "service:registerNative",
+        // assets 通道不设权限拦截（解压目标被强制限定在插件数据目录内，见 assetsTarget）
     };
 
     /** 运行时配置目录（plugins/Yeow/runtime/）：fs 写操作一律禁止修改（读取不受限）。 */
@@ -560,8 +574,6 @@ public class PluginThread implements Runnable, PluginEntity {
         return null;
     }
 
-    /** 数据目录（fs plugin 级 base；Worker 共享）。 */
-    public String getDataDirPublic() { return "plugins/" + name; }
     public TaskScheduler getSchedulerRef() { return scheduler; }
     public String checkChannelPermissionPublic(String channel, String op) { return checkChannelPermission(channel, op); }
     public String handleFsPublic(String pld) { return handleFs(pld); }
@@ -580,6 +592,7 @@ public class PluginThread implements Runnable, PluginEntity {
      * - minecraftVersion：Minecraft 版本（如 1.21.4）
      * - yeow：运行时信息 { platform, version }
      * - now：epoch 微秒时间戳（通信开销在微秒级，纳秒无意义）
+     * - pluginDir：插件数据目录路径（原 dir 通道并入；fs plugin 级 base，如 plugins/<pluginName>）
      */
     private String handleEnv() {
         var osName = System.getProperty("os.name").toLowerCase();
@@ -591,14 +604,16 @@ public class PluginThread implements Runnable, PluginEntity {
         var now = java.time.Instant.now();
         long nowUs = now.getEpochSecond() * 1_000_000L + now.getNano() / 1000L;
         String yeowVersion = core.host().runtimeVersion();
-        if (yeowVersion == null) yeowVersion = "0.2.0";
+        if (yeowVersion == null) yeowVersion = "0.5.0";
         return gson.toJson(Map.of(
             "cpus", Runtime.getRuntime().availableProcessors(),
             "memory", Runtime.getRuntime().totalMemory(),
             "arch", os + "-" + arch,
             "minecraftVersion", core.host().minecraftVersion(),
             "yeow", Map.of("platform", core.host().platformName(), "version", yeowVersion),
-            "now", nowUs));
+            "now", nowUs,
+            // 原 dir 通道并入 env：插件数据目录（fs plugin 级 base；Worker 共享主插件目录）
+            "pluginDir", "plugins/" + name));
     }
 
     /** 禁止对 Yeow 运行时配置目录（含 approve.json / config.yml）的修改--fs 写操作（全部级别）一律拦截。 */
@@ -661,9 +676,22 @@ public class PluginThread implements Runnable, PluginEntity {
                         "ctimeMs", attrs.creationTime().toMillis()));
                 }
                 case "isDirectory" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield String.valueOf(Files.isDirectory(path)); }
-                case "delete" -> { var path = resolvePath(base, p.get("path").getAsString(), false); assertNotRuntimeDir(path); yield String.valueOf(Files.deleteIfExists(path)); }
+                case "delete" -> {
+                    var path = resolvePath(base, p.get("path").getAsString(), false);
+                    assertNotRuntimeDir(path);
+                    if (!Files.exists(path)) yield "false";
+                    // 目录递归删除（与规范 fs.md 一致）：先删最深文件再删目录自身
+                    if (Files.isDirectory(path)) {
+                        try (var s = Files.walk(path)) {
+                            s.sorted(java.util.Comparator.reverseOrder()).forEach(x -> { try { Files.deleteIfExists(x); } catch (Exception ignored) {} });
+                        }
+                    } else {
+                        Files.deleteIfExists(path);
+                    }
+                    yield "true";
+                }
                 case "mkdir" -> { var path = resolvePath(base, p.get("path").getAsString(), false); assertNotRuntimeDir(path); Files.createDirectories(path); yield "true"; }
-                case "list" -> { var path = resolvePath(base, p.get("path").getAsString(), false); try (var s = Files.list(path)) { yield gson.toJson(s.map(Path::toString).toList()); } }
+                case "list" -> { var path = resolvePath(base, p.get("path").getAsString(), false); try (var s = Files.list(path)) { yield gson.toJson(s.map(x -> x.getFileName().toString()).toList()); } }
                 case "readBase64" -> { var path = resolvePath(base, p.get("path").getAsString(), false); yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(Files.readAllBytes(path)))); }
                 case "writeBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.write(path, Base64.getDecoder().decode(p.get("data").getAsString())); yield "true"; }
                 case "appendBase64" -> { var path = resolvePath(base, p.get("path").getAsString()); assertNotRuntimeDir(path); Files.write(path, Base64.getDecoder().decode(p.get("data").getAsString()), StandardOpenOption.CREATE, StandardOpenOption.APPEND); yield "true"; }
@@ -807,20 +835,19 @@ public class PluginThread implements Runnable, PluginEntity {
                                 var hs = p.getAsJsonObject("headers");
                                 hs.entrySet().forEach(e2 -> conn.exchange().getResponseHeaders().add(e2.getKey(), e2.getValue().getAsString()));
                             }
-                            if (p.has("bodyBase64") && !p.get("bodyBase64").isJsonNull() && !p.get("bodyBase64").getAsString().isEmpty()) {
-                                // 二进制响应：base64 解码后原样写出（如资源包等 assets 二进制）
-                                var bytes = Base64.getDecoder().decode(p.get("bodyBase64").getAsString());
+                            var body = p.has("body") && !p.get("body").isJsonNull() ? p.get("body").getAsString() : "";
+                            // 编码（与 fs 写语义一致）：默认 utf8 文本；'base64' 时 body 视为 base64 编码的二进制，解码后原样写出
+                            var isB64 = p.has("encoding") && "base64".equalsIgnoreCase(p.get("encoding").getAsString());
+                            if (isB64 && !body.isEmpty()) {
+                                var bytes = Base64.getDecoder().decode(body);
                                 conn.exchange().sendResponseHeaders(status, bytes.length);
                                 try (var os = conn.exchange().getResponseBody()) { os.write(bytes); }
+                            } else if (body.isEmpty()) {
+                                conn.exchange().sendResponseHeaders(status, -1);
                             } else {
-                                var body = p.has("body") ? p.get("body").getAsString() : "";
-                                if (body.isEmpty()) {
-                                    conn.exchange().sendResponseHeaders(status, -1);
-                                } else {
-                                    var bytes = body.getBytes(StandardCharsets.UTF_8);
-                                    conn.exchange().sendResponseHeaders(status, bytes.length);
-                                    try (var os = conn.exchange().getResponseBody()) { os.write(bytes); }
-                                }
+                                var bytes = body.getBytes(StandardCharsets.UTF_8);
+                                conn.exchange().sendResponseHeaders(status, bytes.length);
+                                try (var os = conn.exchange().getResponseBody()) { os.write(bytes); }
                             }
                         } catch (Exception ignored) {}
                         finally { try { conn.exchange().close(); } catch (Exception ignored) {} }
@@ -838,18 +865,24 @@ public class PluginThread implements Runnable, PluginEntity {
                 }
                 case "request" -> {
                     var url = p.get("url").getAsString(); var method = p.has("method") ? p.get("method").getAsString() : "GET";
-                    var body = p.has("body") ? p.get("body").getAsString() : null;
+                    var body = p.has("body") && !p.get("body").isJsonNull() ? p.get("body").getAsString() : null;
+                    // 请求体编码（与 respond 同语义）：缺省/'utf8' → body 为 UTF-8 文本；'base64' → body 为 base64 二进制
+                    var bodyBase64 = p.has("encoding") && "base64".equalsIgnoreCase(p.get("encoding").getAsString());
                     var headers = p.has("headers") ? p.getAsJsonObject("headers") : new JsonObject();
                     var responseType = p.has("responseType") ? p.get("responseType").getAsString() : "text";
-                    yield handleHttpRequest(url, method, body, headers, responseType);
+                    var timeout = p.has("timeout") ? p.get("timeout").getAsLong() : 0;
+                    yield handleHttpRequest(url, method, body, bodyBase64, headers, responseType, timeout);
                 }
                 case "requestAsync" -> {
                     var url = p.get("url").getAsString(); var method = p.has("method") ? p.get("method").getAsString() : "GET";
-                    var body = p.has("body") ? p.get("body").getAsString() : null;
+                    var body = p.has("body") && !p.get("body").isJsonNull() ? p.get("body").getAsString() : null;
+                    // 请求体编码（与 respond 同语义）：缺省/'utf8' → body 为 UTF-8 文本；'base64' → body 为 base64 二进制
+                    var bodyBase64 = p.has("encoding") && "base64".equalsIgnoreCase(p.get("encoding").getAsString());
                     var headers = p.has("headers") ? p.getAsJsonObject("headers") : new JsonObject();
                     var responseType = p.has("responseType") ? p.get("responseType").getAsString() : "text";
+                    var timeout = p.has("timeout") ? p.get("timeout").getAsLong() : 0;
                     var cb = p.get("cb").getAsString();
-                    ioExecutor.submit(() -> { var result = handleHttpRequest(url, method, body, headers, responseType); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cb, toJsonValue(result))); });
+                    ioExecutor.submit(() -> { var result = handleHttpRequest(url, method, body, bodyBase64, headers, responseType, timeout); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cb, toJsonValue(result))); });
                     yield null;
                 }
                 default -> gson.toJson(Map.of("err", "Unknown http op: " + t));
@@ -857,13 +890,19 @@ public class PluginThread implements Runnable, PluginEntity {
         } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
     }
 
-    private String handleHttpRequest(String url, String method, String body, JsonObject headers, String responseType) {
+    private String handleHttpRequest(String url, String method, String body, boolean bodyBase64, JsonObject headers, String responseType, long timeoutMs) {
         try {
             var uri = URI.create(url); var conn = (java.net.HttpURLConnection) uri.toURL().openConnection();
-            conn.setRequestMethod(method.toUpperCase()); conn.setConnectTimeout(5000); conn.setReadTimeout(10000);
+            conn.setRequestMethod(method.toUpperCase());
+            // 超时（毫秒）：请求级 timeout 覆盖默认（连接 5s / 读取 10s）
+            conn.setConnectTimeout(timeoutMs > 0 ? (int) Math.min(timeoutMs, Integer.MAX_VALUE) : 5000);
+            conn.setReadTimeout(timeoutMs > 0 ? (int) Math.min(timeoutMs, Integer.MAX_VALUE) : 10000);
             if (headers != null) headers.entrySet().forEach(e -> conn.setRequestProperty(e.getKey(), e.getValue().getAsString()));
             if (body != null && ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method))) {
-                conn.setDoOutput(true); conn.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
+                conn.setDoOutput(true);
+                // 请求体（与 fs.writeFile / respond 同语义）：base64 时解码为原始字节写出
+                var bytes = bodyBase64 ? Base64.getDecoder().decode(body) : body.getBytes(StandardCharsets.UTF_8);
+                conn.getOutputStream().write(bytes);
             }
             conn.connect();
             var status = conn.getResponseCode();
@@ -878,14 +917,27 @@ public class PluginThread implements Runnable, PluginEntity {
             var responseHeaders = new LinkedHashMap<String, String>();
             conn.getHeaderFields().forEach((k,v) -> { if (k != null) responseHeaders.put(k.toLowerCase(), String.join(", ", v)); });
             return gson.toJson(Map.of("status", status, "body", responseBody, "headers", responseHeaders));
-        } catch (Exception e) { return gson.toJson(Map.of("error", e.getMessage() != null ? e.getMessage() : e.toString())); }
+        } catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
+    }
+
+    /**
+     * 解压目标解析：**必须位于插件数据目录 `plugins/<name>/` 内**。assets 通道不设权限拦截，
+     * 靠此限定兜底（`resolvePath` 已做规范化 + 越界检查 + 创建父目录）。
+     */
+    private Path assetsTarget(String dest) throws IOException {
+        var pluginDir = Path.of("plugins", name).toAbsolutePath().normalize();
+        var target = resolvePath(pluginDir, dest);
+        assertNotRuntimeDir(target);
+        return target;
     }
 
     private String handleAssets(String pld) {
         try {
             var obj = gson.fromJson(pld, JsonObject.class); var task = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
             var rawPath = p.get("path").getAsString();
-            var dest = p.has("dest") ? p.get("dest").getAsString() : (rawPath.startsWith("assets/") ? rawPath : "assets/" + rawPath);
+            // extract 必须指定 dest；extractDir 的 dest 可选（默认 assets/<path>）——dest 均基于插件数据目录计算并限定其内
+            var hasDest = p.has("dest") && !p.get("dest").isJsonNull();
+            var dest = hasDest ? p.get("dest").getAsString() : (rawPath.startsWith("assets/") ? rawPath : "assets/" + rawPath);
             if (devAssetsDir != null) {
                 var stripped = rawPath.startsWith("assets/") ? rawPath.substring("assets/".length()) : rawPath;
                 // dev 资产路径防护：规范化后必须仍在 devAssetsDir 内（../ 逃逸检查）
@@ -896,18 +948,17 @@ public class PluginThread implements Runnable, PluginEntity {
                     case "read" -> { if (!Files.exists(fp)) yield "null"; yield gson.toJson(Map.of("data", Files.readString(fp))); }
                     case "readBase64" -> { if (!Files.exists(fp)) yield "null"; yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(Files.readAllBytes(fp)))); }
                     case "extract" -> {
+                        if (!hasDest) yield gson.toJson(Map.of("err", "extract requires dest"));
                         if (!Files.exists(fp)) yield gson.toJson(Map.of("err", "Asset not found: " + rawPath));
-                        var target = resolvePath(Path.of("plugins", name).toAbsolutePath().normalize(), dest);
-                        assertNotRuntimeDir(target);
+                        var target = assetsTarget(dest);
                         Files.copy(fp, target, StandardCopyOption.REPLACE_EXISTING);
-                        yield gson.toJson(Map.of("path", target.toString()));
+                        yield gson.toJson(Map.of("path", Path.of("").toAbsolutePath().normalize().relativize(target).toString()));
                     }
                     case "extractDir" -> {
                         if (!Files.isDirectory(fp)) yield gson.toJson(Map.of("err", "Asset directory not found: " + rawPath));
-                        var target = resolvePath(Path.of("plugins", name).toAbsolutePath().normalize(), dest);
-                        assertNotRuntimeDir(target);
+                        var target = assetsTarget(dest);
                         copyDirRecursive(fp, target);
-                        yield gson.toJson(Map.of("path", target.toString()));
+                        yield gson.toJson(Map.of("path", Path.of("").toAbsolutePath().normalize().relativize(target).toString()));
                     }
                     default -> gson.toJson(Map.of("err", "Unknown assets op: " + task));
                 };
@@ -917,18 +968,16 @@ public class PluginThread implements Runnable, PluginEntity {
                     case "read" -> { var entry = zip.getEntry(rawPath); if (entry == null) yield "null"; yield gson.toJson(Map.of("data", new String(zip.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8))); }
                     case "readBase64" -> { var entry = zip.getEntry(rawPath); if (entry == null) yield "null"; yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(zip.getInputStream(entry).readAllBytes()))); }
                     case "extract" -> {
+                        if (!hasDest) yield gson.toJson(Map.of("err", "extract requires dest"));
                         var entry = zip.getEntry(rawPath);
                         if (entry == null || entry.isDirectory()) yield gson.toJson(Map.of("err", "Asset not found: " + rawPath));
-                        var target = resolvePath(Path.of("plugins", name).toAbsolutePath().normalize(), dest);
-                        assertNotRuntimeDir(target);
+                        var target = assetsTarget(dest);
                         Files.copy(zip.getInputStream(entry), target, StandardCopyOption.REPLACE_EXISTING);
-                        yield gson.toJson(Map.of("path", target.toString()));
+                        yield gson.toJson(Map.of("path", Path.of("").toAbsolutePath().normalize().relativize(target).toString()));
                     }
                     case "extractDir" -> {
                         var prefix = rawPath.endsWith("/") ? rawPath : rawPath + "/";
-                        var base = Path.of("plugins", name).toAbsolutePath().normalize();
-                        var target = resolvePath(base, dest);
-                        assertNotRuntimeDir(target);
+                        var target = assetsTarget(dest);
                         var found = false;
                         var entries = zip.entries();
                         while (entries.hasMoreElements()) {
@@ -945,7 +994,7 @@ public class PluginThread implements Runnable, PluginEntity {
                             Files.copy(zip.getInputStream(ze), dst, StandardCopyOption.REPLACE_EXISTING);
                         }
                         if (!found) yield gson.toJson(Map.of("err", "Asset directory not found: " + rawPath));
-                        yield gson.toJson(Map.of("path", target.toString()));
+                        yield gson.toJson(Map.of("path", Path.of("").toAbsolutePath().normalize().relativize(target).toString()));
                     }
                     default -> gson.toJson(Map.of("err", "Unknown assets op: " + task));
                 };

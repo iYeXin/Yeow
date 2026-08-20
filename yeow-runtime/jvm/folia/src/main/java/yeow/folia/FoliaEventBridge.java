@@ -336,7 +336,15 @@ public class FoliaEventBridge implements Listener {
         };
         if (target == null && !"serverPing".equals(et) && !"serverCommand".equals(et)) return;
 
-        var data = eventData(et, ev);
+        Map<String, Object> data;
+        try {
+            data = eventData(et, ev);
+        } catch (Exception ex) {
+            // 与 Paper 对齐：字段提取失败不得静默吞掉（残废载荷照常投递是幽灵事件根因）——
+            // 告警并丢弃本次分发。
+            LOG.warning("[EventValidity] eventData failed for " + et + ": " + ex);
+            return;
+        }
         // TODO[ghost] 权宜之计：载荷与事件类型不匹配视为无效事件，Java 侧丢弃（见 validEventData）。
         // 被过滤即告警（含载荷）——幽灵事件的现场记录，供后续根因排查。
         if (!validEventData(et, data)) {
@@ -533,7 +541,9 @@ public class FoliaEventBridge implements Listener {
             case "playerDeath" -> {
                 var e = (PlayerDeathEvent) ev;
                 m.put("player", e.getEntity().getUniqueId().toString());
-                m.put("deathMessage", e.getDeathMessage());
+                // 死亡消息：Message 对象--key/args 可翻译组件（如有）+ text 纯文本兜底，两者同时传递（与 Paper 对齐）
+                m.put("deathMessage", componentToMessage(deathMessageComponent(e)));
+                m.put("deathType", e.getDamageSource() != null ? e.getDamageSource().getDamageType().getKey().toString() : "UNKNOWN");
             }
             case "playerRespawn" -> {
                 var e = (PlayerRespawnEvent) ev;
@@ -562,7 +572,7 @@ public class FoliaEventBridge implements Listener {
                 m.put("oldLevel", e.getOldLevel());
                 m.put("newLevel", e.getNewLevel());
             }
-            case "playerGameModeChange" -> { var e = (PlayerGameModeChangeEvent) ev; m.put("player", e.getPlayer().getUniqueId().toString()); m.put("newGameMode", e.getNewGameMode().name()); }
+            case "playerGameModeChange" -> { var e = (PlayerGameModeChangeEvent) ev; m.put("player", e.getPlayer().getUniqueId().toString()); m.put("newGameMode", e.getNewGameMode().name().toLowerCase()); }
             case "playerAdvancementDone" -> {
                 var e = (PlayerAdvancementDoneEvent) ev;
                 m.put("player", e.getPlayer().getUniqueId().toString());
@@ -606,17 +616,19 @@ public class FoliaEventBridge implements Listener {
                 var to = e.getTo();
                 m.put("to", Map.of("x", to.getX(), "y", to.getY(), "z", to.getZ(), "yaw", (double) to.getYaw(), "pitch", (double) to.getPitch(), "world", to.getWorld().getName()));
             }
-            case "entityDeath" -> { var e = (EntityDeathEvent) ev; m.put("entity", e.getEntity().getUniqueId().toString()); m.put("entityType", e.getEntityType().name()); }
+            case "entityDeath" -> { var e = (EntityDeathEvent) ev; m.put("entity", e.getEntity().getUniqueId().toString()); m.put("entityType", e.getEntityType().getKey().toString()); m.put("entityName", e.getEntity().getName()); }
             case "blockBreak" -> { var e = (BlockBreakEvent) ev; m.put("player", e.getPlayer().getUniqueId().toString()); m.put("block", e.getBlock().getType().getKey().toString()); m.put("x", e.getBlock().getX()); m.put("y", e.getBlock().getY()); m.put("z", e.getBlock().getZ()); }
             case "inventoryOpen" -> {
                 var e = (InventoryOpenEvent) ev;
                 m.put("player", e.getPlayer().getUniqueId().toString());
                 m.put("inventoryType", e.getInventory().getType().name());
+                m.put("title", e.getView().getTitle());
             }
             case "inventoryClick" -> {
                 var e = (InventoryClickEvent) ev;
                 m.put("player", e.getWhoClicked().getUniqueId().toString());
                 m.put("slot", e.getSlot());
+                m.put("hotbarKey", e.getHotbarButton());
                 m.put("action", e.getClick().name());
                 m.put("inventoryType", e.getInventory().getType().name());
                 m.put("isLeftClick", e.isLeftClick());
@@ -624,6 +636,10 @@ public class FoliaEventBridge implements Listener {
                 m.put("isShiftClick", e.isShiftClick());
                 var gid = FoliaTasks.byInv.get(e.getInventory());
                 if (gid != null) m.put("inventoryId", gid);
+                m.put("clickedItem", e.getCurrentItem() != null && e.getCurrentItem().getType() != Material.AIR
+                    ? Map.of("type", e.getCurrentItem().getType().getKey().toString(), "amount", e.getCurrentItem().getAmount()) : null);
+                m.put("cursorItem", e.getCursor() != null && e.getCursor().getType() != Material.AIR
+                    ? Map.of("type", e.getCursor().getType().getKey().toString(), "amount", e.getCursor().getAmount()) : null);
             }
             case "inventoryClose" -> {
                 var e = (InventoryCloseEvent) ev;
@@ -637,19 +653,19 @@ public class FoliaEventBridge implements Listener {
                 m.put("entity", e.getEntity().getUniqueId().toString());
                 m.put("damage", e.getDamage());
                 m.put("cause", e.getCause().name());
-                m.put("entityType", e.getEntityType().name());
+                m.put("entityType", e.getEntityType().getKey().toString());
             }
             case "entitySpawn" -> {
                 var e = (EntitySpawnEvent) ev;
                 m.put("entity", e.getEntity().getUniqueId().toString());
-                m.put("entityType", e.getEntityType().name());
+                m.put("entityType", e.getEntityType().getKey().toString());
                 var l = e.getLocation();
                 m.put("x", l.getX()); m.put("y", l.getY()); m.put("z", l.getZ()); m.put("world", l.getWorld().getName());
             }
             case "entityExplode" -> {
                 var e = (EntityExplodeEvent) ev;
                 m.put("entity", e.getEntity().getUniqueId().toString());
-                m.put("entityType", e.getEntityType().name());
+                m.put("entityType", e.getEntityType().getKey().toString());
                 var l = e.getLocation();
                 m.put("x", l.getX()); m.put("y", l.getY()); m.put("z", l.getZ());
                 m.put("blockCount", e.blockList().size());
@@ -668,13 +684,13 @@ public class FoliaEventBridge implements Listener {
             case "projectileLaunch" -> {
                 var e = (ProjectileLaunchEvent) ev;
                 m.put("entity", e.getEntity().getUniqueId().toString());
-                m.put("projectileType", e.getEntityType().name());
+                m.put("projectileType", e.getEntityType().getKey().toString());
                 if (e.getEntity().getShooter() instanceof org.bukkit.entity.LivingEntity ls) m.put("shooter", ls.getUniqueId().toString());
             }
             case "projectileHit" -> {
                 var e = (ProjectileHitEvent) ev;
                 m.put("entity", e.getEntity().getUniqueId().toString());
-                m.put("projectileType", e.getEntityType().name());
+                m.put("projectileType", e.getEntityType().getKey().toString());
                 m.put("hitEntity", e.getHitEntity() != null ? e.getHitEntity().getUniqueId().toString() : null);
                 if (e.getHitBlock() != null) {
                     var b = e.getHitBlock();
@@ -769,5 +785,30 @@ public class FoliaEventBridge implements Listener {
             return Map.of("key", tc.key(), "args", args, "text", text);
         }
         return Map.of("text", text);
+    }
+
+    // 死亡消息方法（反射，与 Paper 对齐）：Bukkit 的 `getDeathMessage()` 返回 String（已格式化文本，
+    // 翻译 key 丢失）；Paper 的 `deathMessage()` 返回 Component（可翻译组件）--优先使用后者。
+    private static java.lang.reflect.Method DEATH_MESSAGE_COMPONENT;
+    private static java.lang.reflect.Method DEATH_MESSAGE_STRING;
+    static {
+        try { DEATH_MESSAGE_COMPONENT = PlayerDeathEvent.class.getMethod("deathMessage"); } catch (Exception ignored) {}
+        try { DEATH_MESSAGE_STRING = PlayerDeathEvent.class.getMethod("getDeathMessage"); } catch (Exception ignored) {}
+    }
+
+    /** 读取死亡消息为 Component：优先 `deathMessage()`（Component，可翻译 key 完整）；
+     *  回退 `getDeathMessage()`（String，按文本解析）。 */
+    private static net.kyori.adventure.text.Component deathMessageComponent(PlayerDeathEvent e) {
+        try {
+            if (DEATH_MESSAGE_COMPONENT != null) {
+                var r = DEATH_MESSAGE_COMPONENT.invoke(e);
+                if (r instanceof net.kyori.adventure.text.Component c) return c;
+            }
+            if (DEATH_MESSAGE_STRING != null) {
+                var r = DEATH_MESSAGE_STRING.invoke(e);
+                if (r != null) return FoliaTextUtil.parse(new com.google.gson.JsonPrimitive(String.valueOf(r)));
+            }
+        } catch (Exception ignored) {}
+        return null;
     }
 }
