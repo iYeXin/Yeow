@@ -284,26 +284,6 @@ export function makeAssetPlugin({ root, pkgJson, outDir, prepared }) {
     };
 }
 
-// ── esbuild 插件：统一 yeow-api/yeow-command/yeow-server 到主项目实例 ──
-// 避免依赖包自带副本导致全局状态分裂（如 __yeowInitCbs 被覆盖）
-// 注意：返回路径必须用正斜杠，否则 Windows 下 esbuild 解析失败
-export function makeDedupePlugin(root) {
-    return {
-        name: 'dedupe-yeow-core',
-        setup(build) {
-            build.onResolve({ filter: /^yeow-api$/ }, () => ({
-                path: resolve(root, 'node_modules', 'yeow-api', 'src', 'index.ts').replace(/\\/g, '/'),
-            }));
-            build.onResolve({ filter: /^yeow-command$/ }, () => ({
-                path: resolve(root, 'node_modules', 'yeow-command', 'src', 'index.ts').replace(/\\/g, '/'),
-            }));
-            build.onResolve({ filter: /^yeow-server$/ }, () => ({
-                path: resolve(root, 'node_modules', 'yeow-server', 'src', 'index.ts').replace(/\\/g, '/'),
-            }));
-        },
-    };
-}
-
 // ── 资产输出目录（供 build.js 打包 JAR）────────────────────────────
 export function assetsOutDirFor(outDir) {
     return resolve(outDir, '.assets');

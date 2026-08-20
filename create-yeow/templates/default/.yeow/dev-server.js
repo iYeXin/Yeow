@@ -17,7 +17,6 @@ const WS_PORT = 17368;
 
 const YES = process.argv.includes('-y') || process.env.CI === 'true';
 const EULA = process.argv.includes('--eula') || YES;
-const PROXY = process.argv.find(a => a.startsWith('--proxy='))?.split('=').slice(1).join('=');
 const STOP = (() => { const a = process.argv.find(a => a.startsWith('--stop=')); if (!a) return null; const m = a.split('=')[1].match(/^(\d+)(s|m|h)?$/); return m ? parseInt(m[1]) * (m[2] === 'm' ? 60 : m[2] === 'h' ? 3600 : 1) : null; })();
 
 // ── AI 工作流参数（headless 模式）─────────────────────────────
@@ -35,7 +34,7 @@ const HEADLESS = process.argv.includes('--eula') || process.argv.includes('--tim
   || process.argv.includes('--wait') || process.argv.includes('--outfile') || KEEP;
 
 const cfg = JSON.parse(readFileSync(resolve(ROOT, 'yeow.config.json'), 'utf-8'));
-const RUNTIME = resolve(ROOT, '.yeow', 'assets', 'yeow-runtime-0.2.0.jar');
+const RUNTIME = resolve(ROOT, '.yeow', 'assets', 'yeow-runtime-0.5.0.jar');
 
 // Dev server config (optional, from yeow.config.json)
 const devCfg = cfg.dev || {};
@@ -139,12 +138,11 @@ function broadcast(msg) {
 }
 
 // ── Download ────────────────────────────────────────────────────
-function download(url, dest, agent) {
+function download(url, dest) {
     return new Promise((resolve, reject) => {
         const f = createWriteStream(dest);
-        const o = agent ? { agent } : {};
-        https.get(url, o, res => {
-            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { f.close(); download(res.headers.location, dest, agent).then(resolve).catch(reject); return; }
+        https.get(url, res => {
+            if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) { f.close(); download(res.headers.location, dest).then(resolve).catch(reject); return; }
             if (res.statusCode !== 200) { f.close(); reject(new Error(`HTTP ${res.statusCode}`)); return; }
             const total = parseInt(res.headers['content-length'], 10);
             let dl = 0;
@@ -161,10 +159,8 @@ async function ensurePaper() {
         if (PAPER_URL.startsWith('http://') || PAPER_URL.startsWith('https://')) {
             if (existsSync(PAPER_PATH) && statSync(PAPER_PATH).size > 1_000_000) { if (!HEADLESS) ok('Paper found in cache'); return; }
             mkdirSync(CACHE, { recursive: true });
-            let agent = null;
-            if (PROXY) { info(`Proxy: ${PROXY}`); try { const { HttpsProxyAgent } = await import('https-proxy-agent'); agent = new HttpsProxyAgent(PROXY); } catch {} }
             if (!HEADLESS) info('Downloading Paper...');
-            try { await download(PAPER_URL, PAPER_PATH, agent); if (!HEADLESS) ok('Paper downloaded'); }
+            try { await download(PAPER_URL, PAPER_PATH); if (!HEADLESS) ok('Paper downloaded'); }
             catch (e) { fail('Download failed: ' + e.message); console.log('  Manually: ' + PAPER_PATH); process.exit(1); }
         } else {
             if (!existsSync(PAPER_PATH)) { fail(`Paper JAR not found: ${PAPER_PATH}`); process.exit(1); }
@@ -179,7 +175,7 @@ async function ensurePaper() {
             const versions = await fetch(apiUrl).then(r => r.json());
             const latestBuild = versions.builds[versions.builds.length - 1];
             const dlUrl = `https://api.papermc.io/v2/projects/paper/versions/${PAPER_VERSION}/builds/${latestBuild}/downloads/paper-${PAPER_VERSION}-${latestBuild}.jar`;
-            await download(dlUrl, PAPER_PATH, null);
+            await download(dlUrl, PAPER_PATH);
             if (!HEADLESS) ok('Paper downloaded');
         } catch (e) {
             fail('Download failed: ' + e.message);

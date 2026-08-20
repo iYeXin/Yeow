@@ -4,7 +4,7 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 import { execSync } from 'child_process';
-import { makeAssetPlugin, makeDedupePlugin, assetsOutDirFor, readMergedPermissions, prepareAssets, computeNativeManifest } from './yeow-assets.mjs';
+import { makeAssetPlugin, assetsOutDirFor, readMergedPermissions, prepareAssets, computeNativeManifest } from './yeow-assets.mjs';
 
 const root = resolve(fileURLToPath(import.meta.url), '..', '..');
 const cfg = JSON.parse(readFileSync(resolve(root, 'yeow.config.json'), 'utf-8'));
@@ -82,7 +82,7 @@ async function main() {
             treeShaking: true,
             minify: false,
             sourcemap: isDev ? 'linked' : false,
-            plugins: [makeDedupePlugin(root), makeAssetPlugin({ root, pkgJson, outDir, prepared })],
+            plugins: [makeAssetPlugin({ root, pkgJson, outDir, prepared })],
         });
         console.log('  \u2713 Worker bundled: ' + w.name + ' (' + w.entry + ' \u2192 ' + w.dist + ')');
     }
@@ -108,14 +108,13 @@ async function main() {
         minify: false,
         sourcemap: isDev ? 'linked' : false,
         plugins: [
-            makeDedupePlugin(root),
             makeAssetPlugin({ root, pkgJson, outDir, prepared }),
         ],
     });
     console.log('  \u2713 Bundled (' + (statSync(resolve(outDir, 'main.js')).size / 1024).toFixed(1) + ' KB)');
 
     // ── 组装 JAR ──
-    const zip = new AdmZip(resolve(root, '.yeow', 'assets', 'yeow-template-0.1.0.jar'));
+    const zip = new AdmZip(resolve(root, '.yeow', 'assets', 'yeow-template-0.5.0.jar'));
     zip.updateFile('plugin.yml', Buffer.from(
         'name: ' + name + '\n' +
         'version: ' + version + '\n' +
