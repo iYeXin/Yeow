@@ -114,18 +114,28 @@ await dec.close();
 
 ## 字符串 ↔ 字节
 
-### stringToBytes(text) / stringToBytesAsync(text)
+命名约定：**默认异步，同步加 `Sync` 后缀**（与 yeow-api 其余一致）。
 
-UTF-8 字符串 → 字节。
+### stringToBytes(text) / stringToBytesSync(text)
 
-### bytesToString(bytes) / bytesToStringAsync(bytes)
+UTF-8 字符串 → 字节。`stringToBytes` 异步（ioExecutor），`stringToBytesSync` 同步。
 
-字节 → UTF-8 字符串（非法序列替换为 U+FFFD，不报错）。
+### bytesToString(bytes) / bytesToStringSync(bytes)
+
+字节 → UTF-8 字符串（非法序列替换为 U+FFFD，不报错）。异步版 `bytesToString` / 同步版 `bytesToStringSync`。
+
+### 与 TextEncoder / TextDecoder 的关系
+
+运行时通过 polyfill 提供**全局 `TextEncoder` / `TextDecoder`**（utf-8，Web 语义；详见 [运行时环境](../specifications/runtime/index.md#textencoder--textdecoder)）。二者为**同步** API。
+
+**同步 UTF-8 编解码优先用 `TextEncoder` / `TextDecoder`**（性能最好：小载荷纯 JS 直转、零往返）；超阈值大载荷同样同步处理（经 util 通道，会短暂阻塞 JS 线程）。
+
+> 需要**大规模非阻塞 UTF-8 编解码**时，使用 yeow-api 的异步 `stringToBytes` / `bytesToString`（ioExecutor 执行，不阻塞游戏线程）。
 
 ## 典型用法
 
 ```ts
-import { Gzip, stringToBytes } from 'yeow-api';
+import { Gzip, stringToBytesSync } from 'yeow-api';
 import { createReadStream, createWriteStream, fs } from 'yeow-api';
 
 // 文件流 → gzip 流（分块压缩）
@@ -140,9 +150,13 @@ await w.write(await comp.finish());
 await comp.close();
 await w.end();
 
-// 一次性
-const packed = await Gzip.compress(stringToBytes('hello 你好'), 6);
+// 一次性：同步字节转换（String→Uint8Array），再异步压缩
+const packed = await Gzip.compress(stringToBytesSync('hello 你好'), 6);
 const raw = await Gzip.decompress(packed);
+
+// 异步字节转换（默认）
+const bytes = await stringToBytes('hello 你好');
+const text = await bytesToString(bytes);
 ```
 
 ## 注意

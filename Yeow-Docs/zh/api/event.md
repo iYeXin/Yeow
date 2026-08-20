@@ -68,6 +68,8 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 
 ## 事件列表
 
+> 事件字段取值域（交互/点击动作 `action`、伤害/传送原因 `cause`、容器类型 `inventoryType` 等）见 [值域附录](../specifications/values.md)（动作/容器类型见「直接维护的枚举清单」，伤害/回血原因见「参考实现」）。
+
 ### 玩家事件
 
 | 类型                    | 字段                                                        | 可取消 |
@@ -81,9 +83,9 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 | `playerDeath`           | player, deathMessage(Message), deathType                    |   ✔    |
 | `playerRespawn`         | player, respawnLocation                                     |        |
 | `playerTeleport`        | player, from, to, cause                                     |   ✔    |
-| `playerItemConsume`     | player, itemType                                            |        |
-| `playerDropItem`        | player, itemType, amount                                    |   ✔    |
-| `playerPickupItem`      | player, itemType, amount                                    |   ✔    |
+| `playerItemConsume`     | player, item(ItemStack)                                    |        |
+| `playerDropItem`        | player, item(ItemStack)                                    |   ✔    |
+| `playerPickupItem`      | player, item(ItemStack)                                    |   ✔    |
 | `playerBucketFill`      | player, bucket                                              |   ✔    |
 | `playerBucketEmpty`     | player, bucket                                              |   ✔    |
 | `playerExpChange`       | player, amount                                              |        |
@@ -100,8 +102,8 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 | -------------------- | --------------------------------------------- | :----: |
 | `entityDamage`       | entity, damage, cause, entityType             |   ✔    |
 | `entityDeath`        | entity, entityType, entityName                |        |
-| `entitySpawn`        | entity, entityType, x, y, z, world            |   ✔    |
-| `entityExplode`      | entity, entityType, x, y, z, blockCount       |   ✔    |
+| `entitySpawn`        | entity, entityType, location(Location)        |   ✔    |
+| `entityExplode`      | entity, entityType, location(Location), blockCount |   ✔    |
 | `entityRegainHealth` | entity, amount, reason                        |        |
 | `entityTarget`       | entity, target                                |   ✔    |
 | `projectileLaunch`   | entity, projectileType, shooter?              |   ✔    |
@@ -111,12 +113,12 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 
 | 类型           | 字段                                 | 可取消 |
 | -------------- | ------------------------------------ | :----: |
-| `blockBreak`   | player, block, x, y, z               |   ✔    |
-| `blockPlace`   | player, block, blockAgainst, x, y, z |   ✔    |
-| `blockFade`    | block, x, y, z                       |        |
-| `blockGrow`    | block, x, y, z                       |        |
-| `blockSpread`  | block, x, y, z                       |        |
-| `blockExplode` | block, x, y, z                       |   ✔    |
+| `blockBreak`   | player, block, location(Location)    |   ✔    |
+| `blockPlace`   | player, block, blockAgainst, location(Location) |   ✔    |
+| `blockFade`    | block, location(Location)            |        |
+| `blockGrow`    | block, location(Location)            |        |
+| `blockSpread`  | block, location(Location)            |        |
+| `blockExplode` | block, location(Location)            |   ✔    |
 
 ### 背包事件
 
@@ -126,7 +128,7 @@ JS 模式下事件对象的字段名与类型表一致，`player` 字段自动�
 | `inventoryClose` | player, inventoryType, **inventoryId?**                                                                                            |        |
 | `inventoryClick` | player, slot, hotbarKey, action, inventoryType, isLeftClick, isRightClick, isShiftClick, clickedItem, cursorItem, **inventoryId?** |   ✔    |
 
-> **inventoryId**（2026-08-13）：当事件发生在 Yeow 自定义 Inventory（`Inventory.create` 创建）上时携带该 Inventory 的句柄 id（`inventory.toString()`）——多自定义 Inventory 场景用 `e.inventoryId === inventory.toString()` 识别点击/关闭归属。非自定义 Inventory（背包、箱子等）时缺省。
+> **inventoryId**：当事件发生在 Yeow 自定义 Inventory（`Inventory.create` 创建）上时携带该 Inventory 的句柄 id（`inventory.toString()`）——多自定义 Inventory 场景用 `e.inventoryId === inventory.toString()` 识别点击/关闭归属。非自定义 Inventory（背包、箱子等）时缺省。
 
 ### 服务器事件
 

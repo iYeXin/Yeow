@@ -1,8 +1,6 @@
 # 快速开始
 
-> Yeow 暂未正式发布。Yeow 在正式发布前不保证 API 的稳定性。
-
-> 如果 Modrinth 上的 Yeow 项目仍未结束 Under Review 状态，可以[点此下载](https://raw.githubusercontent.com/iYeXin/Yeow/main/create-yeow/templates/default/.yeow/assets/yeow-runtime-0.2.0.jar) Yeow 运行时插件。
+> **Yeow Beta 已在 PaperMC Hangar 发布**：[https://hangar.papermc.io/iYeXin/Yeow/versions](https://hangar.papermc.io/iYeXin/Yeow/versions)
 
 > [!TIP]
 > **AI 辅助编程**：本页为人工阅读版。若你正在使用 AI 编程助手（Codex、OpenCode、DSH 等 Harness 产品），建议先让 AI 阅读 [AI 辅助启动指南](/ai-agent)——在任何 Harness 产品中，**复制该链接或页面内容发送给 AI**，并描述你的需求（如"创建一个带 /back 命令的插件"），AI 将带领你完成项目创建、开发与调试。完整文档亦可打包下载（[docs.zip](/docs.zip)）喂给 AI。
@@ -50,7 +48,7 @@ npm run build                  # 生产产物 → dist/<name>-<version>.jar + .y
 
 三种部署方式（任选其一）：
 
-1. **JAR 方式**：把 `yeow-runtime-0.2.0.jar` 和插件 JAR 一同放入 `plugins/`（与原生 Java 插件部署一致）
+1. **JAR 方式**：把 `yeow-runtime-0.5.0.jar` 和插件 JAR 一同放入 `plugins/`（与原生 Java 插件部署一致）
 2. **自动扫描**：把插件 `.yeow.zip` 放入 `plugins/Yeow/`，服务器启动时自动加载
 3. **命令加载**：服务器运行中执行 `/yeow load <path>`（本地临时加载）、`/yeow load <url>`（下载临时加载）、`/yeow install <url>`（下载并安装到 `plugins/Yeow/`）、`/yeow update <url>`（替换旧版本）
 
@@ -58,7 +56,7 @@ npm run build                  # 生产产物 → dist/<name>-<version>.jar + .y
 
 > **分发建议**：两种产物应同时上传（`.yeow.zip` 推荐、`.jar` 兼容），并提供 `/yeow install <url>` 一键安装。详见 [构建与分发](distribution.md)。
 
-> **平台无关（Paper / Folia 双平台通用）**：`.yeow.zip` 本身不依赖 Java 或 Paper 系——任何实现 [平台规范](specifications/README.md) 的运行时（理解包结构、调度器、执行器、JS 桥）都能运行同一份插件。**同一份插件包可直接在 Paper 与 [Folia](https://papermc.io/software/folia/) 服务器间互换**：Folia 服务器只需安装 Folia 版 [Yeow 运行时](https://modrinth.com/plugin/yeow)（Modrinth 提供），插件自动享受 Folia 的多线程优势（详见 [进阶知识 · Folia](advanced/folia.md)）。Paper 系（Paper/Purpur/Leaf 等）的 yeow-runtime 是官方实现示例。
+> **平台无关（Paper / Folia 双平台通用）**：`.yeow.zip` 本身不依赖 Java 或 Paper 系——任何实现 [平台规范](specifications/README.md) 的运行时（理解包结构、调度器、执行器、JS 桥）都能运行同一份插件。**同一份插件包可直接在 Paper 与 [Folia](https://papermc.io/software/folia/) 服务器间互换**：Folia 服务器只需安装 Folia 版 [Yeow 运行时](https://hangar.papermc.io/iYeXin/Yeow/versions)（Hangar 提供），插件自动享受 Folia 的多线程优势（详见 [进阶知识 · Folia](advanced/folia.md)）。Paper 系（Paper/Purpur/Leaf 等）的 yeow-runtime 是官方实现示例。
 
 ## 项目结构
 

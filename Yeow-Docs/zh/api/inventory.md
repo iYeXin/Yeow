@@ -6,7 +6,7 @@
 |---|---|---|
 | 玩家物品栏 | `player.inventory` | uuid 寻址 |
 | 容器方块 | `block.getInventory()` | 世界坐标寻址（Chest / Furnace / Hopper / Barrel / Dispenser / Dropper / BrewingStand 等 Container；需方块有 location） |
-| 自定义 Inventory（自定义箱子界面） | `await Inventory.create(size, title)` | 句柄 id 寻址（原 GUI，2026-08-13 改名统一） |
+| 自定义 Inventory（自定义箱子界面） | `await Inventory.create(size, title)` | 句柄 id 寻址（原 GUI 改名统一） |
 
 ```js
 import { Inventory, ItemStack } from 'yeow-api';
@@ -50,6 +50,8 @@ inv.getContents()                 // Promise<(ItemStack | null)[]> — 全槽位
 inv.setContents(items)            // 整容器写入（短数组只写前段；null 清空对应槽位）
 ```
 
+> 容器类型取值（`getType()` 的 `"CHEST"` 等 InventoryType）见 [值域附录 · 直接维护的枚举清单](../specifications/values.md#二直接维护的枚举清单)。
+
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `slot` | `number` | 槽位索引（玩家：0-35 主物品栏，36-39 装备栏等；方块：0 ~ 容器槽位） |
@@ -62,9 +64,9 @@ const inv = await Inventory.create(27, '<gold>Shop</gold>');
 // size 必须为 9 的倍数（9 ~ 54）；title 支持 MiniMessage
 
 inv.toString()                    // 句柄 id（与 inventoryClick/Close 事件的 inventoryId 字段一致）
-await inv.open(player.uuid);      // 为玩家打开
+await inv.open(player);           // 为玩家打开（接受 Player 对象或 uuid）
 await inv.close();                // 关闭所有查看者
-await inv.closePlayer(player.uuid); // 仅关闭指定玩家
+await inv.closePlayer(player);    // 仅关闭指定玩家（接受 Player 对象或 uuid）
 await inv.getViewers();           // string[] — 查看者 uuid 列表
 await inv.destroy();              // 销毁（关闭所有查看者并释放）
 ```

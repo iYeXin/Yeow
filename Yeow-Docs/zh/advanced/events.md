@@ -98,7 +98,7 @@ blockBreak 事件 → 事件线程自旋
 > **除非逻辑非常简单（纯读取、不触发事件），否则不要在事件处理器中使用同步操作**——包括：
 > - `call(...)` / `xxxSync()` 同步调用
 > - **属性读写**（`e.player.ping`、`player.health = x`、`world.time` 等——它们是同步调用糖。改用 `await player.setHealth()` 等异步方法）
-> - `requestSync` 等阻塞式服务调用
+> - 同步阻塞式调用（历史 `requestSync` 一类同步 API）
 >
 > 事件内请使用**异步 API**（`await xxx()`）。异步操作不阻塞 JS 线程，事件可正常完成。
 

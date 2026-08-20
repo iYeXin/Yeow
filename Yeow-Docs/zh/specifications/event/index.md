@@ -8,7 +8,7 @@ Yeow 事件系统是运行时向插件投递游戏事件的机制。插件通过
 
 ## 注册与取消
 
-插件通过 task 通道的 `event.subscribe` 和 `event.unsubscribe` 进行事件订阅管理。详见 [Server & Event 任务规范](../task/server.md)。
+插件通过 task 通道的 `event.subscribe` 和 `event.unsubscribe` 进行事件订阅管理。详见 [Event System 任务规范](../task/event-system.md)。
 
 ## 字段适配规则
 

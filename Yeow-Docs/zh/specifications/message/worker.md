@@ -1,6 +1,6 @@
 # Worker 通道
 
-Worker（虚拟插件）通道——主插件 JS 侧经 `$_send('worker', ...)` 控制其 Worker 的创建/卸载/消息/重载。
+Worker（虚拟插件）通道——主插件 JS 侧经 `$send('worker', ...)`（yeow-api `worker.ts` 内部封装）控制其 Worker 的创建/卸载/消息/重载。
 
 > **内部实现**：Worker 通道是运行时内部能力（配合 yeow-api 的 `createWorker`），不属插件公开权限模型（不受权限约束）。
 
@@ -51,6 +51,6 @@ dev-server 按 `origin` 反解对应 Worker 的 source-map（`JS Error in Worker
 
 ## 约束
 
-- **Worker 不能创建新的 Worker**：Worker 内 `$_send('worker', ...)` 仅接受 `postToMain`，其余返回 `{"err":"workers cannot create workers"}`
+- **Worker 不能创建新的 Worker**：Worker 内 `$send('worker', ...)` 仅接受 `postToMain`，其余返回 `{"err":"workers cannot create workers"}`
 - Worker 与主插件**共享数据目录 / 权限 / 资源**（fs 的 plugin 级 base、assets 命名空间一致）
 - Worker 以 `<主插件>.<worker名>` 注册为插件实体（事件/命令/服务/调度器独立）；`/yeow` 管理命令不覆盖虚拟插件

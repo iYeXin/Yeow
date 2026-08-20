@@ -52,7 +52,7 @@
 | -------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `player`       | string (UUID)                                            | 死亡的玩家                                                                                                                                                                                                       |
 | `deathMessage` | [Message 对象](../task/player.md#message-对象可翻译组件) | 死亡消息：`{ "key": "<翻译键>", "args": [...], "text": "<纯文本>" }`——`key`/`args` 可翻译组件（原始消息为可翻译组件时）与 `text` 纯文本兜底**同时传递**。**可回写**：`mods.deathMessage` 为 Message 对象或字符串 |
-| `deathType`    | string                                                   | 伤害类型 key，例如 `lava`                                                                                                                                                                                        |
+| `deathType`    | string                                                   | 伤害类型注册键，例如 `minecraft:lava`（值域附录 R1）                                                                                                                          |
 
 > 插件可直接把 `deathMessage` 转发给发送消息 API（`broadcast`、`player.sendMessage` 等）——Message 对象天然兼容。
 
@@ -129,7 +129,7 @@
 | 字段          | 类型          | 说明                                                       |
 | ------------- | ------------- | ---------------------------------------------------------- |
 | `player`      | string (UUID) | 玩家                                                       |
-| `newGameMode` | string        | 新模式（`CREATIVE`、`SURVIVAL`、`ADVENTURE`、`SPECTATOR`） |
+| `newGameMode` | string        | 新模式（`creative`、`survival`、`adventure`、`spectator`，小写，与 `player.getGamemode` 一致） |
 
 ## `playerAdvancementDone`
 

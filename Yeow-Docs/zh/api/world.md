@@ -26,6 +26,8 @@ import { World } from 'yeow-api';
 | `difficulty` | `string` | 读写 | PEACEFUL / EASY / NORMAL / HARD |
 | `spawnLocation` | `Location \| null` | 读写 | 世界出生点 |
 
+> 难度取值（`difficulty`）见 [值域附录 · 直接维护的枚举清单](../specifications/values.md#二直接维护的枚举清单)；游戏规则键见 [值域附录 · 版本变迁域](../specifications/values.md#四版本变迁域规则--引用)。
+
 ## 方法
 
 默认为异步（`Promise`），同步版本加 `Sync` 后缀。
@@ -38,9 +40,9 @@ world.getGameRuleSync(rule)         // string | null
 world.setGameRule(rule, value)      // Promise
 world.setGameRuleSync(rule, value)
 ```
-规则名使用大写下划线格式，如 `DO_DAYLIGHT_CYCLE`、`KEEP_INVENTORY`。
+规则名为 **R3 驼峰格式**（值域附录，如 `keepInventory`、`doDaylightCycle`），大小写不敏感（入参宽松；出参严格驼峰）。
 
-### 世界信息与 WorldBorder（2026-08-13）
+### 世界信息与 WorldBorder
 
 ```js
 // 世界信息
@@ -59,7 +61,7 @@ await world.setBorderWarning(distance?, time?);
 await world.setBorderMoving(from, to, seconds);   // 平滑移动
 ```
 
-玩家侧客户端边界：`player.setBorder(size)`（见 [Player](player.md)）。
+玩家侧客户端边界 `player.setBorder` 已移除——仅保留服务端世界边界（`world.setBorder*`，对全体玩家生效）。
 
 ### 方块
 
@@ -76,8 +78,6 @@ world.setBlockSync(x, y, z, block)
 ```js
 block.isSolid(): Promise<boolean>        // 材料级静态判断（委托 Material）
 block.isSolidSync(): boolean
-block.isLiquid(): Promise<boolean>       // 是否为液体（水/熔岩）
-block.isLiquidSync(): boolean
 block.isAir(): Promise<boolean>          // 是否为空气
 block.isAirSync(): boolean
 block.breakNaturally(tool?): Promise<boolean>   // 自然破坏（含掉落物；需要 location）
@@ -108,6 +108,8 @@ world.getChunkAt(x, z)              // Promise<Chunk>（取区块，可能触发
 world.getChunkAtSync(x, z)          // Chunk
 world.isChunkLoaded(x, z)           // Promise<boolean>
 world.isChunkLoadedSync(x, z)       // boolean
+world.isChunkGenerated(x, z)        // Promise<boolean>（区块已生成，未加载/未生成返回 false）
+world.isChunkGeneratedSync(x, z)    // boolean
 world.loadChunk(x, z)               // Promise<boolean>（强制加载）
 world.loadChunkSync(x, z)           // boolean
 world.unloadChunk(x, z)             // Promise<boolean>
@@ -130,11 +132,11 @@ world.getNearbyEntitiesSync(x, y, z, radius)
 ### 世界操作
 
 ```js
-world.dropItem(x, y, z, itemType, amount?)               // Promise
-world.dropItemSync(x, y, z, itemType, amount?)
-world.strikeLightning(x, y, z)                           // Promise
+world.dropItem(x, y, z, item, amount?)               // Promise — item 为 ItemStack 或材质名字符串（字符串 + amount 兼容旧式）
+world.dropItemSync(x, y, z, item, amount?)
+world.strikeLightning(x, y, z)                       // Promise
 world.strikeLightningSync(x, y, z)
-world.strikeLightningEffect(x, y, z)                     // Promise（仅效果）
+world.strikeLightningEffect(x, y, z)                 // Promise（仅效果）
 world.strikeLightningEffectSync(x, y, z)
 world.createExplosion(x, y, z, power?, fire?, breaks?)   // Promise
 world.createExplosionSync(x, y, z, power?, fire?, breaks?)
@@ -147,7 +149,7 @@ world.spawnEntity(type, x, y, z)       // Promise<string | null> — 返回实�
 world.spawnEntitySync(type, x, y, z)   // string | null
 ```
 
-`type` 为实体类型名（如 `ZOMBIE`、`CREEPER`、`COW`）。
+`type` 为 **minecraft 注册键**（如 `minecraft:zombie`、`minecraft:creeper`——与 `entity.type` 一致）；兼容旧式 Bukkit 枚举名（如 `ZOMBIE`）。
 
 ### 音效与粒子
 

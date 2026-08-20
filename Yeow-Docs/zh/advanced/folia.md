@@ -159,7 +159,7 @@ Folia 没有"主线程"可供自旋，Yeow 的同步桥（JS 同步调用要等�
 
 > **已知差异**：
 > - `server.getTps` 三个值返回 `null`（Folia 无全局 TPS 概念，插件需自行判断不可用）
-> - **Scoreboard 创建受限**：`createObjective` / `createTeam` 返回明确错误（Folia 仅支持读取/修改已存在的 objective/team，`registerNewObjective`/`registerNewTeam` 全部重载抛 `UnsupportedOperationException`）——详见 [Scoreboard API](../api/scoreboard.md)
+> - **Scoreboard 创建受限**：`board.createObjective(...)` / `board.createTeam(...)` 返回明确错误（Folia 仅支持读取/修改已存在的 objective/team，`registerNewObjective`/`registerNewTeam` 全部重载抛 `UnsupportedOperationException`）——详见 [Scoreboard API](../api/scoreboard.md)
 > - **全局状态写入自动路由**：`world.setTime` / `setStorm` / `setThundering` / `setDifficulty` / `setSpawnLocation` / `setGameRule` 在 Folia 上只能在**全局 region 线程**修改（AsyncCatcher 拦截）——Yeow 运行时已将这些任务自动路由到全局线程，插件无感知差异
 
 ## 平台透明
@@ -172,7 +172,7 @@ Folia 没有"主线程"可供自旋，Yeow 的同步桥（JS 同步调用要等�
 
 **与 Paper 完全一致**：
 
-1. 将 Folia 运行时 jar（`yeow-runtime-folia-0.2.0.jar`）放入服务器 `plugins/`
+1. 将 Folia 运行时 jar（`yeow-runtime-folia-0.5.0.jar`）放入服务器 `plugins/`
 2. 插件包（`.yeow.zip` 或模板 JAR）放入 `plugins/Yeow/`（自动扫描）或 `/yeow load <path>` 动态加载
 3. 插件数据、`/yeow` 管理命令、热重载等行为与 Paper 相同
 

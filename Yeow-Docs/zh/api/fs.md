@@ -109,6 +109,8 @@ fs.list(path): Promise<string[]>
 fs.listSync(path): string[]
 ```
 
+`list` 返回目录条目名（不含路径前缀，与 Node `fs.readdir` 一致）；`path` 为目录路径（不存在或非目录时抛错）。
+
 > 异步文件操作不阻塞 JS 线程——操作在独立 IO 线程中执行，完成后通过回调通知。
 
 ## 其他命名段

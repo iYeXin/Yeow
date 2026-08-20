@@ -4,23 +4,21 @@ Yeow 是一个面向 Minecraft 服务端的插件开发框架（**Paper 与 [Fol
 
 插件代码不阻塞服务器主线程，一个插件崩溃不影响其他插件；构建产出平台无关的 `.yeow.zip` 插件包，任何实现[平台规范](specifications/README.md)的运行时都能运行同一份插件。**同一份插件包在 Paper 与 Folia 间可直接互换**（Folia 服务器使用 Folia 版运行时即可，插件自动享受其多线程优势，详见[进阶知识 · Folia](advanced/folia.md)）。
 
-> Yeow 暂未正式发布。Yeow 在正式发布前不保证 API 的稳定性。
-
-> 如果 Modrinth 上的 Yeow 项目仍未结束 Under Review 状态，可以[点此下载](https://raw.githubusercontent.com/iYeXin/Yeow/main/create-yeow/templates/default/.yeow/assets/yeow-runtime-0.2.0.jar) Yeow 运行时插件。
+> **Yeow Beta 已在 PaperMC Hangar 发布**：[https://hangar.papermc.io/iYeXin/Yeow/versions](https://hangar.papermc.io/iYeXin/Yeow/versions)
 
 文档内容较多，不确定从哪里开始？按你的角色找到入口：
 
 ## 按角色导引
 
-| 你的角色         | 目标                               | 从这里开始                                                                                                                                      |
-| ---------------- | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **初学者**       | 了解 Yeow 能做什么、上手第一个插件 | [快速开始](getting-started.md) 从零创建项目并部署；[构建与分发](distribution.md) 了解两种产物格式                                               |
-| **插件开发者**   | 日常写插件、查 API                 | [快速开始](getting-started.md) 掌握生命周期与异步/同步约定；[API 参考](api/README.md) 按模块查文档                                              |
-| **进阶学习者**   | 理解底层机制、排查性能问题         | [进阶知识](advanced.md) 架构、线程模型、三级调度器；[运行时警告](runtime-warning.md) 告警类型与解决方案                                         |
-| **依赖包开发者** | 封装可复用的 npm 包                | [编写依赖包](package-author.md) 包结构与资源封装；[封装 Service 的依赖包](package-service.md) 三类 Service 模式                               |
-| **插件使用者**   | 服务器管理员：安装与管理插件       | [运行时运维](operations.md) `/yeow` 管理命令与配置；[构建与分发](distribution.md) 部署方式与一键安装                                          |
-| **平台实现者**   | 实现 Yeow 兼容运行时               | [平台规范](specifications/README.md) 包结构、消息协议、任务/事件/运行时环境标准                                                                 |
-| **适配器开发者** | 让其他语言/引擎接入 Yeow           | [适配器规范](specifications/adapter/index.md) `PluginEntity` 接口、注册 API 与消息契约                                                          |
+| 你的角色         | 目标                               | 从这里开始                                                                                                      |
+| ---------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **初学者**       | 了解 Yeow 能做什么、上手第一个插件 | [快速开始](getting-started.md) 从零创建项目并部署；[构建与分发](distribution.md) 了解两种产物格式               |
+| **插件开发者**   | 日常写插件、查 API                 | [快速开始](getting-started.md) 掌握生命周期与异步/同步约定；[API 参考](api/README.md) 按模块查文档              |
+| **进阶学习者**   | 理解底层机制、排查性能问题         | [进阶知识](advanced.md) 架构、线程模型、三级调度器；[运行时警告](runtime-warning.md) 告警类型与解决方案         |
+| **依赖包开发者** | 封装可复用的 npm 包                | [编写依赖包](package-author.md) 包结构与资源封装；[封装 Service 的依赖包](package-service.md) 三类 Service 模式 |
+| **插件使用者**   | 服务器管理员：安装与管理插件       | [运行时运维](operations.md) `/yeow` 管理命令与配置；[构建与分发](distribution.md) 部署方式与一键安装            |
+| **平台实现者**   | 实现 Yeow 兼容运行时               | [平台规范](specifications/README.md) 包结构、消息协议、任务/事件/运行时环境标准                                 |
+| **适配器开发者** | 让其他语言/引擎接入 Yeow           | [适配器规范](specifications/adapter/index.md) `PluginEntity` 接口、注册 API 与消息契约                          |
 
 ## 文档地图
 

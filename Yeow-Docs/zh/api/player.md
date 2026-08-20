@@ -4,6 +4,8 @@
 import { Player } from 'yeow-api';
 ```
 
+**类型关系：`Player extends LivingEntity extends Entity`**——实体通用能力（`velocity`（`setVelocity`）、`fireTicks`、`getBoundingBox`、`getPassengers`、`teleport` 等）与活体能力（`health`、`maxHealth`、`damage`、`setTarget` 等）在 Player 上直接可用，详见 [Entity API](entity.md)。玩家特有的 `health`/`world`/`location`/`teleport` 等覆盖基类同名成员（走玩家侧任务）。
+
 ## 静态方法
 
 默认为异步（`Promise`），同步版本加 `Sync` 后缀。
@@ -32,6 +34,8 @@ import { Player } from 'yeow-api';
 | `foodLevel` | `number` | 读写 | 饱食度 0-20 |
 | `exp` | `number` | 读写 | 等级进度 0.0-1.0 |
 | `level` | `number` | 读写 | 经验等级 |
+
+> 游戏模式取值（`gamemode`）见 [值域附录 · 直接维护的枚举清单](../specifications/values.md#二直接维护的枚举清单)。
 | `allowFlight` | `boolean` | 读写 | 允许飞行 |
 | `isFlying` | `boolean` | 读写 | 正在飞行 |
 | `isSneaking` | `boolean` | 只读 | 正在潜行 |
@@ -79,11 +83,27 @@ await playSound('world', 'entity.creeper.primed', 0, 65, 0, 1.0, 1.0);
 ```
 
 ```js
-// 停止音效
-import { stopSound, stopAllSounds } from 'yeow-api';
-await stopSound(uuid, 'block.note_block.pling');
-await stopAllSounds(uuid);
+// 停止音效（Player 实例方法，与 playSound 对称）
+await p.stopSound('block.note_block.pling');
+await p.stopSoundSync('block.note_block.pling');
+await p.stopAllSounds();
+await p.stopAllSoundsSync();
 ```
+
+### 进度（成就）
+
+```js
+player.grantAdvancement(key)                  // Promise<boolean> — 授予进度全部条件
+player.grantAdvancementSync(key)
+player.revokeAdvancement(key)                 // Promise<boolean> — 撤销进度
+player.awardCriteria(key, criteria)           // Promise<boolean> — 授予单个条件
+player.awardCriteriaSync(key, criteria)
+player.revokeCriteria(key, criteria)          // Promise<boolean> — 撤销单个条件
+player.getAdvancementProgress(key)            // Promise<AdvancementProgress | null>
+player.getAdvancementProgressSync(key)
+```
+
+`key` 为进度命名空间 key（如 `minecraft:story/mine_stone`）。详见 [Advancement](advancement.md)。
 
 ### 经验
 
@@ -103,6 +123,20 @@ player.teleport(loc)                // Promise
 player.teleportSync(loc)
 ```
 
+### 假方块（客户端视觉）
+
+```js
+player.sendBlockChange(loc, block)      // Promise — 仅客户端视觉，不改变真实世界
+player.sendBlockChangeSync(loc, block)
+```
+
+`block` 为 [Block](block.md) 对象或字符串（同 `world.setBlock`，字符串无状态）：
+
+```js
+await p.sendBlockChange(new Location(0, 80, 0), 'minecraft:stone');
+await p.sendBlockChange(new Location(0, 80, 1), Block.of('minecraft:chest', { facing: 'north' }));
+```
+
 ### 手持物品
 
 ```js
@@ -119,15 +153,13 @@ player.setItemInOffHandSync(item)
 
 返回完整 `ItemStack`（含 meta），手心为空时返回 `null`。`ItemStack` 为纯数据（快照），详见 [ItemStack](item.md)。
 
-### Tab 列表与客户端边界（2026-08-13）
+### Tab 列表
 
 ```js
 player.sendTabHeader(header, footer)    // Promise — Tab 列表 header/footer（MiniMessage；null 清空对应栏）
 player.sendTabHeaderSync(header, footer)
 player.setPlayerListName(name)          // Promise — Tab 列表显示名（null 恢复默认）
 player.setPlayerListNameSync(name)
-player.setBorder(size, centerX?, centerZ?)  // Promise — 客户端世界边界（null 重置为服务端边界；centerX/centerZ 可选，指定边界中心）
-player.setBorderSync(size, centerX?, centerZ?)
 ```
 
 ### ActionBar 与资源包
@@ -156,7 +188,7 @@ player.sendResourcePack(url, hash?, prompt?, force?)  // Promise —— prompt �
 | `player.saturation` | `player.getSaturation()` | `Promise<number>` |
 | `player.totalExperience` | `player.getTotalExperience()` | `Promise<number>` |
 | `player.isOp` | `player.isOpAsync()` | `Promise<boolean>` |
-| `player.online` | `player.getOnline()` | `Promise<boolean>` |
+| `player.online` | `player.isOnlineAsync()` | `Promise<boolean>` |
 | `player.isFlying` | `player.isFlyingAsync()` | `Promise<boolean>` |
 | `player.allowFlight` | `player.getAllowFlight()` | `Promise<boolean>` |
 | `player.isSneaking` | `player.isSneakingAsync()` | `Promise<boolean>` |

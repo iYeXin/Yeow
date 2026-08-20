@@ -1,123 +1,90 @@
 # Scoreboard API
 
-计分板 Objective、Score、Team 操作。
+计分板（OOP 对象式 API）：`Scoreboard` / `Objective` / `Team` 对象，操作都在对象上调用。
+
+```js
+import { Scoreboard } from 'yeow-api';
+```
 
 > [!WARNING]
-> **Folia 平台限制（2026-08-13）**：Folia 的 Scoreboard 实现**不支持创建**计分板对象——
-> `createObjective` / `createTeam` 在 Folia 上返回错误（`{err: "Folia does not support creating new objectives/teams"}`）。
+> **Folia 平台限制**：Folia 的 Scoreboard 实现**不支持创建**计分板对象——
+> `board.createObjective(...)` / `board.createTeam(...)` 在 Folia 上 reject
+> （`Folia does not support creating new objectives/teams`）。
 > 原因：Folia（1.21）的 `registerNewObjective` / `registerNewTeam` 全部重载直接抛
-> `UnsupportedOperationException`，仅实现了**读取与修改已存在对象**的能力（世界保存或服务器命令
-> 创建的 objective/team；`setScore`、`setTeamPrefix`、`setObjectiveDisplay` 等修改操作可用）。
+> `UnsupportedOperationException`，仅实现了**读取与修改已存在对象**的能力
+> （`setScore`、`team.setPrefix`、`obj.setDisplay` 等修改操作可用）。
 > **Paper 上无此限制。**
->
-> **错误语义**：与所有 Yeow 错误一致——运行时（Java）不抛异常，返回 `{err}` 错误对象；
-> 但 JS 侧按标准 `err` 语义处理：**同步调用（`xxxSync`）`throw`，异步调用（`await xxx`）Promise `reject`**。
-> 调用方用 `try/catch`（或 `.catch`）捕获并降级（如仅操作主计分板上已存在的 objective），
-> 或用 `getEnv().platform` 提前判断。
+
+## 获取计分板
 
 ```js
-import {
-    createScoreboard, deleteScoreboard,
-    createObjective, deleteObjective, getObjectives,
-    setObjectiveDisplay, getScore, setScore, resetScore,
-    createTeam, deleteTeam, getTeam, getTeams,
-    setTeamDisplayName, setTeamPrefix, setTeamSuffix, setTeamColor,
-    setTeamFriendlyFire, setTeamSeeInvisible, setTeamOption,
-    teamAddEntry, teamRemoveEntry, teamGetEntries,
-    setPlayerBoard,
-} from 'yeow-api';
+const board = await Scoreboard.create('myBoard');   // 自定义计分板
+const main = Scoreboard.main();                     // 主计分板（服务器默认）
 ```
 
-## 个人计分板
-
-默认所有操作作用于主计分板。传入 `board` 参数可操作自定义计分板：
+## Objective（计分项）
 
 ```js
-const myBoard = await createScoreboard('myBoard');
+// 创建计分项（criteria: dummy(手动), deathCount, playerKillCount, totalKillCount, health）
+const obj = await board.createObjective('kills', 'dummy', '<red>Kills</red>');
 
-// 在自定义计分板上创建计分项
-await createObjective('kills', 'dummy', '<red>Kills</red>', myBoard);
-await setScore('kills', 'Notch', 42, myBoard);
+// 设置显示位置（slot: "BELOW_NAME" | "PLAYER_LIST" | "SIDEBAR" | null(取消)）
+await obj.setDisplay('SIDEBAR');
 
-// 为玩家设置个人计分板
-await setPlayerBoard(player.uuid, myBoard);
+// 分数（target 接受 Player 对象或 entry 字符串）
+await obj.setScore(player, 42);
+await obj.setScore('Notch', 42);
+const score = await obj.getScore(player);    // number | null
+await obj.resetScore(player);
 
-// 销毁
-await deleteScoreboard(myBoard);
+// 查询全部计分项 / 删除
+const objs = await board.getObjectives();    // Objective[]
+await obj.delete();
 ```
 
-所有 Objective、Score、Team 方法均支持可选的最后一个参数 `board`。
-
-## Objective
+## Team（队伍）
 
 ```js
-// 创建计分项
-await createObjective('kills', 'dummy', '<red>Kills</red>');
-// criteria 常用值: dummy(手动), deathCount, playerKillCount, totalKillCount, health
+const team = await board.createTeam('red_team');
+await team.setPrefix('<red>[Red]</red>');
+await team.setSuffix('<gray> [PvP]</gray>');
+await team.setColor('RED');
+await team.setFriendlyFire(false);
+await team.setSeeInvisible(false);
+await team.setOption('COLLISION_RULE', 'PUSH_OWN_TEAM');
 
-// 设置显示位置
-await setObjectiveDisplay('kills', 'SIDEBAR');
-// slot: "BELOW_NAME" | "PLAYER_LIST" | "SIDEBAR" | null(取消)
+// 成员管理（接受 Player 对象或其名/entry 字符串）
+await team.add(player);
+await team.add('Notch');
+await team.remove(player);
+const members = await team.getEntries();    // string[]（快照）
 
-// 查询所有计分项
-const objs = await getObjectives();
-// → [{ name:"kills", criteria:"dummy", displaySlot:"SIDEBAR" }, ...]
-
-// 删除
-await deleteObjective('kills');
+// 查询 / 删除
+const t = await board.getTeam('red_team');  // Team | null
+const teams = await board.getTeams();       // Team[]
+await team.delete();
 ```
 
-## Score
+> 计分板取值域（展示槽 DisplaySlot、队伍选项 TeamOption、队伍颜色等）见 [值域附录 · 直接维护的枚举清单](../specifications/values.md#二直接维护的枚举清单)。
+
+## 玩家个人计分板
 
 ```js
-// 设置分数
-await setScore('kills', 'Notch', 42);
-
-// 查询分数
-const score = await getScore('kills', 'Notch');  // number | null
-
-// 重置分数
-await resetScore('kills', 'Notch');
-```
-
-## Team
-
-```js
-// 创建队伍
-await createTeam('red_team');
-await setTeamPrefix('red_team', '<red>[Red]</red>');
-await setTeamSuffix('red_team', '<gray> [PvP]</gray>');
-await setTeamColor('red_team', 'RED');
-await setTeamFriendlyFire('red_team', false);
-await setTeamOption('red_team', 'COLLISION_RULE', 'PUSH_OWN_TEAM');
-
-// 成员管理
-await teamAddEntry('red_team', 'Notch');
-await teamRemoveEntry('red_team', 'Notch');
-const members = await teamGetEntries('red_team');  // string[]
-
-// 查询
-const team = await getTeam('red_team');  // TeamInfo | null
-const teams = await getTeams();          // TeamInfo[]
-
-await deleteTeam('red_team');
-```
-
-## Player 绑定
-
-```js
-await setPlayerBoard(player.uuid);
+await board.attach(player);        // 为玩家设置个人计分板为本计分板（接受 Player 对象或 uuid）
+await Scoreboard.main().attach(player);   // 重置为主计分板
 ```
 
 ## 示例
 
 ```js
-await createObjective('money', 'dummy', '<gold>Money</gold>');
-await setObjectiveDisplay('money', 'SIDEBAR');
+const board = Scoreboard.main();
+const obj = await board.createObjective('money', 'dummy', '<gold>Money</gold>');
+await obj.setDisplay('SIDEBAR');
+await obj.setScore(player, 100);
 
-await createTeam('staff');
-await setTeamPrefix('staff', '<dark_red>[Staff]</dark_red>');
-await setTeamColor('staff', 'DARK_RED');
-await teamAddEntry('staff', player.name);
-await setPlayerBoard(player.uuid);
+const team = await board.createTeam('staff');
+await team.setPrefix('<dark_red>[Staff]</dark_red>');
+await team.setColor('DARK_RED');
+await team.add(player);
+await board.attach(player);
 ```

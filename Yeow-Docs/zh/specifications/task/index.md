@@ -72,9 +72,9 @@
 |------|------|---------|
 | [player](player.md) | 玩家操作 | 51 |
 | [entity](entity.md) | 实体 + 药水效果 | 38 |
-| [world](world.md) | 世界 + 方块 + 区块快照 + 音效 + 粒子 + 实体生成 + WorldBorder | 48 |
+| [world](world.md) | 世界 + 方块 + 区块快照 + 音效 + 粒子 + 实体生成 + WorldBorder | 49 |
 | [inventory](inventory-gui.md) | 物品栏 + 容器方块 + 自定义 Inventory | 17 |
-| [server](server.md) | 服务器全局操作 + Material 查询 + 权限注册 | 12 |
+| [server](server.md) | 服务器全局操作 + Material 查询 + 权限注册 | 13 |
 | [command](command.md) | 命令注册 + Tab 补全 | 4 |
 | [event-system](event-system.md) | 事件订阅/完成 | 3 |
 | [bossbar](bossbar.md) | BossBar | 12 |
@@ -83,4 +83,4 @@
 | [advancement](advancement.md) | 进度 | 5 |
 | [recipe](recipe.md) | 配方 | 3 |
 
-> 合计 224 个任务（`permission.register` 计入 server 模块；Paper 与 Folia 任务集**严格一致**）。统计口径：`Tasks.java` / `FoliaTasks.java` 实际 case 数，2026-08-13。
+> 合计 225 个任务（`permission.register` 计入 server 模块；`material.*` 计入 server；`block.breakNaturally`、`chunk.*` 计入 world）。Paper 与 Folia 任务集**严格一致**（Folia 的 `recipe.add` 内部按配方类型 shaped/shapeless/furnace/blast/smoker/campfire 分派，非独立任务）。统计口径：`Tasks.java` / `FoliaTasks.java` 任务语义 case 数，2026-08-18。

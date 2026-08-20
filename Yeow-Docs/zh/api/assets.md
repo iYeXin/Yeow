@@ -81,31 +81,29 @@ assets.readSync(getAssetsPath('blob.bin'), 'base64'): string
 
 `options` 可为 `'utf8' | 'base64'` 或 `{ encoding: 'utf8' | 'base64' }`。底层协议仍使用 `assets:read`（文本）与 `assets:readBase64`（二进制 Base64 承载）节点。
 
-## assets.extract(path, dest?) / assets.extractSync(path, dest?)
+## assets.extract(path, dest) / assets.extractSync(path, dest)
 
-解压资产文件到文件系统。默认解压到 `plugins/<插件名>/assets/<path>`。
+解压资产文件到文件系统。**`dest` 必填**，基于插件数据目录（`plugins/<插件名>/`）计算，最终目标必须位于插件目录内。
 
 ```ts
-assets.extract(getAssetsPath('config.json')): Promise<string>
-assets.extractSync(getAssetsPath('config.json')): string
+assets.extract(getAssetsPath('config.json'), 'config.json'): Promise<string>
+assets.extractSync(getAssetsPath('config.json'), 'config.json'): string
 ```
 
-返回解压后的目标路径（**相对服务器根目录**，如 `plugins/<插件名>/assets/config.json`；配合 `fs.outer.getServerPath()` 可拼出绝对路径）。
+返回解压后的目标路径（**相对服务器根目录**，如 `plugins/<插件名>/config.json`；配合 `fs.outer.getServerPath()` 可拼出绝对路径）。
 
-> **权限**：`assets:extract` 默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明 `"assets:extract"`。`assets.read` 默认允许。
+> **权限**：assets 通道**不设权限拦截**；解压目标被强制限定在插件数据目录 `plugins/<插件名>/` 内（越界返回错误）。
 
 ## assets.extractDir(path, dest?) / assets.extractDirSync(path, dest?)
 
-**目录**整体提取到文件系统（递归，保持内部相对结构）。`path` 指向 `assets/` 下的一个目录（如 `native/`）；`dest` 默认 `plugins/<插件名>/assets/<path>`。
+**目录**整体提取到文件系统（递归，保持内部相对结构）。`path` 指向 `assets/` 下的一个目录（如 `native/`）；`dest` 可选，默认 `plugins/<插件名>/assets/<path>`，同样限定在插件数据目录内。
 
 ```ts
 assets.extractDir(getAssetsPath('native/')): Promise<string>
 assets.extractDirSync(getAssetsPath('native/')): string
 ```
 
-返回解压后的目标目录路径（**相对服务器根目录**）。与 `extract` 的差异：`extractDir` 提取整个目录树（含嵌套子目录），适合需要完整保留内部引用的资源集。
-
-> **权限**：`assets:extractDir` 是**独立节点**，默认拒绝，须在 `yeow.config.json` 的 `permissions` 中声明 `"assets:extractDir"`（或 `"assets:*"`）——**`"assets:extract"` 不覆盖目录提取**。未声明调用返回 `Permission denied: assets:extractDir`。
+返回解压后的目标目录路径（**相对服务器根目录**）。与 `extract` 的差异：`extractDir` 提取整个目录树（含嵌套子目录），适合需要完整保留内部引用的资源集；`dest` 仍可选（`extract` 必填）。
 
 ## 示例
 

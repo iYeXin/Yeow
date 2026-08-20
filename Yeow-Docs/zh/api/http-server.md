@@ -44,11 +44,11 @@ server.close()                  // 关闭服务器
 
 **返回值规范化**（中间件与路由一致）：
 
-| 返回                                                  | 处理                                                              |
-| ----------------------------------------------------- | ----------------------------------------------------------------- |
-| 字符串                                                | 文本响应（`{ body }`）                                            |
-| `{ status, body, bodyBase64, headers }`（含任一字段） | 响应选项，原样使用                                                |
-| **其他普通对象**（如 `{ ok: true }`）                 | **自动 JSON 序列化**（`body` + `content-type: application/json`） |
+| 返回                                                          | 处理                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 字符串                                                        | 文本响应（`{ body }`，UTF-8）                                     |
+| `{ status, body, encoding?, headers }`（含任一字段）          | 响应选项，原样使用（`body` 为 `Uint8Array` 直接二进制；字符串 + `encoding: 'base64'` 为 base64 二进制） |
+| **其他普通对象**（如 `{ ok: true }`）                         | **自动 JSON 序列化**（`body` + `content-type: application/json`） |
 
 ### 中间件（洋葱模型）
 
@@ -82,7 +82,7 @@ app.get('/api/data', (req) => ({ ok: true }));   // 自动 JSON 序列化 → {"
 
 ### 静态文件挂载（mount）
 
-`mount(dir, prefix?)` 把**插件数据目录**（`plugins/<插件名>/`）下的目录挂载为静态文件服务（base64 二进制传输 + Content-Type 按扩展名推断）：
+`mount(dir, prefix?)` 把**插件数据目录**（`plugins/<插件名>/`）下的目录挂载为静态文件服务（base64 二进制传输 + Content-Type 按扩展名推断）。**目录请求自动尝试 `index.html`**（`/` → `index.html`、`/a/` → `a/index.html`；`/a` 先按文件读，失败再试 `a/index.html`）：
 
 ```js
 import { createServer } from 'yeow-server';
@@ -115,11 +115,11 @@ onLoad(async () => {
 ```
 
 - 版本更新后 assets 内容变化但数据目录已有旧文件时，可自行加入版本标记比对（如提取后写入 `fs.writeFileSync('web/.version', version)`，检测时比对）决定是否重新提取
-- 也可以不经提取直接响应：`assetsRead(path, 'base64')` + `bodyBase64`（见[二进制响应](#二进制响应base64)）——适合每次读包、文件较小、无需被其他插件/工具访问的场景
+- 也可以不经提取直接响应：`assetsRead(path)`（Uint8Array）+ `body`（见[二进制响应](#二进制响应uint8array--base64)）——适合每次读包、文件较小、无需被其他插件/工具访问的场景
 
 ### 打包资源挂载（mountAssets）
 
-`mountAssets(dir, prefix?)` 把**打包资源**（assets，.zip 内）直接挂载为静态文件服务——**无需提取到磁盘**，每次请求从 .zip 读取单个文件：
+`mountAssets(dir, prefix?)` 把**打包资源**（assets，.zip 内）直接挂载为静态文件服务——**无需提取到磁盘**，每次请求从 .zip 读取单个文件；目录请求同样自动尝试 `index.html`：
 
 ```js
 import { createServer } from 'yeow-server';
@@ -224,37 +224,9 @@ const { serverId, port } = listen((req) => {
 close(serverId);
 ```
 
-### 二进制响应（base64）
+### 二进制响应（Uint8Array / base64）
 
-`respond` 支持 `bodyBase64`——base64 编码的**二进制**响应体（与 `body` 互斥，优先）。典型场景：从 `assets` 读取资源包等二进制文件并暴露下载 URL。
-
-**推荐使用 `yeow-server` 的 `createServer`**（路由 + 自动响应）：
-
-```js
-import { createServer } from 'yeow-server';
-import { assetsRead } from 'yeow-api';
-
-let cachedPack = null;   // 缓存：每次请求都从 .zip 内解压读取较耗时
-
-const app = createServer(17835);
-
-app.get('/resourcepack', async (req) => {
-    if (!cachedPack) {
-        cachedPack = await assetsRead('pack/resourcepack.zip', 'base64');   // 首次读取并缓存
-    }
-    return {
-        bodyBase64: cachedPack,
-        headers: {
-            'content-type': 'application/zip',
-            'content-disposition': 'attachment; filename="resourcepack.zip"',
-        },
-    };
-});
-
-// 客户端/玩家下载: http://<服务器>:17835/resourcepack
-```
-
-> **缓存提示**：`assetsRead(path, 'base64')` 每次调用都会从插件包（.zip）中解压读取目标文件——如果资源包不大，建议**缓存**读取结果（如上面的 `cachedPack`）。
+`respond` 的 `body` 支持三种形态（与 `fs.writeFile` 同语义）：**`Uint8Array` 直接作为二进制**；字符串默认 UTF-8 文本；字符串 + `{ encoding: 'base64' }` 视为 base64 编码的二进制数据。
 
 > **端口告知**：HTTP 监听端口需**插件作者自行保证可用**（未被占用、服务器防火墙放行）——请在插件文档/说明中**告知服主监听的端口号**，由服主配置防火墙与转发。
 
@@ -264,11 +236,11 @@ app.get('/resourcepack', async (req) => {
 import { createServer } from 'yeow-server';
 import { assetsRead, Player, fs, eventOn } from 'yeow-api';
 
-// ① 暴露资源包下载 URL（见上例，缓存 base64）
+// ① 暴露资源包下载 URL（缓存 Uint8Array）
 const app = createServer(17835);
 app.get('/resourcepack', async (req) => {
-    if (!cachedPack) cachedPack = await assetsRead('pack/resourcepack.zip', 'base64');
-    return { bodyBase64: cachedPack, headers: { 'content-type': 'application/zip' } };
+    if (!cachedPack) cachedPack = await assetsRead('pack/resourcepack.zip');
+    return { body: cachedPack, headers: { 'content-type': 'application/zip' } };
 });
 
 // ② 公网地址由服主在插件数据目录配置（plugins/<插件名>/config.json）

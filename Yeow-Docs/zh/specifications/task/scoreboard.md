@@ -107,7 +107,7 @@
 
 `option` 值：`"NAME_TAG_VISIBILITY"`、`"DEATH_MESSAGE_VISIBILITY"`、`"COLLISION_RULE"`。
 
-`value` 值：`"ALWAYS"`、`"NEVER"`、`"HIDE_FOR_OTHER_TEAMS"`、`"HIDE_FOR_OWN_TEAM"`（仅 nameTagVisibility）；`"ALWAYS"`、`"NEVER"`、`"PUSH_OTHER_TEAMS"`、`"PUSH_OWN_TEAM"`（仅 collisionRule）。
+`value` 值：`"ALWAYS"`、`"NEVER"`、`"FOR_OTHER_TEAMS"`、`"FOR_OWN_TEAM"`（三个 option 共用同一枚举；collisionRule 的推挤语义对应 `FOR_OTHER_TEAMS` / `FOR_OWN_TEAM`）。完整说明见 [值域附录](../values.md)。
 
 ### 成员管理
 
@@ -127,3 +127,5 @@
 - **返回**：`true` \| `false`
 
 将玩家的计分板设为指定的自定义计分板。若不传 `board`，设为主计分板。
+
+> 涉及值域（displaySlot、队伍颜色、teamOption/optionStatus）的完整清单见 [值域附录](../values.md)。

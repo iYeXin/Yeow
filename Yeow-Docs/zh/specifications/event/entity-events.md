@@ -7,14 +7,14 @@
 | `entity` | string (UUID) | 受伤的实体 |
 | `damage` | number | 伤害值（**可回写**：`mods.damage` 覆盖伤害值） |
 | `cause` | string | 伤害类型（`ENTITY_ATTACK`、`FALL`、`LAVA` 等） |
-| `entityType` | string | 实体类型枚举名 |
+| `entityType` | string | 实体类型（minecraft 注册键，如 `minecraft:zombie`） |
 
 ## `entityDeath`
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `entity` | string (UUID) | 死亡的实体 |
-| `entityType` | string | 实体类型枚举名 |
+| `entityType` | string | 实体类型（minecraft 注册键，如 `minecraft:zombie`） |
 | `entityName` | string | 实体名称 |
 
 ## `entitySpawn`
@@ -22,7 +22,7 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `entity` | string (UUID) | 生成的实体 |
-| `entityType` | string | 实体类型枚举名 |
+| `entityType` | string | 实体类型（minecraft 注册键，如 `minecraft:zombie`） |
 | `x` | number | X 坐标 |
 | `y` | number | Y 坐标 |
 | `z` | number | Z 坐标 |
@@ -33,7 +33,7 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `entity` | string (UUID) | 爆炸的实体 |
-| `entityType` | string | 实体类型枚举名 |
+| `entityType` | string | 实体类型（minecraft 注册键，如 `minecraft:zombie`） |
 | `x` | number | X 坐标 |
 | `y` | number | Y 坐标 |
 | `z` | number | Z 坐标 |
@@ -63,7 +63,7 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `entity` | string (UUID) | 弹射物实体 |
-| `projectileType` | string | 弹射物类型（`ARROW`、`SNOWBALL` 等） |
+| `projectileType` | string | 弹射物类型（minecraft 注册键，如 `minecraft:arrow`、`minecraft:snowball`） |
 | `shooter` | string \| undefined | 发射者 UUID（仅生物发射时存在） |
 
 ### `projectileHit`
@@ -71,6 +71,6 @@
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `entity` | string (UUID) | 弹射物实体 |
-| `projectileType` | string | 弹射物类型 |
+| `projectileType` | string | 弹射物类型（minecraft 注册键） |
 | `hitEntity` | string \| null | 命中的实体 UUID |
 | `hitBlock` | object \| null | `{ "x": <int>, "y": <int>, "z": <int>, "type": "<key>" }` |

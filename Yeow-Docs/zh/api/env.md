@@ -11,13 +11,14 @@ console.log(env.arch, env.minecraftVersion, env.yeow.version);
 
 返回 `EnvInfo`：
 
-| 字段               | 类型                  | 说明                                                       |
-| ------------------ | --------------------- | ---------------------------------------------------------- |
-| `cpus`             | number                | CPU 逻辑核心数                                             |
-| `memory`           | number                | JVM 总内存（字节）                                         |
-| `arch`             | string                | 系统架构（如 `windows-x64` / `linux-x64` / `linux-arm64`） |
-| `minecraftVersion` | string                | Minecraft 版本（如 `1.21.4`）                              |
-| `yeow`             | { platform, version } | 运行时信息（如 `{ platform: 'paper', version: '0.2.0' }`） |
-| `now`              | number                | **epoch 微秒**时间戳                                       |
+| 字段               | 类型                  | 说明                                                                              |
+| ------------------ | --------------------- | --------------------------------------------------------------------------------- |
+| `cpus`             | number                | CPU 逻辑核心数                                                                    |
+| `memory`           | number                | JVM 总内存（字节）                                                                |
+| `arch`             | string                | 系统架构（如 `windows-x64` / `linux-x64` / `linux-arm64`）                        |
+| `minecraftVersion` | string                | Minecraft 版本（如 `1.21.4`）                                                     |
+| `yeow`             | { platform, version } | 运行时信息（如 `{ platform: 'paper', version: '0.5.0' }`）                        |
+| `now`              | number                | **epoch 微秒**时间戳                                                              |
+| `pluginDir`        | string                | 插件数据目录路径（Paper/Folia 平台如 `plugins/my-plugin`；Worker 中为主插件目录） |
 
 > `now` 为微秒级时间戳——通信开销在微秒级，纳秒无意义。

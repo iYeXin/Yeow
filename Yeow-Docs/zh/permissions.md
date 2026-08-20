@@ -24,7 +24,8 @@ Yeow 对**敏感消息节点**实施声明式权限：插件在 `yeow.config.jso
 | `fs:server.*` / `fs:outer.*` | fs 通道 `server` / `outer` 前缀节点（服务器根 / 任意路径）；`fs:plugin.*` 节点（插件数据目录）**免声明** |
 | `http:*`                     | HTTP 全部操作（`http:request`、`http:requestAsync`、`http:listen`、`http:respond`、`http:close`） |
 | `service:registerNative`     | 注册原生服务（spawn 子进程）                                                                         |
-| `assets:extract` / `assets:extractDir` | 解压资源到磁盘（单文件 / 目录提取，**两个独立节点**）                                    |
+
+> **assets 通道不设权限拦截**：`assets` 只读打包资源，或解压到**本插件数据目录**内（目标强制限定，越界返回错误），因此无需声明权限。
 
 > **节点概念**：权限只按**消息节点**考虑（如 `fs:plugin.readFile`、`fs:server.readFile`）。节点名中的段（`plugin` / `server` / `outer`、`task:player.get` 的 `player`）是业务/访问范围命名，**不是层级**——权限匹配不看命名段含义。
 

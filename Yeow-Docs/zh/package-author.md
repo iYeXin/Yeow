@@ -59,13 +59,13 @@ npm install --save-dev yeow-api
 
 | 声明               | 作用域                              | 用途                                                                                                                                                                                                                                  |
 | ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `peerDependencies` | 使用者侧（npm 安装期 + **构建期**） | 契约：使用者的插件必须有 yeow-api；dedupe 插件在构建期把全部 `import 'yeow-api'` 重写为主项目实例。**同时是构建器识别依赖项的标记**——存在 `assets/` 且 peer 含 `yeow-api` 的包才会参与资产打包与权限合并（漏声明 → 资源静默不进 JAR） |
+| `peerDependencies` | 使用者侧（npm 安装期 + **构建期**） | 契约：使用者的插件必须有 yeow-api。范围不重叠时 npm 会为包安装独立 yeow-api 副本——**多副本可安全共存**（见下文「构建时的自动处理」）。**同时是构建器识别依赖项的标记**——存在 `assets/` 且 peer 含 `yeow-api` 的包才会参与资产打包与权限合并（漏声明 → 资源静默不进 JAR） |
 | `devDependencies`  | 开发期（作者侧）                    | 独立开发时的类型/提示；**不随包发布**，不影响运行时                                                                                                                                                                                   |
 
 **版本策略（两个范围、各司其职，不必相同）**：
 
 - `devDependencies` = **开发目标版本**——你开发/类型检查时用的版本，可窄
-- `peerDependencies` = **兼容的最宽范围**——npm 7+ 在范围不重叠时会为消费端**另装一份 yeow-api**（死重且困惑工具链）；宽范围避免重复安装。只用了各版本共有 API 的老包可写 `^0.3.0 || ^0.4.0`；依赖包源码会被使用者的 `tsc --noEmit`（构建时 typecheck）检查，只要包只用范围内版本都有的 API，宽范围天然安全
+- `peerDependencies` = **兼容的最宽范围**——npm 7+ 在范围不重叠时会为消费端**另装一份 yeow-api**（bundle 体积增加）；宽范围避免重复安装。只用了各版本共有 API 的老包可写 `^0.3.0 || ^0.4.0`；依赖包源码会被使用者的 `tsc --noEmit`（构建时 typecheck）检查，只要包只用范围内版本都有的 API，宽范围天然安全。**即使版本不兼容也不影响运行**：多个 yeow-api 副本共享生命周期/事件/GC 全局注册表，可安全共存（见下文）
 
 ---
 
@@ -78,7 +78,8 @@ npm install --save-dev yeow-api
 | `fs:server.*` / `fs:outer.*`（或 `fs:server.readFile` 等节点） | `fs.server.*` / `fs.outer.*` API（服务器根/任意路径）；`fs.*`（插件数据目录）免声明 |
 | `http:*`（或 `http:requestAsync` 等节点）                      | `fetch`、`request`、HTTP 服务器（`createServer`/`listen`）                          |
 | `service:registerNative`                                       | `registerNativeService`（spawn 原生子进程）                                         |
-| `assets:extract` / `assets:extractDir`                         | `assetsExtract` / `assetsExtractDir`（解压资源到磁盘，两个独立节点）                |
+
+> `assets` 通道（`assetsExtract` / `assetsExtractDir` 解压）**不设权限拦截**：解压目标强制限定在插件数据目录 `plugins/<插件名>/` 内（越界返回错误），无需声明。
 
 规则：
 
@@ -168,13 +169,13 @@ const svc = await registerNativeService('my-svc', {
 
 ## 构建时的自动处理
 
-主项目 `build.js` 使用两个 esbuild 插件（`yeow-assets.mjs`），对依赖包**透明**：
+主项目 `build.js` 使用 esbuild 资产插件（`yeow-assets.mjs`），对依赖包**透明**：
 
-### 1. dedupe 插件
+### 1. yeow-api 多副本共存（无去重）
 
-所有 `import 'yeow-api'`（无论来自主项目还是依赖包）统一解析到**主项目的 yeow-api 实例**。
+构建器**不强制**把 `import 'yeow-api'` 统一到主项目实例——安装由包管理器按语义化版本规则自行决定：peer 范围不重叠（如主项目 `^0.4.0` 与依赖包 `^0.3.0`）时，npm 为依赖包安装**独立 yeow-api 副本**，bundle 中两个副本共存。
 
-> **为什么必须**：若依赖包自带 yeow-api 副本，bundle 会出现两份 lifecycle 模块，`globalThis.__yeowInitCbs` 被后者覆盖，插件回调丢失（表现为 `onLoad` 不执行）。
+> **为什么安全**：yeow-api 对底层协议是纯封装（协议 1.0.0 之后无破坏性变更），多副本只是重复封装同一协议；生命周期钩子（`onInit` / `onLoad` / `onUnload`）注册在**共享全局注册表**（`__yeowInitCbs` 等——读已有、绝不覆盖），事件处理器与句柄 GC 队列同样共享——多个副本的回调进入同一注册表，运行时一次 INIT/LOAD 分发**全部执行**，不会互相覆盖丢失（曾因覆盖 `__yeowInitCbs` 表现为 `onLoad` 不执行）。
 
 ### 2. 资产插件
 
@@ -363,6 +364,6 @@ onLoad(async () => {
 - [ ] `main` / `types` 指向 `src/index.ts`
 - [ ] `peerDependencies` 声明 yeow-api 版本范围（兼容的最宽范围；漏声明 → 资产/权限不参与构建）
 - [ ] `devDependencies` 声明开发目标版本的 yeow-api（独立开发类型检查）
-- [ ] 用到 fs/http/registerNative/assetsExtract 时，README 注明使用者需声明的权限节点
+- [ ] 用到 fs/http/registerNative 时，README 注明使用者需声明的权限节点（assets 解压不设权限拦截，无需声明）
 - [ ] 资源通过 `getAssetsPath()` 获取路径，不手写
 - [ ] 目录资源用尾部 `/` 路径 + `{ dir, entry }` 模式

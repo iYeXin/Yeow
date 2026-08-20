@@ -60,3 +60,5 @@ BossBar 创建、属性修改、玩家绑定。所有任务通过 `task` 通道�
 | `bossbar.removeFlag` | `{ "id": "<handle>", "flag": "<flag>" }` | `true` |
 
 `flag` 可选值：`CREATE_FOG`、`DARKEN_SKY`、`PLAY_BOSS_MUSIC`。
+
+> 涉及值域（color/style/flag）的完整清单见 [值域附录](../values.md)。

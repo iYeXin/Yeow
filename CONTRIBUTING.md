@@ -81,10 +81,10 @@ cd yeow-runtime/jvm
 mvn clean install -DskipTests    # 一次构建 core + paper 并安装到本地 Maven 仓库
 ```
 
-构建产物 `paper/target/yeow-runtime-0.2.0.jar`（shaded，含 core + 引擎 + 配置解析）需要**复制到脚手架模板**，供 `create-yeow` 生成的插件项目使用：
+构建产物 `paper/target/yeow-runtime-0.5.0.jar`（shaded，含 core + 引擎 + 配置解析）需要**复制到脚手架模板**，供 `create-yeow` 生成的插件项目使用：
 
 ```bash
-cp paper/target/yeow-runtime-0.2.0.jar ../create-yeow/templates/default/.yeow/assets/
+cp paper/target/yeow-runtime-0.5.0.jar ../create-yeow/templates/default/.yeow/assets/
 ```
 
 ### 3. yeow-template
@@ -97,7 +97,7 @@ mvn clean package -DskipTests
 编译时解析 `yeow-runtime/jvm` 来自本地 Maven 仓库（第 2 步已安装）。产物同样复制到模板：
 
 ```bash
-cp target/yeow-template-0.1.0.jar ../create-yeow/templates/default/.yeow/assets/
+cp target/yeow-template-0.5.0.jar ../create-yeow/templates/default/.yeow/assets/
 ```
 
 > **为什么必须同步复制？** `create-yeow` 生成的项目在 `npm run dev` / `npm run build` 时从 `.yeow/assets/` 读取这两个 jar。不同步会导致旧签名（如 `registerPlugin` 返回类型变化）引发 `NoSuchMethodError`。

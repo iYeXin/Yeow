@@ -15,6 +15,7 @@
 | [event](event/index.md)                   | 事件订阅机制与各类事件的数据字段                                          |
 | [native-service](native-service/index.md) | Native Service 子进程协议（TCP JSON line）                                |
 | [runtime](runtime/index.md)               | 运行时机制（JS 环境、回调系统、全局变量、事件循环）                       |
+| [values.md](values.md)                    | **值域附录**：取值格式规则（R1-R5）与清单——平台专有枚举直接维护（游戏模式/难度/BossBar/计分板/ClickType/ItemFlag/InventoryType 等）+ 参考实现（非强制：DamageCause/传送原因/回血原因）；版本变迁域（方块/物品/实体/生物群系/音效/粒子/附魔/药水/属性/伤害类型/游戏规则/翻译键/进度/配方）给规则 + 权威链接 |
 | [adapter](adapter/index.md)               | 插件适配器规范（多语言 / 社区适配器实现 PluginEntity 并注册）             |
 
 ---
@@ -146,7 +147,8 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 | `fs:outer.*`             | fs 通道 `outer` 前缀节点（任意路径，如 `fs:outer.readFile`）              |
 | `http:*`                 | http 通道全部操作（`request`/`requestAsync`/`listen`/`respond`/`close`）  |
 | `service:registerNative` | service 通道的 `registerNative`（spawn 子进程）                           |
-| `assets:extract` / `assets:extractDir` | assets 通道的 `extract` / `extractDir`（解压到磁盘，两个独立节点） |
+
+> `assets` 通道不设权限拦截：只读打包资源或解压到本插件数据目录内（目标强制限定）。
 
 规则：
 
@@ -154,7 +156,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 - **节点匹配**：精确节点（`fs:server.readFile`）；**整组通配** `fs:server.*` 命中该前缀全部节点；**通道通配** `fs:*` 命中 fs 通道全部节点——构建时 `fs:*` 在 `computedPermissions` 中**自动展开**为 `fs:outer.*, fs:server.*`（语义等价）
 - **默认允许**：上述默认拒绝节点之外的节点（如 `service:request`、`service:register`、`assets:read`、`fs:plugin.readFile`）无需声明
 - **拒绝行为**：未声明调用返回错误 `Permission denied: <node>`。同步调用直接返回错误 JSON；异步调用（含 `cb`）通过回调投递 `{"err":"Permission denied: <node>"}`，JS 侧表现为 Promise reject
-- **其他通道**（`task`/`timer`/`log`/`env`/`dir`/`debug`/`lifecycle`）不受权限模型约束
+- **其他通道**（`task`/`timer`/`log`/`env`/`debug`/`lifecycle`）不受权限模型约束
 - 权限在插件加载时读取并**固定**（运行时不可变更），加载消息中打印声明内容——打印时 `fs:*` 会**展开为 `fs:outer.*, fs:server.*`**（仅展示，便于服主理解影响范围；权限校验仍按原值 `fs:*`）
 
 **`computedPermissions` 语义**：插件作者与依赖包在各自的 `yeow.config.json` 的 `permissions` 中声明；构建时合并（去重 + 通配归一化，`X:*` 覆盖 `X:...`、`X:段.*` 覆盖 `X:段.<op>`；`fs:*` 展开为 `fs:outer.*, fs:server.*`）写入 `yeow.json` 的 `computedPermissions`。运行时读取该字段。运行时只校验通配/节点匹配，无需理解节点命名段含义。
@@ -275,7 +277,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 - [ ] **包结构解析**：读 ZIP（yeow.json、.yeow/main.js、assets/；可选 dev.json），JAR 与 `.yeow.zip` 同构
 - [ ] **同名唯一**：插件名冲突时拒绝加载并警告（自动扫描 / 命令 / 宿主机制途径一致）
-- [ ] **权限模型**：解析 yeow.json `computedPermissions`；`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 默认拒绝（`fs:plugin.*` 免声明）；未声明调用返回 `Permission denied: <node>`
+- [ ] **权限模型**：解析 yeow.json `computedPermissions`；`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative` 默认拒绝（`fs:plugin.*` 免声明；`assets` 通道不设权限拦截，解压目标限定在插件数据目录内）；未声明调用返回 `Permission denied: <node>`
 - [ ] **加载消息**：插件加载成功时输出加载消息（含插件名、版本、权限声明）
 - [ ] **JS 引擎**：ES2025+（Sec-Uint8Array），支持 `Promise`/`WeakRef`/`FinalizationRegistry`/`Uint8Array`
 - [ ] **原生注入**：`__plugin`、`$dev`（底层桥接如 `$_send` 为内部实现，不属规范约束）

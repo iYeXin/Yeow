@@ -29,18 +29,19 @@ const items = await getItems();
 ```ts
 Material.isSolid('minecraft:stone');      // Promise<boolean> — 是否为固体
 Material.isSolidSync('minecraft:stone');  // boolean
-Material.isLiquid('minecraft:water');     // Promise<boolean> — 是否为液体
-Material.isLiquidSync('minecraft:water'); // boolean
 Material.isAir('minecraft:air');          // Promise<boolean> — 是否为空气
 Material.isAirSync('minecraft:air');      // boolean
+Material.getMaxDurability('minecraft:diamond_pickaxe');  // Promise<number> — 最大耐久（非耐用品为 0）
+Material.getMaxDurabilitySync('minecraft:diamond_pickaxe'); // number
 ```
 
 说明：
 
-- `isSolid` / `isAir` 对应 Paper 系 `Material.isSolid()` / `Material.isAir()`
-- `isLiquid`：Paper 系 1.13 起移除了 `Material.isLiquid()`，实现为水/熔岩枚举判断——**原版液体方块材质仅此两种**
+- `getMaxDurability` 返回工具/盔甲等的耐久上限；非耐用品返回 `0`；未知类型抛错
 - 判断与方块状态无关（如 `minecraft:chest[facing=...]` 任何状态都是固体）
 - `Block` 实例的 `isSolid()` 等即委托此处
+
+> 材料 / 方块 / 物品键（`minecraft:xxx`）的取值格式见 [值域附录 · 版本变迁域](../specifications/values.md#四版本变迁域规则--引用)。
 
 ## MaterialInfo
 

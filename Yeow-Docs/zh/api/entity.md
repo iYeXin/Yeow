@@ -22,7 +22,7 @@ new Entity(uuid)                // 通过 UUID 引用实体
 | 属性 | 类型 | 读写 | 说明 |
 |------|------|:----:|------|
 | `uuid` | `string` | 只读 | 实体 UUID |
-| `type` | `string` | 只读 | 类型（ZOMBIE, PLAYER...） |
+| `type` | `string` | 只读 | 类型（minecraft 注册键，如 `minecraft:zombie`） |
 | `name` | `string` | 只读 | 显示名 |
 | `customName` | `string \| null` | 读写 | 自定义名 |
 | `world` | `string \| null` | 只读 | 所在世界 |
@@ -33,6 +33,8 @@ new Entity(uuid)                // 通过 UUID 引用实体
 | `hasGravity` | `boolean` | 读写 | 重力 |
 | `passengers` | `string[]` | 只读 | 乘客 UUID |
 | `vehicle` | `string \| null` | 只读 | 载具 UUID |
+
+> 实体类型键（`minecraft:zombie` 等）的取值域见 [值域附录 · 版本变迁域](../specifications/values.md#四版本变迁域规则--引用)。
 
 ## 方法
 
@@ -49,7 +51,7 @@ entity.teleportSync(loc)
 
 | 同步 getter | 异步方法 | 返回 |
 |------------|---------|------|
-| `entity.type` | `entity.getType()` | `Promise<string>` |
+| `entity.type` | `entity.getType()` | `Promise<string>`（minecraft 注册键，如 `minecraft:zombie`） |
 | `entity.name` | `entity.getName()` | `Promise<string>` |
 | `entity.customName` | `entity.getCustomName()` | `Promise<string \| null>` |
 | `entity.world` | `entity.getWorld()` | `Promise<string \| null>` |
@@ -96,7 +98,7 @@ entity.getMaxHealth()        // Promise<number>
 entity.isDeadAsync()         // Promise<boolean>
 ```
 
-## 基础操作（2026-08-13）
+## 基础操作
 
 所有 `Entity`（velocity/fireTicks/ticksLived/isOnGround）与 `LivingEntity`（damage/setTarget）：
 
@@ -130,9 +132,9 @@ if (e) {
     e.isGlowing = true;
     await e.teleport(new Location(0, 80, 0, 0, 0, 'world'));
 
-    // 药水效果
-    await addPotionEffect(e.uuid, {
-        type: 'speed', duration: 200, amplifier: 0
+    // 药水效果（LivingEntity 实例方法；type 为 minecraft 注册键）
+    await e.addPotionEffect({
+        type: 'minecraft:speed', duration: 200, amplifier: 0
     });
 }
 ```

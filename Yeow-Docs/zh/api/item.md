@@ -28,7 +28,7 @@ interface ItemMeta {
 }
 
 interface PotionEffectData {
-  type: string;          // 药水效果名（如 "speed"，不区分大小写）
+  type: string;          // 药水效果：minecraft 注册键（如 "minecraft:speed"；兼容旧式枚举名 "speed"/"SPEED"）
   duration?: number;     // 刻（默认 200）
   amplifier?: number;    // 等级（默认 0）
   ambient?: boolean;     // 环境粒子（信标样式，默认 false）
@@ -36,12 +36,16 @@ interface PotionEffectData {
 }
 
 interface AttributeModifierData {
-  attribute: string;                        // Bukkit Attribute 枚举名（如 "ATTACK_DAMAGE" / "MOVEMENT_SPEED"）
+  attribute: string;                        // minecraft 注册键（如 "minecraft:attack_damage"；兼容旧式 Bukkit 枚举名 "ATTACK_DAMAGE"）
   amount: number;
   operation: 'ADD_NUMBER' | 'ADD_SCALED_AMOUNT' | 'MULTIPLY_SCALED_1';
   slot?: string;                            // mainhand / offhand / feet / legs / chest / head / body / any（默认 any）
 }
 ```
+
+> 附魔与属性修饰符键（`minecraft:sharpness`、`minecraft:attack_damage`）、`itemFlags`（ItemFlag）的取值域见 [值域附录](../specifications/values.md)（附魔/属性见「版本变迁域」，ItemFlag 见「直接维护的枚举清单」）。
+>
+> 工具/盔甲等的耐久上限通过 `Material.getMaxDurability(type)` 获取，详见 [Material API](./material.md)。
 
 ## 工具函数
 

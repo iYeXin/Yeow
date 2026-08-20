@@ -1,14 +1,14 @@
 # 环境能力与通道
 
-> 环境能力注入：$_send 底层桥、$send 封装、各通道说明、运行时配置（plugins/Yeow/runtime/config.yml）。
+> 环境能力注入：$send 封装（底层桥 `$_send` 为内部实现，init.js 闭包持有、全局不暴露）、各通道说明、运行时配置（plugins/Yeow/runtime/config.yml）。
 
 ## 环境能力注入
 
-PluginThread 在 JS 上下文只注册一个底层函数：
+PluginThread 在 JS 上下文只注册一个底层函数，**init.js 以闭包持有并立即从全局对象移除**——插件代码只能使用封装后的 `$send`：
 
 | 函数                          | 签名                                 | 说明                                   |
 | ----------------------------- | ------------------------------------ | -------------------------------------- |
-| `$_send(channel, jsonString)` | `(string, string) => string \| null` | JS→Java 唯一通信入口，返回 JSON 字符串 |
+| `$_send(channel, jsonString)` | `(string, string) => string \| null` | JS→Java 唯一通信入口（内部实现，全局不暴露） |
 
 支持的消息通道：
 
@@ -23,18 +23,14 @@ PluginThread 在 JS 上下文只注册一个底层函数：
 | `debug`     | 错误上报 / 心跳 ping-pong              | 插件线程直接处理      |
 | `log`       | 控制台日志（自动添加 `[插件名]` 前缀） | 插件线程直接处理      |
 | `env`       | 运行时环境信息 + 微秒时间戳            | 插件线程直接处理      |
-| `dir`       | 插件数据目录路径                       | 插件线程直接处理      |
 | `lifecycle` | 生命周期确认（unloadDone）             | 插件线程直接处理      |
 
 ### `$send` 封装层
 
-init.js 在 `$_send` 基础上封装了 `$send(channel, payload)`，自动做 JSON 转换：
+init.js 在 `$_send` 基础上封装了 `$send(channel, payload)`，自动做 JSON 转换。**`$_send` 仅存在于 init.js 闭包内**——插件代码（含依赖包）直接调用 `$_send` 会得到 `ReferenceError`：
 
 ```js
-// $_send 直接使用需手动 JSON
-$_send('task', JSON.stringify({type: 'player.get', params: {identifier: 'uuid'}}));
-
-// $send 自动处理 JSON
+// $send 自动处理 JSON（插件唯一可用入口）
 $send('task', {type: 'player.get', params: {identifier: 'uuid'}});
 ```
 
@@ -87,10 +83,10 @@ JS 端在 `onUnload` 回调执行完毕后通过 `$send('lifecycle')` 向 Java �
 init.js 将 `$_send` 封装为标准 JS API：
 
 ```
-$_send(channel, jsonString)   ← 唯一Java原生函数
+$_send(channel, jsonString)   ← 唯一Java原生函数（init.js 闭包持有，全局不暴露）
     ↓
 init.js 封装层
-    ├── $send(channel, object)   ← 自动 JSON 转换
+    ├── $send(channel, object)   ← 自动 JSON 转换（插件唯一可用入口）
     ├── console.log/warn/error   ← 自动添加 [pluginName] 前缀
     ├── setTimeout / clearTimeout
     ├── setInterval / clearInterval

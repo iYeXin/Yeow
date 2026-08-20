@@ -23,7 +23,7 @@
 | `inventory.setItems` | `{ 寻址, "slots": [<int>, ...], "item": <ItemStack \| null> }` | `true` |
 | `inventory.fill` | `{ 寻址, "item": <ItemStack> }` | `true` |
 | `inventory.addItem` | `{ 寻址, "item": <ItemStack> }` | `int`（未放入数量；0 = 全部放入。玩家物品栏溢出部分掉落在地上，仍返回 0） |
-| `inventory.removeItem` | `{ 寻址, "item": <ItemStack> }` | `true`（按类型 + meta 匹配，amount 默认 1） |
+| `inventory.removeItem` | `{ 寻址, "item": <ItemStack> }` | `int`（未移除数量；0 = 全部移除。按类型 + meta 匹配，amount 默认 1） |
 | `inventory.clear` | `{ 寻址, "slot": <int>? }`（slot 可选，不传清空全部） | `true` |
 | `inventory.getSize` | `{ 寻址 }` | `int`（容器槽位数） |
 | `inventory.getType` | `{ 寻址 }` | `string`（`"PLAYER"` / `"CUSTOM"` / 方块实体类型名如 `"CHEST"`） |
@@ -67,9 +67,9 @@
     "itemFlags": ["HIDE_ENCHANTS", "HIDE_ATTRIBUTES"],
     "damage": 3,
     "color": "#FF0000",
-    "potionEffects": [{ "type": "speed", "duration": 200, "amplifier": 1 }],
+    "potionEffects": [{ "type": "minecraft:speed", "duration": 200, "amplifier": 1 }],
     "skullOwner": "Notch",
-    "attributeModifiers": [{ "attribute": "ATTACK_DAMAGE", "amount": 5, "operation": "ADD_NUMBER", "slot": "mainhand" }]
+    "attributeModifiers": [{ "attribute": "minecraft:attack_damage", "amount": 5, "operation": "ADD_NUMBER", "slot": "mainhand" }]
   }
 }
 ```
@@ -88,8 +88,8 @@
 | `meta.itemFlags` | string[] | 否 | 物品标志（ItemFlag 枚举名，如 `HIDE_ENCHANTS`） |
 | `meta.damage` | int | 否 | 耐久损伤值（被损耗的耐久） |
 | `meta.color` | string \| object | 否 | 皮革盔甲染色 / 自定义药水颜色（`"#RRGGBB"` 或 `{r,g,b}`） |
-| `meta.potionEffects` | object[] | 否 | 自定义药水效果（仅药水类物品生效）：`{type, duration?, amplifier?, ambient?, particles?}` |
+| `meta.potionEffects` | object[] | 否 | 自定义药水效果（仅药水类物品生效）：`{type, duration?, amplifier?, ambient?, particles?}`（`type` 为 minecraft 注册键，如 `minecraft:speed`；兼容旧式枚举名） |
 | `meta.skullOwner` | string | 否 | 玩家头颅：玩家名 / UUID / base64 纹理值 |
-| `meta.attributeModifiers` | object[] | 否 | 属性修饰符：`{attribute, amount, operation, slot?}`（operation: `ADD_NUMBER`/`ADD_SCALED_AMOUNT`/`MULTIPLY_SCALED_1`；slot: `mainhand`/`offhand`/`feet`/`legs`/`chest`/`head`/`body`/`any`） |
+| `meta.attributeModifiers` | object[] | 否 | 属性修饰符：`{attribute, amount, operation, slot?}`（`attribute` 为 minecraft 注册键如 `minecraft:attack_damage`，兼容旧式枚举名；operation: `ADD_NUMBER`/`ADD_SCALED_AMOUNT`/`MULTIPLY_SCALED_1`；slot: `mainhand`/`offhand`/`feet`/`legs`/`chest`/`head`/`body`/`any`） |
 
 > 扩展字段（damage/color/potionEffects/skullOwner/attributeModifiers，2026-08-13）：运行时不支持的字段**静默忽略**（跨版本兼容）。

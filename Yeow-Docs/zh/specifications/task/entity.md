@@ -21,7 +21,7 @@
 
 | 任务                          | 请求                                       | 返回                           |
 | ----------------------------- | ------------------------------------------ | ------------------------------ |
-| `entity.getType`              | `{ "uuid": "<uuid>" }`                     | `string` (枚举名，如 `ZOMBIE`) |
+| `entity.getType`              | `{ "uuid": "<uuid>" }`                     | `string` (minecraft 注册键，如 `minecraft:zombie`) |
 | `entity.getName`              | `{ "uuid": "<uuid>" }`                     | `string`                       |
 | `entity.getCustomName`        | `{ "uuid": "<uuid>" }`                     | `string` (空串表示未设置)      |
 | `entity.setCustomName`        | `{ "uuid": "<uuid>", "value": "<name>" }`  | `true`                         |
@@ -85,7 +85,7 @@
 
 ```json
 {
-  "type": "speed",
+  "type": "minecraft:speed",
   "duration": 200,
   "amplifier": 1,
   "ambient": false,
@@ -131,3 +131,5 @@
 > **setTarget 语义**（2026-08-13）：设置 AI 目标——**不保证必然生效**（取决于运行时、实体类型和寻路能力）。
 > 目标为实体（`targetUuid`，`Mob.setTarget`）或位置（`world`+`x`+`y`+`z`，`Pathfinder.moveTo`，可带 `speed` 移动速度）。
 > 需要生物实体（Mob）才生效；非生物/无法寻路的实体静默忽略。
+
+> 涉及值域（实体类型、药水效果等）的格式规则与清单见 [值域附录](../values.md)。

@@ -34,16 +34,6 @@ npm run build
   - 面向 Yeow 生态的分发（用户已装 Yeow 运行时）
   - 多平台目标（未来非 Paper 系运行时）
 
-## 建议：同时上传两种格式
-
-在 Modrinth 等平台一个项目可上传多个文件（不同版本/格式）。推荐：
-
-1. 上传 **`.yeow.zip`** 作为首选文件（标注推荐）
-2. 上传 **`.jar`** 作为兼容文件
-3. 标记 `Folia Support`
-4. 在项目描述中注明前置要求：**需要安装 Yeow 插件作为前置**（https://modrinth.com/plugin/yeow）
-5. 建议同时上传 `yeow.config.json` 或 README 中说明插件声明的[权限](permissions.md)，便于用户评估
-
 用户根据自身服务器情况二选一：装了 Yeow 运行时 → 用 `.yeow.zip`；纯兼容场景 → 用 `.jar`。
 
 ---
@@ -56,7 +46,7 @@ npm run build
 /yeow install <your-plugin-url>
 ```
 
-- **前置**：服务器必须已安装 [Yeow 插件](https://modrinth.com/plugin/yeow)（运行时），否则没有 `/yeow` 命令
+- **前置**：服务器必须已安装 [Yeow 插件](https://hangar.papermc.io/iYeXin/Yeow/versions)（运行时），否则没有 `/yeow` 命令
 - `<url>` 必须**直接指向 `.yeow.zip` 文件**（不是网页页面）。你可以托管在自己的站点（如 GitHub Release）或直接使用 Modrinth 的直链：
   - 网页端：文件下载按钮 → 右键复制链接（通常为 `https://cdn.modrinth.com/data/<project>/versions/<version>/<file>.yeow.zip`）
 - 行为：下载 → 以标准格式 `<name>-<version>.yeow.zip` 保存到 `plugins/Yeow/` → 立即加载（重启后自动扫描保持安装）
@@ -79,7 +69,7 @@ npm run build
 ## 分发检查清单
 
 - [ ] `npm run build` 生成 `.jar` 与 `.yeow.zip`，两者均上传
-- [ ] 项目描述注明前置：Yeow 插件（https://modrinth.com/plugin/yeow）
-- [ ] 说明插件声明的[权限节点](permissions.md)（`fs:server.*` / `fs:outer.*`、`http:*`、`service:registerNative`、`assets:extract` 等）
+- [ ] 项目描述注明前置：Yeow 插件（https://hangar.papermc.io/iYeXin/Yeow/versions）
+- [ ] 说明插件声明的[权限节点](permissions.md)（`fs:server.*` / `fs:outer.*`、`http:*`、`service:registerNative` 等；assets 通道不设权限拦截）
 - [ ] 提供 `/yeow install <直链>` 一键安装示例
 - [ ] 说明数据目录位置（`plugins/<name>/`）与备份机制（`plugins/Yeow/.backup/`）

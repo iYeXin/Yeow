@@ -13,7 +13,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 ```
 
 - 文档（中文）：[Yeow-Docs](Yeow-Docs/) · [文档站点](https://github.com/iyexin/yeow/tree/main/Yeow-Docs)
-- 运行时下载：[Modrinth](https://modrinth.com/plugin/yeow)
+- 运行时下载：[Hangar](https://hangar.papermc.io/iYeXin/Yeow/versions)
 - 开发与贡献：[CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
@@ -57,7 +57,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 完整文档见 [Yeow-Docs/zh/getting-started.md](Yeow-Docs/zh/getting-started.md)。
 
-1. **安装运行时**：将 `yeow-runtime-0.2.0.jar` 放入服务器 `plugins/`
+1. **安装运行时**：将 `yeow-runtime-0.5.0.jar` 放入服务器 `plugins/`
 2. **创建插件**：`npm create yeow@latest -- -y && cd my-plugin && npm install`
 3. **开发**：`npm run dev`（自动下载 Paper、启动热重载）
 4. **构建**：`npm run build` → `dist/<name>-<version>.jar` + `.yeow.zip`
@@ -70,7 +70,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 ## 跨平台
 
 - 插件包是标准 ZIP（`.yeow.zip`，含打包 JS、资源、元信息与权限声明），**不依赖 Java 环境**
-- **Paper 与 [Folia](https://papermc.io/software/folia/) 双平台通用**：同一份 `.yeow.zip` / `.jar` 插件包可直接互换，API 使用方法完全一致；Folia 服务器只需安装 Folia 版 [Yeow 运行时](https://modrinth.com/plugin/yeow)（Modrinth 提供）
+- **Paper 与 [Folia](https://papermc.io/software/folia/) 双平台通用**：同一份 `.yeow.zip` / `.jar` 插件包可直接互换，API 使用方法完全一致；Folia 服务器只需安装 Folia 版 [Yeow 运行时](https://hangar.papermc.io/iYeXin/Yeow/versions)（Hangar 提供）
 - **Folia 深度适配**：`yeow-runtime-folia` 是独立实现——区域驻留调度器、热点迁移、预算控制、非阻塞投递，插件无需任何改动即可自动享受 Folia 的多线程并行优势（详见 [`Yeow-Docs/zh/advanced/folia.md`](Yeow-Docs/zh/advanced/folia.md)）
 - 任何实现[平台规范](Yeow-Docs/zh/specifications/README.md)的运行时都能运行同一份插件；Folia 只是 Yeow 跨平台性的第一个例子，未来还将支持 Fabric / NeoForge 等平台
 - Paper 系（Paper/Purpur/Leaf 等）的 `yeow-runtime` 是官方实现示例

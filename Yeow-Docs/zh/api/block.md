@@ -10,28 +10,26 @@ import { Block, Material } from 'yeow-api';
 
 ```ts
 Block.of('minecraft:stone')                         // 纯数据描述符，无 location
-Block.of('minecraft:water', { level: '8' })         // 带状态（状态值统一为字符串）
+Block.of('minecraft:water', { level: 8 })            // 带状态（值保留类型：数字/布尔/字符串）
 new Block(type, state?, location?)                  // location 可选
 block.type                                          // "minecraft:stone"（快照）
-block.state                                         // { level: "8" } | undefined（快照）
+block.state                                         // { level: 8 } | undefined（快照）
 block.location                                      // Location | undefined —— 世界位置
-block.withState({ waterlogged: 'true' })            // 派生新描述符（原对象不变）
-block.matches('minecraft:water', { level: '8' })    // 类型/状态匹配（忽略空状态差异）
+block.withState({ waterlogged: false })             // 派生新描述符（原对象不变）
+block.matches('minecraft:water', { level: 8 })      // 类型/状态匹配（忽略空状态差异）
 
 // 材料级静态判断（基于 type，委托 Material；不依赖位置/状态）：
 block.isSolid()          // Promise<boolean>
 block.isSolidSync()      // boolean
-block.isLiquid()         // Promise<boolean> — 是否为液体（水/熔岩）
-block.isLiquidSync()     // boolean
 block.isAir()            // Promise<boolean> — 是否为空气
 block.isAirSync()        // boolean
 
 // 世界操作（需要 location，否则报错）：
-block.breakNaturally(itemStack)       // Promise<boolean> — 模拟使用工具自然破坏并掉落物品，不传参数仍产生掉落
+block.breakNaturally(itemStack)       // Promise<boolean> — 模拟使用工具自然破坏并掉落物品，不传参数仍产生掉落，如需模拟空手挖掘，使用 `minecraft:paper` 等占位
 block.breakNaturallySync(itemStack)   // boolean
 ```
 
-状态对应 **Minecraft 原版的方块状态**（键值对枚举，值统一为字符串），如 `minecraft:water[level=8]` → `{ type: "minecraft:water", state: { level: "8" } }`。
+状态对应 **Minecraft 原版的方块状态**（键值对枚举，**值保留原版类型**——数字/布尔/字符串），如 `minecraft:water[level=8]` → `{ type: "minecraft:water", state: { level: 8 } }`、`minecraft:stone[waterlogged=false]` → `{ waterlogged: false }`。
 
 ## 从世界中获取
 
@@ -50,7 +48,7 @@ await b.breakNaturally();
 
 - `type` / `state` / `location` 均为**获取时刻的快照**——之后世界变化不会自动更新
 - **需要最新状态时请重新调用 `world.getBlock(x, y, z)`**（没有 refresh 方法）
-- `isSolid` / `isLiquid` / `isAir` 为**材料级静态判断**（基于类型，状态不影响）——与位置无关，不查询世界
+- `isSolid` / `isAir` 为**材料级静态判断**（基于类型，状态不影响）——与位置无关，不查询世界
 
 ## 放置方块
 
@@ -68,14 +66,15 @@ await world.setBlock(0, 65, 2, Block.of('minecraft:chest', { facing: 'north' }))
 
 ## Material（材料级判断）
 
-`Block` 的 `isSolid` / `isLiquid` / `isAir` 委托 `Material` 上的同名方法；也可直接使用（无需方块实例）：
+`Block` 的 `isSolid` / `isAir` 委托 `Material` 上的同名方法；也可直接使用（无需方块实例）：
 
 ```ts
 Material.isSolid('minecraft:stone');   // Promise<boolean>
 Material.isSolidSync('minecraft:stone'); // boolean
-Material.isLiquid('minecraft:water');  // Promise<boolean> — 原版液体仅水/熔岩
 Material.isAir('minecraft:air');       // Promise<boolean>
 ```
+
+> **已移除 `isLiquid`**（近似语义，见 [Material API](material.md)）。
 
 ## 示例
 

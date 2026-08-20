@@ -67,6 +67,6 @@ Yeow 的目标是成为 **Minecraft 的 Web 标准**：一个开放、跨实现�
 
 ## 愿景
 
-Yeow 的愿景是构造**面向未来的、开放的、属于所有人的创造入口**。
+Yeow 的愿景是构造**面向未来的、开放的、属于所有人的创造起点**。
 
 **YEOW = <span style="color: var(--vp-c-brand-1);">Y</span>our <span style="color: var(--vp-c-brand-1);">E</span>ntry to an <span style="color: var(--vp-c-brand-1);">O</span>pen <span style="color: var(--vp-c-brand-1);">W</span>orld。**

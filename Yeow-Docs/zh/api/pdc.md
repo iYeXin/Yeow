@@ -92,7 +92,7 @@ await pdcSet(uuid, 'score', 1);         // 存为 <插件名>:score（如 myplug
 await pdcSet(uuid, 'minecraft:level', 2);  // 显式命名空间
 ```
 
-> **注意：** key 中的大写字母运行时自动转为小写（如 `MyPlugin.deathLoc` → `myplugin.deathloc`）。允许字符：`a-z` `0-9` `/` `.` `_` `-`。**命名空间由 `yeow` 改为插件名**（2026-08-13）：历史数据若存于 `yeow:` 命名空间下，需用 `yeow:key` 显式访问迁移。
+> **注意：** key 中的大写字母运行时自动转为小写（如 `MyPlugin.deathLoc` → `myplugin.deathloc`）。允许字符：`a-z` `0-9` `/` `.` `_` `-`。**命名空间由 `yeow` 改为插件名**：历史数据若存于 `yeow:` 命名空间下，需用 `yeow:key` 显式访问迁移。
 
 ## 示例
 

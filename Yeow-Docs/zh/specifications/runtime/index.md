@@ -155,9 +155,10 @@ JS 端处理流程：
 | `lifecycle` | 否      | `$send` 返回 `null`（fire-and-forget）           | —                                                          |
 | `log`       | 否      | `$send` 返回 `null`（fire-and-forget）           | —                                                          |
 | `env`       | 否      | `$send` 直接返回环境信息 JSON（同步）            | —                                                          |
-| `dir`       | 否      | `$send` 直接返回目录路径字符串                   | —                                                          |
 | `debug`     | 否      | `$send` 返回 `null`（fire-and-forget）           | —                                                          |
 | `service`   | 是      | 注册/请求/订阅/发布。request 异步，register 同步 | —                                                          |
+| `util`      | 是      | `$send` 阻塞，直到计算完成                       | `$send` 立即返回 `null`，IO 线程完成后发送回调             |
+| `worker`    | 是      | create/load/unload/reload 同步执行（`$_send` 阻塞） | 含 `cb` 时异步执行，完成/失败经回调投递（`r` 为 JSON 字符串或对象） |
 
 ---
 
@@ -172,6 +173,8 @@ JS 端处理流程：
 ```
 
 JS 与运行时的唯一通信入口（规范规定）。**`payload` 为纯 JS 对象**——底层传输格式（JSON 或其他）与 `$_send` 桥接函数均属**内部实现**，实现方自行决策；本规范中的示例以 JSON 呈现。
+
+> **实现边界**：运行时实现中 `$_send` 由 init.js 闭包持有并**从全局对象移除**——插件代码只能访问 `$send`，直接引用 `$_send` 为 `ReferenceError`。
 
 - `channel`：字符串，指定操作分类。可选值见 [消息通道](#消息通道)。
 - `payload`：纯 JS 对象，运行时负责序列化传输。
@@ -240,15 +243,17 @@ boolean
 (url: string, init?: {
   method?: string;
   headers?: Record<string, string>;
-  body?: string | null;
+  body?: string | Uint8Array | null;  // 与 fs.writeFile 同语义：Uint8Array 直接二进制；字符串按 encoding 解释
+  encoding?: 'utf8' | 'base64';        // body 为字符串时：'utf8'（默认）文本 / 'base64' base64 二进制
+  timeout?: number;                    // 超时毫秒数（连接与读取；缺省运行时默认 5s/10s）
 }) => Promise<Response>
 ```
 
 HTTP 客户端，行为尽可能符合 WHATWG Fetch 标准。
 
-**内部实现依赖：** `_registerCallback` + `$send('http', {t:'requestAsync', p:{url,method,headers,body,cb}})`。回调触发时解析为 `Response` 对象。
+**内部实现依赖：** `_registerCallback` + `$send('http', {t:'requestAsync', p:{url,method,headers,body,responseType:'base64',timeout?,cb}})`。回调触发时解析为 `Response` 对象。
 
-返回的 `Response` 对象结构：
+**响应体以 base64 缓存原始字节**（`responseType: 'base64'`），解码按需触发：
 
 ```ts
 interface Response {
@@ -256,12 +261,28 @@ interface Response {
   status: number;        // HTTP 状态码
   statusText: string;    // "OK" 或 "Error"
   headers: { get(name: string): string | undefined };
-  text(): Promise<string>;
-  json(): Promise<any>;
+  base64(): Promise<string>;              // 原始 base64（零解码）
+  bytes(): Promise<Uint8Array>;           // 原始字节（Uint8Array）
+  arrayBuffer(): Promise<ArrayBuffer>;    // 原始字节（标准 ArrayBuffer）
+  text(): Promise<string>;                // 经 TextDecoder 做 UTF-8 解码（小载荷 JS 直转、超阈值 util 通道）
+  json(): Promise<any>;                   // 经 TextDecoder 解码后 JSON.parse
 }
 ```
 
-**注意：** 实现不要求支持 `ReadableStream`、`blob()`、`arrayBuffer()` 等高级特性。
+**注意：** 实现不要求支持 `ReadableStream`、`blob()` 等高级特性。
+
+### `TextEncoder` / `TextDecoder`
+
+**实现要求存在**（Web API 语义，utf-8）：
+
+```ts
+new TextEncoder().encode(str: string): Uint8Array
+new TextDecoder('utf-8').decode(bytes: Uint8Array): string
+```
+
+- 当前仅支持 `utf-8`；传入其他编码抛 `RangeError`。
+- `TextDecoder` 非法 UTF-8 序列替换为 `U+FFFD`。
+- **内部实现不作要求**：具体是否用底层通道、阈值等由实现自决（当前实现 ≤100 字节且 ≤50 字符纯 JS 直转，超阈值经 `util` 通道 `encode.utf8` / `decode.utf8`——此策略不构成规范约束）。
 
 > [!WARNING]
 > **`fetch` 依赖 `http:requestAsync` 权限**：`fetch` 的实现基于 http 通道的 `requestAsync`（`$send('http', {t:'requestAsync', ...})`）。插件未声明 `http:*`（或 `http:requestAsync`）权限时，运行时必须返回 `Permission denied: http:requestAsync`（经回调投递），`fetch` 的 Promise reject。见[通道权限](#通道权限敏感节点默认拒绝)。
@@ -281,7 +302,7 @@ clearInterval(id: string): void
 - `ms` 精度为毫秒，不支持小于 1ms 的延迟（`setInterval(fn, 0)` 按 1ms 处理）
 - **内部实现依赖：** `_registerCallback` + `$send('timer', {type:'timeout'|'interval'|'clear', cb, delay})`
 - `setInterval` 的回调以 `persistent: true` 注册；`clearTimeout`/`clearInterval` 通过 `_unregisterCallback` + `$send('timer', {type:'clear', cb})` **取消 Java 侧定时任务**（仅本地注销会导致 interval 周期任务永久空转）
-- 定时器回调投递格式：`{ "t": "cb", "p": "<id>", "r": null }`（空结果）
+- 定时器回调投递格式：`{ "t": "cb", "p": "<id>", "r": true }`（空结果，回调实参被 JS 定时器包装忽略）
 
 ### `console`
 
@@ -300,7 +321,7 @@ console.info(...args: any[]): void
 () => string | null
 ```
 
-仅在 `$dev` 为 `true` 时有效。返回当前正在执行的回调注册时的调用栈字符串。
+仅在 `$dev` 为 `true` 时有效。返回当前正在执行的回调的调用链节点对象（内部结构，含注册时调用栈；供 `_attachCbStack` / `_attachNode` 使用）。
 
 **用途：** 在异步操作失败时（如 `post()` 的 Promise reject），出错点通常不在注册回调的代码行。此函数返回的栈信息用于增强异常堆栈，帮助开发者追踪原始调用位置。
 
@@ -352,7 +373,7 @@ console.info(...args: any[]): void
 Record<string, Array<{ cbId: string; handler: Function; manualRelease?: boolean }>>
 ```
 
-事件处理器注册表。应用代码通过 `_registerCallback`（persistent: true）注册事件处理器，并将回调 ID 通过 `event.subscribe` 任务提交到运行时。运行时投放事件时无需直接操作此表。
+事件处理器注册表。**由 yeow-api `event.ts` 维护（非运行时注入；首次 `eventOn` 时在 JS 侧惰性创建）**。应用代码通过 `_registerCallback`（persistent: true）注册事件处理器，并将回调 ID 通过 `event.subscribe` 任务提交到运行时。运行时投放事件时无需直接操作此表。
 
 每个条目保存了回调 ID（用于事件 complete 时发送 `event.complete`）、处理器函数引用（用于 `eventOff` 的引用比较）、以及是否启用手动 complete 模式。
 
@@ -393,9 +414,10 @@ string[]
 | `lifecycle` | 生命周期确认 / 资源回收 | 直接处理                     | 否      | [lifecycle 通道](../message/lifecycle.md) |
 | `log`       | 日志                    | 直接处理                     | 否      | [log 通道](../message/log.md)             |
 | `env`       | 运行时环境信息 + 微秒时间戳 | 直接处理（同步）         | 否      | —                                         |
-| `dir`       | 插件数据目录路径        | 直接处理                     | 否      | —                                         |
 | `debug`     | 调试 / 错误上报 / Ping  | 直接处理                     | 否      | —                                         |
 | `service`   | 服务注册/请求/订阅/发布 | 直接处理 / 跨线程路由        | 是      | [service 通道](../message/service.md)     |
+| `util`      | gzip + UTF-8 ↔ 字节转换 | 直接处理。异步时使用 IO 线程 | 是      | [util 通道](../message/util.md)           |
+| `worker`    | 虚拟插件（Worker）控制/消息 | 直接处理（内部通道，不受权限模型约束） | 是 | [worker 通道](../message/worker.md)   |
 
 **通道分发原则：**
 - `task` 通道的消息进入调度器，按优先级和时间预算逐 tick 执行。所有插件的任务统一调度。
@@ -413,7 +435,8 @@ string[]
 | `fs:server.*` / `fs:outer.*`   | fs 通道 `server` / `outer` 前缀节点（服务器根 / 任意路径）；`fs:plugin.*` 节点（插件数据目录）免声明 | `["fs:server.*"]` 或 `["fs:server.readFile"]` |
 | `http:*`                       | http 全部操作（含 `fetch` 使用的 `requestAsync`）                                          | `["http:*"]` 或 `["http:requestAsync"]`       |
 | `service:registerNative`       | 注册原生服务（spawn 子进程）                                                               | `["service:registerNative"]`                  |
-| `assets:extract` / `assets:extractDir`       | 解压资源到磁盘（单文件 / 目录，两个独立节点）                 | `["assets:extractDir"]` |
+
+> `assets` 通道不设权限拦截：只读打包资源或解压到本插件数据目录内（解压目标强制限定在 `plugins/<插件名>/`，越界返回错误）。
 
 规则：
 
@@ -421,7 +444,7 @@ string[]
 - **通配**：声明 `channel:*` 命中该通道全部节点；**整组通配** `channel:段.*` 命中该前缀全部节点；**节点级**：声明 `channel:段.op` 只命中该操作
 - **默认允许**：上述默认拒绝节点之外的节点（`service:request`、`service:register`、`assets:read`、`assets:readBase64`、`fs:plugin.readFile` 等）无需声明
 - **拒绝行为**：未声明调用返回 `Permission denied: <channel>:<op>`——同步调用以错误 JSON 返回；含 `cb` 的异步调用通过回调投递 `{"err": "Permission denied: <channel>:<op>"}`（JS 侧 Promise reject）
-- `task` / `timer` / `log` / `env` / `dir` / `debug` / `lifecycle` 通道不受约束
+- `task` / `timer` / `log` / `env` / `debug` / `lifecycle` 通道不受约束
 
 ### `env` 通道
 
@@ -433,8 +456,9 @@ string[]
   "memory": 17179869184,
   "arch": "windows-x64",
   "minecraftVersion": "1.21.4",
-  "yeow": { "platform": "paper", "version": "0.2.0" },
-  "now": 1723100000000000
+  "yeow": { "platform": "paper", "version": "0.5.0" },
+  "now": 1723100000000000,
+  "pluginDir": "plugins/my-plugin"
 }
 ```
 
@@ -446,3 +470,4 @@ string[]
 | `minecraftVersion` | string | Minecraft 版本（如 `1.21.4`） |
 | `yeow` | object | 运行时信息：`{ "platform": "paper", "version": "<运行时版本>" }` |
 | `now` | number | **epoch 微秒**时间戳（通信开销在微秒级，纳秒无意义） |
+| `pluginDir` | string | 插件数据目录路径（如 `plugins/<pluginName>`；原 `dir` 通道并入，Worker 中为主插件目录） |

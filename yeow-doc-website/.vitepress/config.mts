@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitepress'
+﻿import { defineConfig } from 'vitepress'
 
 // 文档源：docs/ 是 Yeow-Docs/zh 的目录联接（junction / symlink，见 scripts/setup-docs.mjs）。
 // 零复制、始终同步；preserveSymlinks 保证模块路径保持在项目根内，裸导入（vue 等）可正常解析。
@@ -36,7 +36,7 @@ export default defineConfig({
             { text: '规范', link: '/specifications/', activeMatch: '/specifications/' },
             { text: '路线图', link: '/todo', activeMatch: '/todo' },
             { text: 'GitHub', link: 'https://github.com/iyexin/yeow' },
-            { text: '下载运行时', link: 'https://modrinth.com/plugin/yeow' },
+            { text: '下载运行时', link: 'https://hangar.papermc.io/iYeXin/Yeow/versions' },
         ],
         sidebar: [
             {
@@ -44,6 +44,7 @@ export default defineConfig({
                 items: [
                     { text: '概览', link: '/overview' },
                     { text: '快速开始', link: '/getting-started' },
+                    { text: '环境能力', link: '/environment' },
                     { text: 'AI 启动指南', link: '/ai-agent' },
                     { text: 'CLI 参考', link: '/cli' },
                     { text: '构建与分发', link: '/distribution' },
@@ -178,6 +179,7 @@ export default defineConfig({
                 collapsed: true,
                 items: [
                     { text: '规范总览', link: '/specifications/' },
+                    { text: '值域附录', link: '/specifications/values' },
                     { text: 'Java 插件集成', link: '/specifications/java-api' },
                     {
                         text: '消息通道',
@@ -193,6 +195,7 @@ export default defineConfig({
                             { text: 'Log', link: '/specifications/message/log' },
                             { text: 'Lifecycle', link: '/specifications/message/lifecycle' },
                             { text: 'Debug', link: '/specifications/message/debug' },
+                            { text: 'Util', link: '/specifications/message/util' },
                             { text: 'Worker', link: '/specifications/message/worker' },
                         ],
                     },

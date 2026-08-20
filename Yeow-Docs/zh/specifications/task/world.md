@@ -77,6 +77,7 @@
 |------|------|------|
 | `world.getChunkAt` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `{ "x": <int>, "z": <int>, "world": "<name>" }`（取区块，可能触发加载） |
 | `world.isChunkLoaded` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean` |
+| `world.isChunkGenerated` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean`（区块已生成，未加载/未生成返回 false） |
 | `world.loadChunk` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean`（强制加载） |
 | `world.unloadChunk` | `{ "world": "<name>", "x": <int>, "z": <int> }` | `boolean` |
 
@@ -96,8 +97,8 @@
 
 | 任务 | 请求 | 返回 |
 |------|------|------|
-| `world.getBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `{ "type": "<key>", "x": <int>, "y": <int>, "z": <int>, "state": { "<状态键>": "<值>" }, "world": "<name>" }`（state 为空对象时表示无状态；world 为所属世界名，用于构造 location） |
-| `world.setBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int>, "blockType": "<material>", "state": { "<键>": "<值>" }? }` | `true`（state 存在时按 `type[键=值,...]` 构造 BlockData 放置；传入 Block 时忽略其 location） |
+| `world.getBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int> }` | `{ "type": "<key>", "x": <int>, "y": <int>, "z": <int>, "state": { "<状态键>": <string\|number\|boolean> }, "world": "<name>" }`（state 为空对象时表示无状态；值保留类型——布尔 `waterlogged: false`、数字 `level: 8`、枚举串 `facing: "north"`；world 为所属世界名） |
+| `world.setBlock` | `{ "world": "<name>", "x": <int>, "y": <int>, "z": <int>, "blockType": "<material>", "state": { "<键>": <string\|number\|boolean> }? }` | `true`（state 存在时按 `type[键=值,...]` 构造 BlockData 放置；值按字面量原样写入——`waterlogged=false`、`level=8`；传入 Block 时忽略其 location） |
 
 `type` 和 `blockType` 使用 Material 命名空间 key（如 `minecraft:stone`），也兼容简写 `stone`。
 
@@ -116,8 +117,8 @@
 | 任务 | 请求 | 返回 |
 |------|------|------|
 | `material.isSolid` | `{ "type": "<key>" }` | `boolean`（Paper 系 `Material.isSolid()`） |
-| `material.isLiquid` | `{ "type": "<key>" }` | `boolean`（Paper 系无 `isLiquid`，实现为 `WATER`/`LAVA` 枚举判断——原版液体方块材质仅此两种） |
 | `material.isAir` | `{ "type": "<key>" }` | `boolean`（Paper 系 `Material.isAir()`） |
+| `material.getMaxDurability` | `{ "type": "<key>" }` | `int`（最大耐久；非耐用品返回 `0`；未知类型返回错误） |
 
 ---
 
@@ -140,7 +141,7 @@
 - **请求**：`{ "world": "<name>", "type": "<entityType>", "x": <double>, "y": <double>, "z": <double> }`
 - **返回**：`string` (实体 UUID)
 
-`type` 为 Paper 系 EntityType 枚举名（如 `ZOMBIE`、`CREEPER`）。
+`type` 为 **minecraft 注册键**（如 `minecraft:zombie`、`minecraft:creeper`——与 `entity.getType` 输出一致）；兼容旧式 Bukkit 枚举名（如 `ZOMBIE`、`CREEPER`）。
 
 ### `world.spawnItem`
 
@@ -179,7 +180,7 @@
 
 | 任务 | 请求 | 返回 |
 |------|------|------|
-| `world.dropItem` | `{ "world": "<name>", "x": <double>, "y": <double>, "z": <double>, "itemType": "<material>", "amount": <int> }` | `true` |
+| `world.dropItem` | `{ "world": "<name>", "x": <double>, "y": <double>, "z": <double>, "item": <ItemStack> }` | `true` |
 | `world.strikeLightning` | `{ "world": "<name>", "x": <double>, "y": <double>, "z": <double> }` | `true` |
 | `world.strikeLightningEffect` | `{ "world": "<name>", "x": <double>, "y": <double>, "z": <double> }` | `true` |
 | `world.createExplosion` | `{ "world": "<name>", "x": <double>, "y": <double>, "z": <double>, "power": <float>, "setFire": <bool>, "breakBlocks": <bool> }` | `true` |
@@ -208,4 +209,6 @@
 | `world.setBorderWarning` | `{ "world": "<name>", "distance": <int>?, "time": <int>? }` | `true`（警告距离 / 时间） |
 | `world.setBorderMoving` | `{ "world": "<name>", "from": <double>, "to": <double>, "seconds": <long> }` | `true`（平滑移动） |
 
-玩家侧客户端边界：`player.setBorder`（见 [player 任务](player.md)）。
+> 玩家侧客户端边界 `player.setBorder` 已移除——仅保留服务端世界边界（`world.setBorder*`，对全体玩家生效）。
+
+> 涉及值域（方块/物品/材料、实体类型、生物群系、音效、粒子、游戏规则、难度、环境、世界类型等）的格式规则与清单见 [值域附录](../values.md)。

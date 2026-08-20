@@ -74,6 +74,7 @@
 | `player.getWorld` | `{ "uuid": "<uuid>" }` | `string` (世界名) |
 | `player.getLocation` | `{ "uuid": "<uuid>" }` | `{ "x": <double>, "y": <double>, "z": <double>, "yaw": <double>, "pitch": <double>, "world": "<name>" }` |
 | `player.teleport` | `{ "uuid": "<uuid>", "x": <double>, "y": <double>, "z": <double>, "yaw": <double>, "pitch": <double>, "world": "<name>" }` | `true` |
+| `player.sendBlockChange` | `{ "uuid": "<uuid>", "x": <double>, "y": <double>, "z": <double>, "world": "<name>"?, "blockType": "<key>", "state": { ... }? }` | `true` | 向玩家发送假方块变化（仅客户端视觉，不改变真实世界）。`blockType` 为方块 key（输入宽松：可省略 `minecraft:`、大小写不限）；`state` 为方块状态键值对（值保留类型——数字/布尔/字符串）；`world` 省略时默认玩家所在世界 |
 | `player.getDisplayName` | `{ "uuid": "<uuid>" }` | `string` |
 | `player.setDisplayName` | `{ "uuid": "<uuid>", "value": "<name>" }` | `true` |
 
@@ -137,7 +138,6 @@
 |------|------|------|------|
 | `player.sendTabHeader` | `{ "uuid": "<uuid>", "header": "<text>"?, "footer": "<text>"? }` | `true` | Tab 列表 header/footer（MiniMessage；null 清空对应栏） |
 | `player.setPlayerListName` | `{ "uuid": "<uuid>", "name": "<text>"? }` | `true` | Tab 列表显示名（null 恢复默认） |
-| `player.setBorder` | `{ "uuid": "<uuid>", "size": <double>?, "centerX": <double>?, "centerZ": <double>? }` | `true` | 客户端世界边界（null 重置为服务端边界） |
 
 `ItemStack` 返回格式（**纯数据**，值为读取时刻的快照）：
 
@@ -163,3 +163,5 @@
 
 - [MiniMessage](https://docs.advntr.dev/minimessage/format) 格式（以 `<` 开头）
 - 传统 `§` 段分符格式（向后兼容）
+
+> 涉及值域（游戏模式、音效、药水效果、附魔、ItemFlag、伤害类型等）的格式规则与清单见 [值域附录](../values.md)。
