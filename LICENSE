@@ -5,7 +5,7 @@ This repository is a **multi-license monorepo**. Each component carries its own 
 | Component                                    | License                                                                 |
 | -------------------------------------------- | ------------------------------------------------------------------------ |
 | `yeow-runtime` / `yeow-api` / `create-yeow` / `yeow-template` / `yeow-dev` | MIT（see below） |
-| `Yeow-Docs` / `yeow-doc-website`             | MIT（see below）                                                         |
+| `yeow-doc-website`（含 `docs/cn/` 文档）    | MIT（see below）                                                         |
 | `quickjs-wrapper`                            | **Apache-2.0**（see [quickjs-wrapper/LICENSE](quickjs-wrapper/LICENSE)） |
 | `quickjs-wrapper/native/quickjs`（QuickJS engine，git submodule） | MIT（see [quickjs-wrapper/native/quickjs/LICENSE](quickjs-wrapper/native/quickjs/LICENSE)） |
 

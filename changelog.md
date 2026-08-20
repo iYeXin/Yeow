@@ -66,6 +66,13 @@
 - **移除 api/http-server.md**「典型场景：从 `assets` 读取资源包等二进制文件并暴露下载 URL。」及下方示例（完整闭环小节同步去除「见上例」引用）
 - 验证：`tsc --noEmit`（yeow-api）通过；`mvn package`（含测试）通过
 
+### 开发模式热重载：允许重新加载权限
+
+- **修改 `permissions` 后开发热重载即生效**（此前只重载代码、不更新权限）：构建脚本（build.js）把 `computedPermissions` 回写至 `yeow.config.json`；dev-server 随 `hot-reload` 消息带上权限，运行时 `RuntimeCore.handleHotReload` 在重载代码前用新权限集刷新插件（`PluginThread.updatePermissions`——权限集由 final 不可变改为 volatile 可替换）——强杀重建路径同样继承新权限
+- 生产行为不变：仍需 `/yeow reload` 或重启服务器
+- 文档：permissions.md（热重载说明更新）
+- 产物：模板内置 `yeow-runtime-0.5.0.jar` 已重新构建并同步
+
 ## 2026-08-19
 
 ### fetch arrayBuffer + init.js 拆分为 polyfill.js（TextEncoder/TextDecoder）

@@ -23,8 +23,6 @@ npm install
 
 ```bash
 npm run dev                    # 启动 Paper 服务器 + 热重载
-npm run dev -- -y              # 跳过交互，自动接受 EULA
-npm run dev -- --stop=30m      # 30 分钟后自动停止
 ```
 
 编辑 `src/` 或 `assets/` 下的文件自动触发热重载，无需重启服务器。

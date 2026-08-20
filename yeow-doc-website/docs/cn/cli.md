@@ -36,7 +36,6 @@ npm create yeow@latest [-- options]
 ```bash
 npm create yeow@latest -- -y                    # JS 项目（默认）
 npm create yeow@latest -- -y --ts               # TS 项目
-npm create yeow@latest -- -y --ts --no-typecheck # TS 项目跳过类型检查
 npm create yeow@latest -- -y --name=survival --author=Notch
 ```
 
@@ -63,13 +62,13 @@ npm run dev [-- options]
 npm run dev -- --eula --keep --timeout=2m --wait=30s --outfile=log.txt
 ```
 
-| 参数 | 说明 |
-|------|------|
-| `--eula` | 自动接受 EULA（headless 必需） |
+| 参数                     | 说明                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `--eula`                 | 自动接受 EULA（headless 必需）                                                                         |
 | `--timeout=<N><s\|m\|h>` | **加载超时**（默认 `2m`）：启动到加载完成（`Done (...)!`）的时限；超时直接退出并提示检查网络或加大超时 |
-| `--wait=<N><s\|m\|h>` | **加载成功后等待**（默认 `30s`）：时间到后命令自动结束（控制权交回 AI） |
-| `--outfile=<path>` | 服务器日志输出文件（缺省输出到控制台） |
-| `--keep` | 命令结束后**保留服务器子进程**（否则关闭） |
+| `--wait=<N><s\|m\|h>`    | **加载成功后等待**（默认 `30s`）：时间到后命令自动结束（控制权交回 AI）                                |
+| `--outfile=<path>`       | 服务器日志输出文件（缺省输出到控制台）                                                                 |
+| `--keep`                 | 命令结束后**保留服务器子进程**（否则关闭）                                                             |
 
 流程与输出：
 
@@ -106,7 +105,7 @@ npm run dev -- --eula --keep --timeout=2m --wait=30s --outfile=log.txt
 插件源码经 esbuild 打包为 `dist/.dev/main.js`（附带 `main.js.map`）。运行时错误通过 WebSocket 上报 dev-server 后，`source-map` 库把编译后位置反解回**原始源码**：
 
 ```
-  ⛔ JS Error [my-yeow-plugin]
+   JS Error [my-yeow-plugin]
   'test1' is not defined
   at src/index.js:29:0
         27| });

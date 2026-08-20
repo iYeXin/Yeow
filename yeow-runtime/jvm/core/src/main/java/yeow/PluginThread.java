@@ -27,7 +27,7 @@ public class PluginThread implements Runnable, PluginEntity {
     private final Logger log;
     /** 依附于本插件的 Worker（虚拟插件）：key = worker 名；主插件卸载时连带卸载。 */
     private final ConcurrentHashMap<String, WorkerThread> workers = new ConcurrentHashMap<>();
-    private final Set<String> permissions;
+    private volatile Set<String> permissions;
     private final Map<String, String> nativeHashes; // 打包后路径(assets/<id>/...) → SHA-256（yeow.json native 声明）
     private volatile QuickJSContext ctx;
     private volatile boolean running = false;
@@ -108,6 +108,11 @@ public class PluginThread implements Runnable, PluginEntity {
 
     /** 权限快照（重建实体用，不可变）。 */
     Set<String> permissions() { return permissions; }
+
+    /** 更新权限集（开发模式热重载时由运行时按新构建包的 computedPermissions 刷新）。 */
+    public void updatePermissions(Set<String> perms) {
+        this.permissions = perms != null ? Set.copyOf(perms) : Set.of();
+    }
 
     /** 原生服务 SHA-256 声明（重建实体用，不可变）。 */
     Map<String, String> nativeHashes() { return nativeHashes; }

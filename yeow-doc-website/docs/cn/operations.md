@@ -6,7 +6,7 @@
 
 运行时提供 `/yeow` 命令，支持 Tab 补全：
 
-> **权限**：`yeow.admin`（管理命令：load / install / update / unload / uninstall / reload）与 `yeow.profile`（性能命令）均由运行时注册，**默认授予 OP**（`default: op`，可在权限插件中单独调整）。
+> **权限**：`yeow.admin`（管理命令：load / install / update / unload / uninstall / reload）与 `yeow.profile`（性能命令）均由运行时注册，**默认授予 OP**（可在权限插件中单独调整）。
 
 | 命令                                     | 说明                                                                                                                                                                                 |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -16,7 +16,7 @@
 | `/yeow unload <plugin\|all>`             | 卸载插件（与热重载相同的卸载逻辑，5s 强制终止）                                                                                                                                      |
 | `/yeow uninstall <plugin>`               | 卸载并把 `plugins/Yeow/` 下对应 `.yeow.zip` 移入 `plugins/Yeow/.backup/`（数据目录 `plugins/<plugin>/` 需手动清理）                                                                  |
 | `/yeow reload <plugin\|all> [path\|url]` | 重新加载。`<plugin>` 可选 `path` 或 `url` 从新来源加载（URL 为临时，不持久化）；`all` 按原路径全部重载                                                                               |
-| `/yeow approve <code>`                   | 用控制台提示中的**一次性批准码**批准插件（声明原生服务的插件被拒后，批准会**自动加载**它；code 用后作废，关闭时写回 `approve.json`）                                                                |
+| `/yeow approve <code>`                   | 用控制台提示中的**一次性批准码**批准插件（声明原生服务的插件被拒后，批准会**自动加载**它；code 用后作废，关闭时写回 `approve.json`）                                                 |
 | `/yeow profile`                          | 性能快照（需 `profile.enabled: true` 开启全量分析）                                                                                                                                  |
 | `/yeow track <plugin> <seconds>`         | 单插件深度追踪（需 `profile.enabled: true`）                                                                                                                                         |
 
@@ -85,10 +85,10 @@ folia:
 
 ## 部署形态速查
 
-| 形态 | 放置位置 | 说明 |
-| --- | --- | --- |
-| 标准 JAR | `plugins/` | 与原生 Java 插件部署一致（需同时安装 Yeow 运行时） |
-| `.yeow.zip` | `plugins/Yeow/` | 启动自动扫描加载；**平台无关**（Paper / Folia 通用） |
-| `/yeow install <url>` | `plugins/Yeow/` | 一键下载安装，重启保留 |
+| 形态                  | 放置位置        | 说明                                                 |
+| --------------------- | --------------- | ---------------------------------------------------- |
+| 标准 JAR              | `plugins/`      | 与原生 Java 插件部署一致（需同时安装 Yeow 运行时）   |
+| `.yeow.zip`           | `plugins/Yeow/` | 启动自动扫描加载；**平台无关**（Paper / Folia 通用） |
+| `/yeow install <url>` | `plugins/Yeow/` | 一键下载安装，重启保留                               |
 
 分发与检查清单见[构建与分发](distribution.md)。

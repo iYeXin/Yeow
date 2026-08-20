@@ -658,6 +658,15 @@ public class RuntimeCore {
         var code = Files.readString(java.nio.file.Path.of(codeFile));
         var pt = plugins.get(pname);
         if (pt == null) { LOG.warning("Unknown plugin for hot reload: " + pname); return; }
+        // 开发模式热重载允许重新加载权限：以新构建包的 computedPermissions 覆盖权限集——
+        // 在 reloadInternal 之前刷新，使重载后的代码立即按新权限校验；强杀重建路径
+        // （rebuildPluginEntity 读 pt.permissions()）同样继承更新后的权限。
+        if (obj.has("permissions") && obj.get("permissions").isJsonArray()) {
+            var perms = new java.util.LinkedHashSet<String>();
+            for (var el : obj.getAsJsonArray("permissions")) perms.add(el.getAsString());
+            if (pt instanceof PluginThread t) t.updatePermissions(perms);
+            LOG.info("Hot reload: permissions updated for " + pname + " (" + perms.size() + " nodes)");
+        }
         // 命令注销/事件退订/平台资源清理由 reload → cleanupResources → host.purgePlatformResources 完成
         if (serviceManager != null) serviceManager.purgePluginServices(pname);
         if (obj.has("assetsDir") && !obj.get("assetsDir").isJsonNull()) {

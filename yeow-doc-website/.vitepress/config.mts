@@ -1,7 +1,8 @@
 ﻿import { defineConfig } from 'vitepress'
 
-// 文档源：docs/ 是 Yeow-Docs/zh 的目录联接（junction / symlink，见 scripts/setup-docs.mjs）。
-// 零复制、始终同步；preserveSymlinks 保证模块路径保持在项目根内，裸导入（vue 等）可正常解析。
+// 文档源：docs/cn/ 为仓库内真实的文档目录（由原 Yeow-Docs/zh 迁移而来，直接提交，无构建复制）。
+// 「上次修改日期」由 VitePress 内置 VPLastUpdated 渲染（themeConfig.lastUpdated）——
+// 读取的是已入库文件的 git 提交日期，故不写回任何 md、源零污染。
 // base：站点部署在 /v1/ 路径下（版本化文档，后续 v2 可并存）。
 const base = '/yeow/v1/'
 
@@ -11,7 +12,7 @@ export default defineConfig({
     description: '用 TypeScript 写 Minecraft 跨平台插件（Paper / Folia）· QuickJS 引擎',
     site: 'https://yexin.wiki/yeow/v1/',
     base,
-    srcDir: 'docs',
+    srcDir: 'docs/cn',
     appearance: 'dark',
     cleanUrls: true,
     head: [
@@ -20,13 +21,9 @@ export default defineConfig({
         ['meta', { name: 'og:url', content: 'https://github.com/iyexin/yeow' }],
         ['link', { rel: 'icon', type: 'image/svg+xml', href: `${base}favicon.svg` }],
     ],
-    vite: {
-        resolve: {
-            preserveSymlinks: true,
-        },
-    },
     themeConfig: {
         logo: '/favicon.svg',
+        lastUpdated: { text: '最后更新于' },
         nav: [
             { text: '指南', link: '/overview', activeMatch: '/overview|/getting-started|/ai-agent|/cli|/runtime-warning|/permissions|/operations' },
             { text: 'API', link: '/api/', activeMatch: '/api/' },

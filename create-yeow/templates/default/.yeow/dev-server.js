@@ -260,14 +260,20 @@ function startHotReload() {
                 const compiled = resolve(ROOT, 'dist', '.dev', 'main.js');
                 if (existsSync(compiled)) {
                     const devAssets = resolve(ROOT, 'dist', '.dev', '.assets');
+                    // 权限随热重载一并刷新：构建脚本（build.js）已把 computedPermissions 回写至 yeow.config.json
+                    let permissions = [];
+                    try {
+                        permissions = JSON.parse(readFileSync(resolve(ROOT, 'yeow.config.json'), 'utf-8')).computedPermissions || [];
+                    } catch {}
                     broadcast({
                         type: 'hot-reload',
                         plugin: cfg.name,
                         codeFile: compiled.replace(/\\/g, '/'),
                         assetsDir: existsSync(devAssets) ? devAssets.replace(/\\/g, '/') : null,
+                        permissions,
                     });
                     _consumer = null;
-                    ok('Hot reload sent via WebSocket');
+                    ok('Hot reload sent via WebSocket' + (permissions.length ? ` (permissions ${permissions.length})` : ''));
                 }
             } catch (e) {
                 fail('Build failed: ' + e.message);

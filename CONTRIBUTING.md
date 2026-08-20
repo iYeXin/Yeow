@@ -37,8 +37,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 | `quickjs-wrapper` | QuickJS JVM 封装 | Gradle + CMake（详见下文） |
 | `yeow-tools` | 开发基准/诊断工具 | `mvn package`（独立，不依赖运行时） |
 | `yeow-dev` | 构建期虚拟模块（空 npm 包） | 无构建；发布 `npm publish`（构建时被 esbuild 拦截，不实际加载） |
-| `Yeow-Docs` | 文档源 | 无构建；直接编辑 Markdown |
-| `yeow-doc-website` | 文档站点 | `npm run build`（`docs/` 是指向 `Yeow-Docs/zh` 的目录联接） |
+| `yeow-doc-website` | 文档源 + 文档站点 | 文档目录 `docs/cn/`（仓库内直接提交）；`npm run build` 产出 `/v1/` 站点 |
 
 ---
 
@@ -121,16 +120,17 @@ cp target/yeow-template-0.5.0.jar ../create-yeow/templates/default/.yeow/assets/
 
 ## 文档维护
 
-### Yeow-Docs（文档源）
+### docs/cn（中文文档源，位于 yeow-doc-website 内）
 
 - 按现有结构编辑：`getting-started.md` / `api/*` / `advanced.md` / `specifications/*` 等
 - 相对链接保持 `.md` 后缀（站点构建时自动重写）
 - 新增文档时同步更新 `README.md`（文档地图）与站点侧边栏（见下）
+- **「上次修改」由 VitePress 内置 `VPLastUpdated` 渲染（读取已入库文件的 git 提交日期），无需手动写日期**
 
 ### yeow-doc-website（站点）
 
-- `docs/` 是 `Yeow-Docs/zh` 的 **junction/symlink**（`npm install` 自动创建，脚本 `scripts/setup-docs.mjs`），**不要直接编辑站点内文件**
-- 修改 `Yeow-Docs` 后站点立即生效；导航/侧边栏在 `.vitepress/config.mts`
+- `docs/` 为仓库内真实的文档目录（多语言根），中文文档在 `docs/cn/`（由原 `Yeow-Docs/zh` 迁移，直接提交，**无构建复制/无 junction**）——直接编辑 `docs/cn/` 下的文件
+- 修改后重新 `npm run dev/build` 即生效；导航/侧边栏在 `.vitepress/config.mts`
 - 预览：`cd yeow-doc-website && npm run dev`（站点运行在 `/v1/` 路径）
 - 构建：`npm run build`
 

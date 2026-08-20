@@ -57,10 +57,10 @@ npm install --save-dev yeow-api
 
 ### 两个声明的分工
 
-| 声明               | 作用域                              | 用途                                                                                                                                                                                                                                  |
-| ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 声明               | 作用域                              | 用途                                                                                                                                                                                                                                                                     |
+| ------------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `peerDependencies` | 使用者侧（npm 安装期 + **构建期**） | 契约：使用者的插件必须有 yeow-api。范围不重叠时 npm 会为包安装独立 yeow-api 副本——**多副本可安全共存**（见下文「构建时的自动处理」）。**同时是构建器识别依赖项的标记**——存在 `assets/` 且 peer 含 `yeow-api` 的包才会参与资产打包与权限合并（漏声明 → 资源静默不进 JAR） |
-| `devDependencies`  | 开发期（作者侧）                    | 独立开发时的类型/提示；**不随包发布**，不影响运行时                                                                                                                                                                                   |
+| `devDependencies`  | 开发期（作者侧）                    | 独立开发时的类型/提示；**不随包发布**，不影响运行时                                                                                                                                                                                                                      |
 
 **版本策略（两个范围、各司其职，不必相同）**：
 
@@ -85,32 +85,7 @@ npm install --save-dev yeow-api
 
 - 节点级（`fs:server.readFile`）、整组通配（`fs:server.*`）与通道通配（`fs:*`）均可；未声明调用返回 `Permission denied: <node>`（异步 API 为 Promise reject）
 - 其余节点（`service:request`、`assets:read`、`fs.*` 等）默认允许
-- 权限在插件**加载时**读取并固定；使用者修改 `permissions` 后需重新构建并**完整重载插件**（`/yeow reload` 或重启服务器）才生效——开发模式热重载不更新权限
-
-### 包作者必须在 README 中说明所需权限
-
-**凡是包内用到上述敏感能力，README 必须注明使用者需要声明哪些权限节点**——否则使用者的插件加载后调用会直接返回 `Permission denied`，且加载日志中的权限清单不含对应节点，难以排查。约定格式：
-
-```md
-## 权限
-
-本包需要在使用者插件的 `yeow.config.json` 中声明（构建后写入 yeow.json）：
-
-```json
-{
-    "permissions": ["service:registerNative", "fs:server.readFile", "http:requestAsync"]
-}
-```
-
-| 节点                     | 用途                     |
-| ------------------------ | ------------------------ |
-| `service:registerNative` | 启动图片处理原生子进程   |
-| `fs:server.readFile`     | 读取服务器根目录缓存文件 |
-| `http:requestAsync`      | 下载远程模型（`fetch`）  |
-
-缺少声明时对应功能报 `Permission denied` 错误。
-
-> 未注明权限的包：使用者无法预知所需权限——这属于包文档缺陷。发布前请对照上文表格逐一核对包内使用的 API，确保权限清单完整。
+- 权限在插件**加载时**读取并固定；使用者修改 `permissions` 后需重新构建并**完整重载插件**（`/yeow reload` 或重启服务器）生效——若处于开发模式，热重载同时更新权限
 
 ---
 
@@ -134,7 +109,7 @@ export async function registerImageService(): Promise<string> {
 }
 ```
 
-> **为什么从 `yeow-dev` 引入？** `getAssetsPath` 必须知道调用代码属于哪个依赖项（以注入对应的命名空间 id），而 `yeow-dev` 是构建期虚拟模块——构建器按 importer 归属解析，这正是"编译期"语义。`yeow-dev` 已发布为空包（可不安装，类型声明由 `yeow-api` 提供）。
+> **为什么从 `yeow-dev` 引入？** `getAssetsPath` 必须知道调用代码属于哪个依赖项（以注入对应的命名空间 id），而 `yeow-dev` 是构建期虚拟模块——构建器按 importer 归属解析。`yeow-dev` 已发布为空包（可不安装，类型声明由 `yeow-api` 提供）。
 
 **构建时自动处理：**
 
@@ -200,7 +175,7 @@ const svc = await registerNativeService('my-svc', {
 }
 ```
 
-**每个包只需声明自己的权限**——npm/pnpm 的包是扁平分布的，node_modules 顶层的包（直接依赖与被提升的传递依赖）都会参与计算，但**包无需考虑（也不建议考虑）其依赖所需的权限**：权限由使用者的插件构建时统一汇总，依赖包只要把自己的权限声明清楚即可。缺失 `yeow.config.json` 或 `permissions` 字段的依赖包不贡献任何权限。
+**每个包只需声明自己的权限**——npm/pnpm 的包是扁平分布的，node_modules 顶层的包（直接依赖与被提升的传递依赖）都会参与计算，但包无需考虑其依赖所需的权限：权限由使用者的插件构建时统一汇总，依赖包只要把自己的权限声明清楚即可。缺失 `yeow.config.json` 或 `permissions` 字段的依赖包不贡献任何权限。
 
 ### 最终权限（computedPermissions）
 
@@ -348,13 +323,13 @@ import { initRenderer } from 'yeow-image';
 
 onLoad(async () => {
     const renderer = await initRenderer();
-    const result = await renderer.render(2, 2, pixels);  // Uint8Array，base64 编码封装在包内
+    const result = await renderer.render(2, 2, pixels);
 });
 ```
 
-> **使用者必须声明权限**：本示例的 `initRenderer` 内部调用 `registerNativeService`，使用者插件需在 `yeow.config.json` 中声明 `"service:registerNative"`，否则 `initRenderer()` 会抛 `Permission denied`。包 README 必须注明（见上文[权限声明](#权限声明)）。
+> **依赖包声明权限**：yeow-image 应当在自己的 `yeow.config.json` 中声明 `permissions: ['service:registerNative']`
 
-> **封装建议**：把 `serviceId`、就绪等待、base64 编码等细节全部封装在包内，对外只暴露高层操作函数（如 `renderer.render()`）。使用者无需了解 Native Service 的存在。
+> **封装建议**：把 `serviceId`、就绪等待等细节全部封装在包内，对外只暴露高层操作函数（如 `renderer.render()`）。使用者无需了解 Native Service 的存在。
 
 ---
 
@@ -364,6 +339,5 @@ onLoad(async () => {
 - [ ] `main` / `types` 指向 `src/index.ts`
 - [ ] `peerDependencies` 声明 yeow-api 版本范围（兼容的最宽范围；漏声明 → 资产/权限不参与构建）
 - [ ] `devDependencies` 声明开发目标版本的 yeow-api（独立开发类型检查）
-- [ ] 用到 fs/http/registerNative 时，README 注明使用者需声明的权限节点（assets 解压不设权限拦截，无需声明）
+- [ ] 用到 fs/http/registerNative 时，在自己的 `yeow.config.json` 中声明
 - [ ] 资源通过 `getAssetsPath()` 获取路径，不手写
-- [ ] 目录资源用尾部 `/` 路径 + `{ dir, entry }` 模式

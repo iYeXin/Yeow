@@ -1,12 +1,12 @@
-// 打包全部文档（Yeow-Docs/zh 下所有 .md，排除 public/）为 docs.zip 放入 public/，
-// VitePress 构建后输出到站点根（/v1/docs.zip）；同时同步 sitemap.md 到 create-yeow 模板项目。
+// 打包 docs/cn（仓库内真实文档目录，无构建复制）下所有 .md（排除 public/）为 docs.zip 放入 docs/cn/public/，
+// VitePress 构建后输出到站点根（/v1/docs.zip）；同时同步 docs/cn/sitemap.md 到 create-yeow 模板项目。
 import { readdirSync, readFileSync, statSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
 import { join, relative, resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import AdmZip from 'adm-zip';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const DOCS = resolve(root, '..', 'Yeow-Docs', 'zh');
+const DOCS = resolve(root, 'docs', 'cn'); // 仓库内文档目录（直接提交，无复制/盖章）
 const PUBLIC = join(DOCS, 'public');
 const TEMPLATE_SITEMAP = resolve(root, '..', 'create-yeow', 'templates', 'default', 'sitemap.md');
 

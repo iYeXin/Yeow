@@ -45,7 +45,7 @@ Yeow 对**敏感消息节点**实施声明式权限：插件在 `yeow.config.jso
 > [!WARNING]
 > **HTTP 服务器需要 `http:listen` + `http:respond` 两个节点**——只声明 `http:listen` 而漏掉 `http:respond` 时，服务器能启动、请求能到达回调，但 `respond` 被拒绝 → 响应永不发送 → **客户端请求挂起超时**（curl 超时 / CLOSE_WAIT，服务端日志无异常）。声明 `"http:*"`，或同时声明 `"http:listen"` 与 `"http:respond"`。
 
-> 修改 `permissions` 后需重新构建并完整重载插件（`/yeow reload` 或重启服务器）；开发模式热重载只重载代码，不更新权限。
+> 修改 `permissions` 后需重新构建——开发模式热重载会**一并重新加载权限**（构建时 `computedPermissions` 随热重载消息刷新）；生产环境需完整重载插件（`/yeow reload` 或重启服务器）。
 
 ### 最终权限（computedPermissions）
 

@@ -20,7 +20,7 @@ import java.util.logging.Logger;
 /**
  * Folia 平台调度器（实验性）：**非阻塞调度器 + 区域驻留 + 迁移**。
  *
- * 设计要点（详见 Yeow-Docs/zh/advanced/folia.md）：
+ * 设计要点（详见 yeow-doc-website/docs/cn/advanced/folia.md）：
  * - **无独立线程**：调度循环（dispatch cycle）作为任务驻留在某 region 线程上运行，
  *   队列空/预算尽/in-flight 满时退出，由新提交（submit）/完成回调（wake）唤醒
  * - **非阻塞投递**：取到任务立即投递，**绝不等待结果**——目标在驻留区域就地执行

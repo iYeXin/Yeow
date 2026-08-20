@@ -1,6 +1,6 @@
 node_modules/
-docs/
 .vitepress/dist/
 .vitepress/cache/
 *.log
 .env
+docs/*/public/docs.zip
