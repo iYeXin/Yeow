@@ -1,127 +1,127 @@
 # 站点地图（Sitemap）
 
-> 面向 **Vibe Coding / AI 查阅**：本站全部页面的标题 + 摘要 + 绝对 URL。站点根 `https://yexin.wiki/yeow/v1`。
+> 面向 **Vibe Coding / AI 查阅**：本站全部页面的标题 + 摘要 + 绝对 URL。站点根 `https://cn.yexin.wiki/yeow/v1`。
 > Markdown 源位于仓库 `yeow-doc-website/docs/cn/`；本地预览：`yeow-doc-website` 下 `npm run dev`。
 
 ## 指南（根）
 
-| 页面                    | URL                                                | 摘要                                                                                                                                                |
-| ----------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 概览                    | `https://yexin.wiki/yeow/v1/overview`              | 项目总览：用 TypeScript 写 Paper 插件（QuickJS 引擎，每插件独立线程）。按角色（初学者/开发者/服主/平台实现者）的文档入口导引 + 关键概念速览         |
-| AI 辅助启动指南         | `https://yexin.wiki/yeow/v1/ai-agent`              | 面向 AI 代理 / Vibe Coding：Yeow 项目简介、启动命令（`--ts`）、下一步、文档查阅策略（站点地图/docs.zip/Harness 用法）                               |
-| 快速开始                | `https://yexin.wiki/yeow/v1/getting-started`       | 从零开始：`npm create yeow` 建项目 → `npm run dev` 开发（热重载）→ `npm run build` 构建 → 部署方式。含插件示例（/back 传送）、异步/同步约定         |
-| 环境能力                | `https://yexin.wiki/yeow/v1/environment`           | 运行时环境速览：全局能力（$send/fetch/TextEncoder/TextDecoder/定时器）、线程与异步模型、与浏览器/Node 环境的差异、性能建议                          |
-| CLI 参考                | `https://yexin.wiki/yeow/v1/cli`                   | create-yeow 脚手架与 dev-server 的命令行用法：交互式/非交互创建、开发服务器参数（-y/--stop）、构建脚本、调试体验（source-map 错误定位与异步调用链） |
-| 构建与分发              | `https://yexin.wiki/yeow/v1/distribution`          | 两种产物：标准 Paper JAR（plugins/）与平台无关 .yeow.zip（plugins/Yeow/ 自动扫描或 /yeow install）；分发建议与 Modrinth 发布                        |
-| 权限与原生服务可信性    | `https://yexin.wiki/yeow/v1/permissions`           | 敏感权限声明（默认拒绝表/通配规则/computedPermissions）、原生服务 SHA-256 可信性声明与一次性批准码机制                                              |
-| 运行时运维              | `https://yexin.wiki/yeow/v1/operations`            | 服主视角：/yeow 管理命令全集、运行时配置（config.yml 含 Folia 节）、部署形态速查                                                                    |
-| 运行时警告              | `https://yexin.wiki/yeow/v1/runtime-warning`       | 预警引擎：heartbeat.timeout / event.slow / plugin.hung / budget.congested 等告警的触发条件、含义与解决方案；配置阈值；动态扩容机制                  |
-| 进阶知识                | `https://yexin.wiki/yeow/v1/advanced`              | 进阶索引：架构/调度器/事件/生命周期/通道/服务/Folia/关于；告警与运维指向根级文档                                                                    |
-| 进阶 · 架构与线程模型   | `https://yexin.wiki/yeow/v1/advanced/architecture` | 包结构、启动流程、线程模型、插件实体抽象、Worker（虚拟插件）、定时器资源管理、平台无关性、开发模式错误回显                                          |
-| 进阶 · 调度器与任务     | `https://yexin.wiki/yeow/v1/advanced/scheduler`    | 三级优先级调度器（时间片预算/自动降级/空闲自旋）、任务配置（TaskOptions）、异步 vs 同步、手动分片、调度器设计（队列/降级算法/空队自旋）             |
-| 进阶 · 事件与回调       | `https://yexin.wiki/yeow/v1/advanced/events`       | 事件桥（EventBridge）：并发/串行、事件数据、处理器操作与模式选择、事件重入死锁                                                                      |
-| 进阶 · 生命周期与热重载 | `https://yexin.wiki/yeow/v1/advanced/lifecycle`    | onInit/onLoad/onUnload、统一回调系统、热重载（强杀机制：原生中断 + 实体重建）、生产 /yeow reload/unload                                             |
-| 进阶 · 环境能力与通道   | `https://yexin.wiki/yeow/v1/advanced/channels`     | $send 封装（底层桥 $_send 为内部实现，闭包持有不外露）、各消息通道说明（运行时配置指向 /operations）                                                |
-| 进阶 · 服务机制         | `https://yexin.wiki/yeow/v1/advanced/service`      | Plugin Service（插件间通信）与 Native Service（原生扩展）的机制（API 用法见 /api/service）                                                          |
-| 关于 Yeow               | `https://yexin.wiki/yeow/v1/advanced/about`        | 关于 Yeow                                                                                                                                           |
-| 编写依赖包              | `https://yexin.wiki/yeow/v1/package-author`        | 将共享逻辑与资源封装为 npm 依赖包：assets 命名空间、依赖项识别、构建自动处理（多副本共存/权限合并/native 清单）                                     |
-| 封装 Service 的依赖包   | `https://yexin.wiki/yeow/v1/package-service`       | 依赖包中封装 Service 的三种类型：SDK 调用封装 / JS 服务（全局唯一+降级）/ 原生服务（子进程），与"JS 门面 + 原生引擎"组合模式                        |
-| 路线图                  | `https://yexin.wiki/yeow/v1/todo`                  | v1 方向性规划：API/事件覆盖、调试工具、Folia 支持；Worker API 已实现                                                                                |
-| 索引（README）          | `https://yexin.wiki/yeow/v1/`                      | 文档首页：快速上手命令、为什么用 Yeow（工程化/线程分离/平台无关/原生扩展）、对比表、文档与工具链索引                                                |
-| 更新日志                | `https://yexin.wiki/yeow/v1/changelog`             | 按日期的更新记录（2026-08-08 起）                                                                                                                   |
+| 页面                    | URL                                                   | 摘要                                                                                                                                                |
+| ----------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 概览                    | `https://cn.yexin.wiki/yeow/v1/overview`              | 项目总览：用 TypeScript 写 Paper 插件（QuickJS 引擎，每插件独立线程）。按角色（初学者/开发者/服主/平台实现者）的文档入口导引 + 关键概念速览         |
+| AI 辅助启动指南         | `https://cn.yexin.wiki/yeow/v1/ai-agent`              | 面向 AI 代理 / Vibe Coding：Yeow 项目简介、启动命令（`--ts`）、下一步、文档查阅策略（站点地图/docs.zip/Harness 用法）                               |
+| 快速开始                | `https://cn.yexin.wiki/yeow/v1/getting-started`       | 从零开始：`npm create yeow` 建项目 → `npm run dev` 开发（热重载）→ `npm run build` 构建 → 部署方式。含插件示例（/back 传送）、异步/同步约定         |
+| 环境能力                | `https://cn.yexin.wiki/yeow/v1/environment`           | 运行时环境速览：全局能力（$send/fetch/TextEncoder/TextDecoder/定时器）、线程与异步模型、与浏览器/Node 环境的差异、性能建议                          |
+| CLI 参考                | `https://cn.yexin.wiki/yeow/v1/cli`                   | create-yeow 脚手架与 dev-server 的命令行用法：交互式/非交互创建、开发服务器参数（-y/--stop）、构建脚本、调试体验（source-map 错误定位与异步调用链） |
+| 构建与分发              | `https://cn.yexin.wiki/yeow/v1/distribution`          | 两种产物：标准 Paper JAR（plugins/）与平台无关 .yeow.zip（plugins/Yeow/ 自动扫描或 /yeow install）；分发建议与 Modrinth 发布                        |
+| 权限与原生服务可信性    | `https://cn.yexin.wiki/yeow/v1/permissions`           | 敏感权限声明（默认拒绝表/通配规则/computedPermissions）、原生服务 SHA-256 可信性声明与一次性批准码机制                                              |
+| 运行时运维              | `https://cn.yexin.wiki/yeow/v1/operations`            | 服主视角：/yeow 管理命令全集、运行时配置（config.yml 含 Folia 节）、部署形态速查                                                                    |
+| 运行时警告              | `https://cn.yexin.wiki/yeow/v1/runtime-warning`       | 预警引擎：heartbeat.timeout / event.slow / plugin.hung / budget.congested 等告警的触发条件、含义与解决方案；配置阈值；动态扩容机制                  |
+| 进阶知识                | `https://cn.yexin.wiki/yeow/v1/advanced`              | 进阶索引：架构/调度器/事件/生命周期/通道/服务/Folia/关于；告警与运维指向根级文档                                                                    |
+| 进阶 · 架构与线程模型   | `https://cn.yexin.wiki/yeow/v1/advanced/architecture` | 包结构、启动流程、线程模型、插件实体抽象、Worker（虚拟插件）、定时器资源管理、平台无关性、开发模式错误回显                                          |
+| 进阶 · 调度器与任务     | `https://cn.yexin.wiki/yeow/v1/advanced/scheduler`    | 三级优先级调度器（时间片预算/自动降级/空闲自旋）、任务配置（TaskOptions）、异步 vs 同步、手动分片、调度器设计（队列/降级算法/空队自旋）             |
+| 进阶 · 事件与回调       | `https://cn.yexin.wiki/yeow/v1/advanced/events`       | 事件桥（EventBridge）：并发/串行、事件数据、处理器操作与模式选择、事件重入死锁                                                                      |
+| 进阶 · 生命周期与热重载 | `https://cn.yexin.wiki/yeow/v1/advanced/lifecycle`    | onInit/onLoad/onUnload、统一回调系统、热重载（强杀机制：原生中断 + 实体重建）、生产 /yeow reload/unload                                             |
+| 进阶 · 环境能力与通道   | `https://cn.yexin.wiki/yeow/v1/advanced/channels`     | $send 封装（底层桥 $_send 为内部实现，闭包持有不外露）、各消息通道说明（运行时配置指向 /operations）                                                |
+| 进阶 · 服务机制         | `https://cn.yexin.wiki/yeow/v1/advanced/service`      | Plugin Service（插件间通信）与 Native Service（原生扩展）的机制（API 用法见 /api/service）                                                          |
+| 关于 Yeow               | `https://cn.yexin.wiki/yeow/v1/advanced/about`        | 关于 Yeow                                                                                                                                           |
+| 编写依赖包              | `https://cn.yexin.wiki/yeow/v1/package-author`        | 将共享逻辑与资源封装为 npm 依赖包：assets 命名空间、依赖项识别、构建自动处理（多副本共存/权限合并/native 清单）                                     |
+| 封装 Service 的依赖包   | `https://cn.yexin.wiki/yeow/v1/package-service`       | 依赖包中封装 Service 的三种类型：SDK 调用封装 / JS 服务（全局唯一+降级）/ 原生服务（子进程），与"JS 门面 + 原生引擎"组合模式                        |
+| 路线图                  | `https://cn.yexin.wiki/yeow/v1/todo`                  | v1 方向性规划：API/事件覆盖、调试工具、Folia 支持；Worker API 已实现                                                                                |
+| 索引（README）          | `https://cn.yexin.wiki/yeow/v1/`                      | 文档首页：快速上手命令、为什么用 Yeow（工程化/线程分离/平台无关/原生扩展）、对比表、文档与工具链索引                                                |
+| 更新日志                | `https://cn.yexin.wiki/yeow/v1/changelog`             | 按日期的更新记录（2026-08-08 起）                                                                                                                   |
 
 ## API 参考（/v1/api/）
 
-| 页面        | URL                                          | 摘要                                                                                                                                                                             |
-| ----------- | -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API 索引    | `https://yexin.wiki/yeow/v1/api/`            | 全部 API 模块的分组索引                                                                                                                                                          |
-| Player      | `https://yexin.wiki/yeow/v1/api/player`      | 玩家：属性（血量/饥饿/经验/飞行等）、位置、消息（Message 对象）、Title/ActionBar、音效、资源包、传送、权限、`performCommand`、手持物品（ItemStack 快照）                         |
-| Server      | `https://yexin.wiki/yeow/v1/api/server`      | 服务器级：广播、MOTD（setMotd 全局默认）、serverPing 事件回写（按次覆盖 motd/icon/人数）、版本、TPS、最大玩家数                                                                  |
-| Env         | `https://yexin.wiki/yeow/v1/api/env`         | 运行时环境信息（同步）：CPU 核心数、内存、系统架构、Minecraft 版本、Yeow 运行时信息、epoch 微秒时间戳                                                                            |
-| Permission  | `https://yexin.wiki/yeow/v1/api/permission`  | 权限：`registerPermission`（default: all/op/none）、命令权限、检查流程、`permissionCheck` Yeow 生态钩子（优先级/触发范围/无限循环提醒）、Paper 兼容（permissions.yml/LuckPerms） |
-| World       | `https://yexin.wiki/yeow/v1/api/world`       | 世界：时间/天气/难度/规则、方块（getBlock/setBlock，Block 对象）、区块、光照、生物群系、实体查询、掉落/闪电/爆炸/生成                                                            |
-| Chunk       | `https://yexin.wiki/yeow/v1/api/chunk`       | 区块快照（进阶性能工具）：3D 完整快照与 2D 顶部快照（short[] base64 零拷贝视图 + 方块索引映射）                                                                                  |
-| Location    | `https://yexin.wiki/yeow/v1/api/location`    | 坐标与朝向：x/y/z/yaw/pitch/world                                                                                                                                                |
-| Block       | `https://yexin.wiki/yeow/v1/api/block`       | 统一方块概念：数据描述符（type/state）+ 可选 location；静态数据语义（快照）；材料级判断委托 Material；breakNaturally 需 location                                                 |
-| Material    | `https://yexin.wiki/yeow/v1/api/material`    | 材料注册表查询（getMaterials/getBlocks/getItems）+ 材料级静态判断对象（isSolid/isAir，不依赖坐标/状态）                                                                          |
-| Entity      | `https://yexin.wiki/yeow/v1/api/entity`      | 实体：类型/名称/位置、发光/无敌/静默/重力、乘客/载具、碰撞盒、生命值；LivingEntity                                                                                               |
-| Potion      | `https://yexin.wiki/yeow/v1/api/potion`      | 药水效果：添加/移除/清除/查询（类型、时长、等级）                                                                                                                                |
-| Particle    | `https://yexin.wiki/yeow/v1/api/particle`    | 粒子生成：类型、位置、数量、偏移、颜色/方块/物品粒子                                                                                                                             |
-| Inventory   | `https://yexin.wiki/yeow/v1/api/inventory`   | 统一容器：玩家物品栏 / 容器方块（Chest 等）/ 自定义 Inventory（对象式 API，点击关闭事件携带 inventoryId）                                                                        |
-| BossBar     | `https://yexin.wiki/yeow/v1/api/bossbar`     | 血条：标题/进度/颜色/样式/可见性、玩家绑定、Flag                                                                                                                                 |
-| Scoreboard  | `https://yexin.wiki/yeow/v1/api/scoreboard`  | 计分板：Board、目标（显示槽位/分数）、队伍（前后缀/颜色/选项/成员）                                                                                                              |
-| Advancement | `https://yexin.wiki/yeow/v1/api/advancement` | 进度：授予/撤销、进度查询、判据授予/撤销                                                                                                                                         |
-| Recipe      | `https://yexin.wiki/yeow/v1/api/recipe`      | 配方：有序/无序合成、熔炉/高炉/烟熏/营火；添加/移除/按产物查询                                                                                                                   |
-| Event       | `https://yexin.wiki/yeow/v1/api/event`       | 事件订阅：`eventOn`/`eventOff`、自动/手动模式（取消、回写）、全事件字段表、消息（Message 对象）                                                                                  |
-| Command     | `https://yexin.wiki/yeow/v1/api/command`     | 命令注册 + Tab 补全（含 yeow-command 重载式命令 Command.create 与模式化参数）                                                                                                    |
-| ItemStack   | `https://yexin.wiki/yeow/v1/api/item`        | 物品纯数据描述符：type/amount/meta（显示名/附魔/耐久/染色/药水/头颅/属性修饰符）；构造工具（create/clone/equals）；值语义（快照，不绑定真实物品）                                |
-| Service     | `https://yexin.wiki/yeow/v1/api/service`     | 插件间服务（registerService/request/subscribe/publish）与原生服务（registerNativeService，spawn 子进程 + TCP 通信）                                                              |
-| HTTP        | `https://yexin.wiki/yeow/v1/api/http`        | 底层 HTTP 客户端：`request`（异步，请求/响应体二进制与 fs 同语义、encoding/timeout 可选）、全局 `fetch`（text/json 按需解码 + base64/bytes）                                     |
-| HTTP Server | `https://yexin.wiki/yeow/v1/api/http-server` | 高层 `createServer`（yeow-server）：洋葱中间件、路由、mount/mountAssets 静态挂载、二进制响应（Uint8Array/encoding）、返回对象自动 JSON、资源包下载闭环                           |
-| Worker      | `https://yexin.wiki/yeow/v1/api/worker`      | 虚拟插件（独立线程）：createWorker（仅注册）/load/unload/reload、双向 postMessage、Worker 侧 onMessage/postMessage；共享数据目录/权限、禁嵌套、/yeow 不覆盖                      |
-| FS          | `https://yexin.wiki/yeow/v1/api/fs`          | 文件系统：plugin/server/outer 三级（路径安全）、读写/追加/二进制、目录操作、systemPaths、path 工具                                                                               |
-| Assets      | `https://yexin.wiki/yeow/v1/api/assets`      | 打包资源：`getAssetsPath`（yeow-dev，构建期注入命名空间）+ 读取/解压（单文件与目录）                                                                                             |
-| PDC         | `https://yexin.wiki/yeow/v1/api/pdc`         | 持久数据容器：JSON 自动序列化、全量读取、插件命名空间（跨插件不冲突）、Player/Block 实例方法                                                                                     |
-| Util        | `https://yexin.wiki/yeow/v1/api/util`        | 数据工具：gzip 压缩/解压、UTF-8 ↔ 字节转换（含分块流式 Gzip）                                                                                                                    |
-| Log         | `https://yexin.wiki/yeow/v1/api/log`         | 日志：`log`/`Logger`/`console`（自动插件名前缀）                                                                                                                                 |
-| Text        | `https://yexin.wiki/yeow/v1/api/text`        | 文本与 MiniMessage：标记语法、转义规则（真实换行 vs 字面 `\n`）、Message 对象（可翻译组件 {key,args,text}）                                                                      |
+| 页面        | URL                                             | 摘要                                                                                                                                                                             |
+| ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API 索引    | `https://cn.yexin.wiki/yeow/v1/api/`            | 全部 API 模块的分组索引                                                                                                                                                          |
+| Player      | `https://cn.yexin.wiki/yeow/v1/api/player`      | 玩家：属性（血量/饥饿/经验/飞行等）、位置、消息（Message 对象）、Title/ActionBar、音效、资源包、传送、权限、`performCommand`、手持物品（ItemStack 快照）                         |
+| Server      | `https://cn.yexin.wiki/yeow/v1/api/server`      | 服务器级：广播、MOTD（setMotd 全局默认）、serverPing 事件回写（按次覆盖 motd/icon/人数）、版本、TPS、最大玩家数                                                                  |
+| Env         | `https://cn.yexin.wiki/yeow/v1/api/env`         | 运行时环境信息（同步）：CPU 核心数、内存、系统架构、Minecraft 版本、Yeow 运行时信息、epoch 微秒时间戳                                                                            |
+| Permission  | `https://cn.yexin.wiki/yeow/v1/api/permission`  | 权限：`registerPermission`（default: all/op/none）、命令权限、检查流程、`permissionCheck` Yeow 生态钩子（优先级/触发范围/无限循环提醒）、Paper 兼容（permissions.yml/LuckPerms） |
+| World       | `https://cn.yexin.wiki/yeow/v1/api/world`       | 世界：时间/天气/难度/规则、方块（getBlock/setBlock，Block 对象）、区块、光照、生物群系、实体查询、掉落/闪电/爆炸/生成                                                            |
+| Chunk       | `https://cn.yexin.wiki/yeow/v1/api/chunk`       | 区块快照（进阶性能工具）：3D 完整快照与 2D 顶部快照（short[] base64 零拷贝视图 + 方块索引映射）                                                                                  |
+| Location    | `https://cn.yexin.wiki/yeow/v1/api/location`    | 坐标与朝向：x/y/z/yaw/pitch/world                                                                                                                                                |
+| Block       | `https://cn.yexin.wiki/yeow/v1/api/block`       | 统一方块概念：数据描述符（type/state）+ 可选 location；静态数据语义（快照）；材料级判断委托 Material；breakNaturally 需 location                                                 |
+| Material    | `https://cn.yexin.wiki/yeow/v1/api/material`    | 材料注册表查询（getMaterials/getBlocks/getItems）+ 材料级静态判断对象（isSolid/isAir，不依赖坐标/状态）                                                                          |
+| Entity      | `https://cn.yexin.wiki/yeow/v1/api/entity`      | 实体：类型/名称/位置、发光/无敌/静默/重力、乘客/载具、碰撞盒、生命值；LivingEntity                                                                                               |
+| Potion      | `https://cn.yexin.wiki/yeow/v1/api/potion`      | 药水效果：添加/移除/清除/查询（类型、时长、等级）                                                                                                                                |
+| Particle    | `https://cn.yexin.wiki/yeow/v1/api/particle`    | 粒子生成：类型、位置、数量、偏移、颜色/方块/物品粒子                                                                                                                             |
+| Inventory   | `https://cn.yexin.wiki/yeow/v1/api/inventory`   | 统一容器：玩家物品栏 / 容器方块（Chest 等）/ 自定义 Inventory（对象式 API，点击关闭事件携带 inventoryId）                                                                        |
+| BossBar     | `https://cn.yexin.wiki/yeow/v1/api/bossbar`     | 血条：标题/进度/颜色/样式/可见性、玩家绑定、Flag                                                                                                                                 |
+| Scoreboard  | `https://cn.yexin.wiki/yeow/v1/api/scoreboard`  | 计分板：Board、目标（显示槽位/分数）、队伍（前后缀/颜色/选项/成员）                                                                                                              |
+| Advancement | `https://cn.yexin.wiki/yeow/v1/api/advancement` | 进度：授予/撤销、进度查询、判据授予/撤销                                                                                                                                         |
+| Recipe      | `https://cn.yexin.wiki/yeow/v1/api/recipe`      | 配方：有序/无序合成、熔炉/高炉/烟熏/营火；添加/移除/按产物查询                                                                                                                   |
+| Event       | `https://cn.yexin.wiki/yeow/v1/api/event`       | 事件订阅：`eventOn`/`eventOff`、自动/手动模式（取消、回写）、全事件字段表、消息（Message 对象）                                                                                  |
+| Command     | `https://cn.yexin.wiki/yeow/v1/api/command`     | 命令注册 + Tab 补全（含 yeow-command 重载式命令 Command.create 与模式化参数）                                                                                                    |
+| ItemStack   | `https://cn.yexin.wiki/yeow/v1/api/item`        | 物品纯数据描述符：type/amount/meta（显示名/附魔/耐久/染色/药水/头颅/属性修饰符）；构造工具（create/clone/equals）；值语义（快照，不绑定真实物品）                                |
+| Service     | `https://cn.yexin.wiki/yeow/v1/api/service`     | 插件间服务（registerService/request/subscribe/publish）与原生服务（registerNativeService，spawn 子进程 + TCP 通信）                                                              |
+| HTTP        | `https://cn.yexin.wiki/yeow/v1/api/http`        | 底层 HTTP 客户端：`request`（异步，请求/响应体二进制与 fs 同语义、encoding/timeout 可选）、全局 `fetch`（text/json 按需解码 + base64/bytes）                                     |
+| HTTP Server | `https://cn.yexin.wiki/yeow/v1/api/http-server` | 高层 `createServer`（yeow-server）：洋葱中间件、路由、mount/mountAssets 静态挂载、二进制响应（Uint8Array/encoding）、返回对象自动 JSON、资源包下载闭环                           |
+| Worker      | `https://cn.yexin.wiki/yeow/v1/api/worker`      | 虚拟插件（独立线程）：createWorker（仅注册）/load/unload/reload、双向 postMessage、Worker 侧 onMessage/postMessage；共享数据目录/权限、禁嵌套、/yeow 不覆盖                      |
+| FS          | `https://cn.yexin.wiki/yeow/v1/api/fs`          | 文件系统：plugin/server/outer 三级（路径安全）、读写/追加/二进制、目录操作、systemPaths、path 工具                                                                               |
+| Assets      | `https://cn.yexin.wiki/yeow/v1/api/assets`      | 打包资源：`getAssetsPath`（yeow-dev，构建期注入命名空间）+ 读取/解压（单文件与目录）                                                                                             |
+| PDC         | `https://cn.yexin.wiki/yeow/v1/api/pdc`         | 持久数据容器：JSON 自动序列化、全量读取、插件命名空间（跨插件不冲突）、Player/Block 实例方法                                                                                     |
+| Util        | `https://cn.yexin.wiki/yeow/v1/api/util`        | 数据工具：gzip 压缩/解压、UTF-8 ↔ 字节转换（含分块流式 Gzip）                                                                                                                    |
+| Log         | `https://cn.yexin.wiki/yeow/v1/api/log`         | 日志：`log`/`Logger`/`console`（自动插件名前缀）                                                                                                                                 |
+| Text        | `https://cn.yexin.wiki/yeow/v1/api/text`        | 文本与 MiniMessage：标记语法、转义规则（真实换行 vs 字面 `\n`）、Message 对象（可翻译组件 {key,args,text}）                                                                      |
 
 ## 平台规范（/v1/specifications/）
 
-| 页面           | URL                                                         | 摘要                                                                                                                                                                                                                                                                             |
-| -------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 规范总览       | `https://yexin.wiki/yeow/v1/specifications/`                | 协议层总纲：包结构（yeow.json/.yeow/main.js/assets）、加载流程、权限模型、运行时架构、任务执行器、事件/命令桥、Native Service、合格运行时检查清单                                                                                                                                |
-| 值域附录       | `https://yexin.wiki/yeow/v1/specifications/values`          | 取值格式规则（R1-R5）与清单：平台枚举直接维护（游戏模式/难度/BossBar/计分板/ClickType/ItemFlag/InventoryType 等）；参考实现（非强制：DamageCause/传送原因/回血原因）；版本变迁域规则+链接（方块/物品/实体/生物群系/音效/粒子/附魔/药水/属性/伤害类型/游戏规则/翻译键/进度/配方） |
-| Java 插件集成  | `https://yexin.wiki/yeow/v1/specifications/java-api`        | 其他 Java 插件调用 Yeow 服务（requestService 请求-响应、subscribeService 订阅事件）、提交游戏任务、约束                                                                                                                                                                          |
-| 适配器规范     | `https://yexin.wiki/yeow/v1/specifications/adapter/`        | 多语言/社区适配器：PluginEntity 接口、消息契约、submitTask、注册 API、检查清单                                                                                                                                                                                                   |
-| 运行时环境标准 | `https://yexin.wiki/yeow/v1/specifications/runtime/`        | JS 环境：语言标准（ES2025+SecU8）、回调系统（cb 语义）、事件循环、通道总览与权限、全局变量（$send/$dev/fetch/timers）                                                                                                                                                            |
-| 原生服务       | `https://yexin.wiki/yeow/v1/specifications/native-service/` | 原生子进程协议：平台选择、提取、TCP JSON line（ready/request/response/publish）                                                                                                                                                                                                  |
+| 页面           | URL                                                            | 摘要                                                                                                                                                                                                                                                                             |
+| -------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 规范总览       | `https://cn.yexin.wiki/yeow/v1/specifications/`                | 协议层总纲：包结构（yeow.json/.yeow/main.js/assets）、加载流程、权限模型、运行时架构、任务执行器、事件/命令桥、Native Service、合格运行时检查清单                                                                                                                                |
+| 值域附录       | `https://cn.yexin.wiki/yeow/v1/specifications/values`          | 取值格式规则（R1-R5）与清单：平台枚举直接维护（游戏模式/难度/BossBar/计分板/ClickType/ItemFlag/InventoryType 等）；参考实现（非强制：DamageCause/传送原因/回血原因）；版本变迁域规则+链接（方块/物品/实体/生物群系/音效/粒子/附魔/药水/属性/伤害类型/游戏规则/翻译键/进度/配方） |
+| Java 插件集成  | `https://cn.yexin.wiki/yeow/v1/specifications/java-api`        | 其他 Java 插件调用 Yeow 服务（requestService 请求-响应、subscribeService 订阅事件）、提交游戏任务、约束                                                                                                                                                                          |
+| 适配器规范     | `https://cn.yexin.wiki/yeow/v1/specifications/adapter/`        | 多语言/社区适配器：PluginEntity 接口、消息契约、submitTask、注册 API、检查清单                                                                                                                                                                                                   |
+| 运行时环境标准 | `https://cn.yexin.wiki/yeow/v1/specifications/runtime/`        | JS 环境：语言标准（ES2025+SecU8）、回调系统（cb 语义）、事件循环、通道总览与权限、全局变量（$send/$dev/fetch/timers）                                                                                                                                                            |
+| 原生服务       | `https://cn.yexin.wiki/yeow/v1/specifications/native-service/` | 原生子进程协议：平台选择、提取、TCP JSON line（ready/request/response/publish）                                                                                                                                                                                                  |
 
 ### 消息通道（/v1/specifications/message/）
 
-| 页面      | URL                                                           | 摘要                                                                                                                                |
-| --------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| 通道总览  | `https://yexin.wiki/yeow/v1/specifications/message/`          | 全部通道索引（task/timer/fs/http/assets/lifecycle/log/env/debug/service/util/worker）+ 通用通道说明                                 |
-| Task      | `https://yexin.wiki/yeow/v1/specifications/message/task`      | task 通道：游戏任务请求/响应格式、同步 vs 异步（cb）、错误格式                                                                      |
-| Timer     | `https://yexin.wiki/yeow/v1/specifications/message/timer`     | 定时器通道：timeout/interval 消息格式                                                                                               |
-| FS        | `https://yexin.wiki/yeow/v1/specifications/message/fs`        | fs 通道：plugin/server/outer 三级、各操作（读写/删除/列出/base64/systemPaths）请求格式与路径规则                                    |
-| HTTP      | `https://yexin.wiki/yeow/v1/specifications/message/http`      | http 通道：listen/respond（body + encoding 二进制）/close/request/requestAsync 消息格式                                             |
-| Assets    | `https://yexin.wiki/yeow/v1/specifications/message/assets`    | assets 通道：read/readBase64/extract/extractDir 消息格式（命名空间路径）                                                            |
-| Service   | `https://yexin.wiki/yeow/v1/specifications/message/service`   | service 通道：注册（plugin/native）、请求、订阅/发布、原生 terminate 回调                                                           |
-| Log       | `https://yexin.wiki/yeow/v1/specifications/message/log`       | log 通道：日志消息格式                                                                                                              |
-| Lifecycle | `https://yexin.wiki/yeow/v1/specifications/message/lifecycle` | lifecycle 通道：unloadDone 确认、gc-collect 资源回收                                                                                |
-| Debug     | `https://yexin.wiki/yeow/v1/specifications/message/debug`     | debug 通道：reportError 错误上报、ping-pong 心跳                                                                                    |
-| Util      | `https://yexin.wiki/yeow/v1/specifications/message/util`      | util 通道：gzip 压缩/解压（一次性与流式分块）、UTF-8 ↔ 字节转换（encode.utf8/decode.utf8）                                          |
-| Worker    | `https://yexin.wiki/yeow/v1/specifications/message/worker`    | worker 通道：create（仅注册）/load/unload/post/reload/postToMain 消息格式、生命周期、origin 错误字段、约束（禁嵌套/共享数据与权限） |
+| 页面      | URL                                                              | 摘要                                                                                                                                |
+| --------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| 通道总览  | `https://cn.yexin.wiki/yeow/v1/specifications/message/`          | 全部通道索引（task/timer/fs/http/assets/lifecycle/log/env/debug/service/util/worker）+ 通用通道说明                                 |
+| Task      | `https://cn.yexin.wiki/yeow/v1/specifications/message/task`      | task 通道：游戏任务请求/响应格式、同步 vs 异步（cb）、错误格式                                                                      |
+| Timer     | `https://cn.yexin.wiki/yeow/v1/specifications/message/timer`     | 定时器通道：timeout/interval 消息格式                                                                                               |
+| FS        | `https://cn.yexin.wiki/yeow/v1/specifications/message/fs`        | fs 通道：plugin/server/outer 三级、各操作（读写/删除/列出/base64/systemPaths）请求格式与路径规则                                    |
+| HTTP      | `https://cn.yexin.wiki/yeow/v1/specifications/message/http`      | http 通道：listen/respond（body + encoding 二进制）/close/request/requestAsync 消息格式                                             |
+| Assets    | `https://cn.yexin.wiki/yeow/v1/specifications/message/assets`    | assets 通道：read/readBase64/extract/extractDir 消息格式（命名空间路径）                                                            |
+| Service   | `https://cn.yexin.wiki/yeow/v1/specifications/message/service`   | service 通道：注册（plugin/native）、请求、订阅/发布、原生 terminate 回调                                                           |
+| Log       | `https://cn.yexin.wiki/yeow/v1/specifications/message/log`       | log 通道：日志消息格式                                                                                                              |
+| Lifecycle | `https://cn.yexin.wiki/yeow/v1/specifications/message/lifecycle` | lifecycle 通道：unloadDone 确认、gc-collect 资源回收                                                                                |
+| Debug     | `https://cn.yexin.wiki/yeow/v1/specifications/message/debug`     | debug 通道：reportError 错误上报、ping-pong 心跳                                                                                    |
+| Util      | `https://cn.yexin.wiki/yeow/v1/specifications/message/util`      | util 通道：gzip 压缩/解压（一次性与流式分块）、UTF-8 ↔ 字节转换（encode.utf8/decode.utf8）                                          |
+| Worker    | `https://cn.yexin.wiki/yeow/v1/specifications/message/worker`    | worker 通道：create（仅注册）/load/unload/post/reload/postToMain 消息格式、生命周期、origin 错误字段、约束（禁嵌套/共享数据与权限） |
 
 ### 任务类型（/v1/specifications/task/）
 
-| 页面         | URL                                                            | 摘要                                                                                                                        |
-| ------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 任务总览     | `https://yexin.wiki/yeow/v1/specifications/task/`              | 全部 task 类型索引与请求/返回约定                                                                                           |
-| Player       | `https://yexin.wiki/yeow/v1/specifications/task/player`        | player.* 任务：属性/位置/消息（Message 对象格式）/Title/音效/资源包/传送/权限/手持物品                                      |
-| Server       | `https://yexin.wiki/yeow/v1/specifications/task/server`        | server.* 任务：广播（Message）、MOTD、版本、TPS、最大玩家数；Material 查询                                                  |
-| World        | `https://yexin.wiki/yeow/v1/specifications/task/world`         | world.* 任务：时间/天气/方块（BlockData 状态）/区块/光照/生物群系/实体/爆炸/生成；block.breakNaturally、material.* 静态判断 |
-| Entity       | `https://yexin.wiki/yeow/v1/specifications/task/entity`        | entity.* 任务：类型/名称/属性/位置/碰撞盒/生命值/药水效果                                                                   |
-| Scoreboard   | `https://yexin.wiki/yeow/v1/specifications/task/scoreboard`    | scoreboard.* 任务：Board/Objective/Score/Team 全操作                                                                        |
-| Recipe       | `https://yexin.wiki/yeow/v1/specifications/task/recipe`        | recipe.* 任务：配方定义（shaped/shapeless/熔炉系）与添加/移除                                                               |
-| PDC          | `https://yexin.wiki/yeow/v1/specifications/task/pdc`           | pdc.* 任务：实体/方块持久键值数据                                                                                           |
-| Inventory    | `https://yexin.wiki/yeow/v1/specifications/task/inventory-gui` | inventory.* 任务（统一三寻址：玩家/容器方块/自定义）：内容操作、生命周期、ItemStack 完整格式                                |
-| Command      | `https://yexin.wiki/yeow/v1/specifications/task/command`       | command.* 任务：注册/执行/补全（回调协议）                                                                                  |
-| Event System | `https://yexin.wiki/yeow/v1/specifications/task/event-system`  | event.* 任务：subscribe/unsubscribe/complete（eventId 匹配）；并发/串行模式                                                 |
-| Advancement  | `https://yexin.wiki/yeow/v1/specifications/task/advancement`   | advancement.* 任务：授予/撤销/进度查询/判据                                                                                 |
-| BossBar      | `https://yexin.wiki/yeow/v1/specifications/task/bossbar`       | bossbar.* 任务：创建/销毁/标题/进度/样式/玩家                                                                               |
+| 页面         | URL                                                               | 摘要                                                                                                                        |
+| ------------ | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| 任务总览     | `https://cn.yexin.wiki/yeow/v1/specifications/task/`              | 全部 task 类型索引与请求/返回约定                                                                                           |
+| Player       | `https://cn.yexin.wiki/yeow/v1/specifications/task/player`        | player.* 任务：属性/位置/消息（Message 对象格式）/Title/音效/资源包/传送/权限/手持物品                                      |
+| Server       | `https://cn.yexin.wiki/yeow/v1/specifications/task/server`        | server.* 任务：广播（Message）、MOTD、版本、TPS、最大玩家数；Material 查询                                                  |
+| World        | `https://cn.yexin.wiki/yeow/v1/specifications/task/world`         | world.* 任务：时间/天气/方块（BlockData 状态）/区块/光照/生物群系/实体/爆炸/生成；block.breakNaturally、material.* 静态判断 |
+| Entity       | `https://cn.yexin.wiki/yeow/v1/specifications/task/entity`        | entity.* 任务：类型/名称/属性/位置/碰撞盒/生命值/药水效果                                                                   |
+| Scoreboard   | `https://cn.yexin.wiki/yeow/v1/specifications/task/scoreboard`    | scoreboard.* 任务：Board/Objective/Score/Team 全操作                                                                        |
+| Recipe       | `https://cn.yexin.wiki/yeow/v1/specifications/task/recipe`        | recipe.* 任务：配方定义（shaped/shapeless/熔炉系）与添加/移除                                                               |
+| PDC          | `https://cn.yexin.wiki/yeow/v1/specifications/task/pdc`           | pdc.* 任务：实体/方块持久键值数据                                                                                           |
+| Inventory    | `https://cn.yexin.wiki/yeow/v1/specifications/task/inventory-gui` | inventory.* 任务（统一三寻址：玩家/容器方块/自定义）：内容操作、生命周期、ItemStack 完整格式                                |
+| Command      | `https://cn.yexin.wiki/yeow/v1/specifications/task/command`       | command.* 任务：注册/执行/补全（回调协议）                                                                                  |
+| Event System | `https://cn.yexin.wiki/yeow/v1/specifications/task/event-system`  | event.* 任务：subscribe/unsubscribe/complete（eventId 匹配）；并发/串行模式                                                 |
+| Advancement  | `https://cn.yexin.wiki/yeow/v1/specifications/task/advancement`   | advancement.* 任务：授予/撤销/进度查询/判据                                                                                 |
+| BossBar      | `https://cn.yexin.wiki/yeow/v1/specifications/task/bossbar`       | bossbar.* 任务：创建/销毁/标题/进度/样式/玩家                                                                               |
 
 ### 事件（/v1/specifications/event/）
 
-| 页面           | URL                                                                | 摘要                                                                                                                             |
-| -------------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| 事件总览       | `https://yexin.wiki/yeow/v1/specifications/event/`                 | 全部事件类型索引                                                                                                                 |
-| Player 事件    | `https://yexin.wiki/yeow/v1/specifications/event/player-events`    | 玩家事件字段：加入/退出/聊天/移动/交互/死亡（Message 对象）/重生/掉落/拾取/桶/经验/等级/游戏模式/进度/潜行/飞行/传送/进食/资源包 |
-| Entity 事件    | `https://yexin.wiki/yeow/v1/specifications/event/entity-events`    | 实体事件字段：伤害/死亡/生成/爆炸/回血/目标/弹射物                                                                               |
-| Block 事件     | `https://yexin.wiki/yeow/v1/specifications/event/block-events`     | 方块事件字段：破坏/放置/消退/生长/蔓延/爆炸                                                                                      |
-| Inventory 事件 | `https://yexin.wiki/yeow/v1/specifications/event/inventory-events` | 背包事件字段：打开/关闭/点击（槽位/按键/动作）                                                                                   |
-| Server 事件    | `https://yexin.wiki/yeow/v1/specifications/event/server-events`    | 服务器事件：serverPing（回写 motd/icon/maxPlayers/numPlayers）、serverCommand、资源包状态                                        |
+| 页面           | URL                                                                   | 摘要                                                                                                                             |
+| -------------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 事件总览       | `https://cn.yexin.wiki/yeow/v1/specifications/event/`                 | 全部事件类型索引                                                                                                                 |
+| Player 事件    | `https://cn.yexin.wiki/yeow/v1/specifications/event/player-events`    | 玩家事件字段：加入/退出/聊天/移动/交互/死亡（Message 对象）/重生/掉落/拾取/桶/经验/等级/游戏模式/进度/潜行/飞行/传送/进食/资源包 |
+| Entity 事件    | `https://cn.yexin.wiki/yeow/v1/specifications/event/entity-events`    | 实体事件字段：伤害/死亡/生成/爆炸/回血/目标/弹射物                                                                               |
+| Block 事件     | `https://cn.yexin.wiki/yeow/v1/specifications/event/block-events`     | 方块事件字段：破坏/放置/消退/生长/蔓延/爆炸                                                                                      |
+| Inventory 事件 | `https://cn.yexin.wiki/yeow/v1/specifications/event/inventory-events` | 背包事件字段：打开/关闭/点击（槽位/按键/动作）                                                                                   |
+| Server 事件    | `https://cn.yexin.wiki/yeow/v1/specifications/event/server-events`    | 服务器事件：serverPing（回写 motd/icon/maxPlayers/numPlayers）、serverCommand、资源包状态                                        |
 
 ## 侧边栏导航结构
 

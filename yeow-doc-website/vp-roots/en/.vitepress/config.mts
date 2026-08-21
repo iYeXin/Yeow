@@ -253,7 +253,7 @@ export default defineConfig({
         lightModeSwitchTitle: 'Switch to light mode',
         darkModeSwitchTitle: 'Switch to dark mode',
         editLink: {
-            pattern: 'https://github.com/iyexin/yeow/edit/main/Yeow-Docs/en/:path',
+            pattern: 'https://github.com/iyexin/yeow/edit/main/yeow-doc-website/docs/en/:path',
             text: 'Edit this page on GitHub',
         },
         search: {

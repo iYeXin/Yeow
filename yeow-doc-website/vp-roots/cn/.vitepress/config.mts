@@ -254,7 +254,7 @@ export default defineConfig({
         lightModeSwitchTitle: '切换到浅色模式',
         darkModeSwitchTitle: '切换到深色模式',
         editLink: {
-            pattern: 'https://github.com/iyexin/yeow/edit/main/Yeow-Docs/zh/:path',
+            pattern: 'https://github.com/iyexin/yeow/edit/main/yeow-doc-website/docs/cn/:path',
             text: '在 GitHub 上编辑此页',
         },
         search: {

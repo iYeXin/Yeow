@@ -129,10 +129,11 @@ cp target/yeow-template-0.5.0.jar ../create-yeow/templates/default/.yeow/assets/
 
 ### yeow-doc-website（站点）
 
-- `docs/` 为仓库内真实的文档目录（多语言根），中文文档在 `docs/cn/`（由原 `Yeow-Docs/zh` 迁移，直接提交，**无构建复制/无 junction**）——直接编辑 `docs/cn/` 下的文件
-- 修改后重新 `npm run dev/build` 即生效；导航/侧边栏在 `.vitepress/config.mts`
+- `docs/` 为仓库内文档目录（多语言根）：中文在 `docs/cn/`、英文占位在 `docs/en/`（直接提交，无构建复制/无 junction）——直接编辑对应语言目录下的文件
+- 站点构建配置在 `vp-roots/<cn|en>/.vitepress/config.mts`（每语言一个独立 root），导航/侧边栏在此配置；多语言切换组件在 `vp-roots/<cn|en>/.vitepress/theme`（vt-locales-btn 原生风格，跨域跳转携带路径）
+- 修改后重新 `npm run dev`（中文）/ `npm run dev:en`（英文），或 `npm run build` 同时构建两语言（产物分别在 `vp-roots/cn/.vitepress/dist` 与 `vp-roots/en/.vitepress/dist`）
 - 预览：`cd yeow-doc-website && npm run dev`（站点运行在 `/v1/` 路径）
-- 构建：`npm run build`
+- 构建 + 发布：`npm run publish`（按 `.env` 的 `CN_PATH`/`EN_PATH` 逐语言上传）
 
 ---
 
