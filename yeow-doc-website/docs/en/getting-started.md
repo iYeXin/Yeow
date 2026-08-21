@@ -75,36 +75,35 @@ my-plugin/
 Implement `/back`: Record player death location, type `/back` to teleport back.
 
 ```ts
-import {
-  onLoad, onUnload, registerCommand, eventOn,
-  Player, Location, pdcSet, pdcGet, log,
-} from 'yeow-api';
+import { onLoad, onUnload, registerCommand, eventOn, Location, log } from 'yeow-api';
+import type { PlayerDeathEvent } from 'yeow-api';
 
 onLoad(() => {
   // Record all death locations and notify player
-  eventOn('playerDeath', async (e) => {
+  eventOn('playerDeath', async (e: PlayerDeathEvent) => {
     const loc = e.player.location;
-    if (loc) {
-      // PDC auto JSON serialization: directly store/retrieve objects (no need for manual JSON.stringify/parse)
-      pdcSet(e.player.uuid, 'back.deathLocation', { x: loc.x, y: loc.y, z: loc.z, world: loc.world || e.player.world });
-      await e.player.sendMessage(
-        `<red>You died!</red> <gray>Use</gray> <click:run_command:/back><aqua><u>/back</u></aqua></click> <gray>to return</gray>`,
-      );
-    }
+    if (!loc) return;
+    // PDC auto JSON serialization: directly store/retrieve objects (no need for manual JSON.stringify/parse)
+    await e.player.setPdc('back.deathLocation', {
+      x: loc.x, y: loc.y, z: loc.z, world: loc.world || e.player.world,
+    });
+    await e.player.sendMessage(
+      `<red>You died!</red> <gray>Use</gray> <click:run_command:/back><aqua><u>/back</u></aqua></click> <gray>to return</gray>`,
+    );
   });
 
   // /back — Return to death location
   registerCommand('back', {
     description: 'Teleport to your death location',
+    permission: { node: 'back.use', default: 'all' },   // Declare permission node: all players default, server admin can manage via permissions plugin
     executor: async (p) => {
-      const loc = await pdcGet(p.sender.uuid, 'back.deathLocation');
-      if (!loc) return p.sender.sendMessage('<red>No death location recorded</red>');
+      if (p.sender === 'CONSOLE') return;
+      const player = p.sender;                           // Confirmed not CONSOLE → Player
+      const loc = await player.getPdc<{ x: number; y: number; z: number; world: string }>('back.deathLocation');
+      if (!loc) return player.sendMessage('<red>No death location recorded</red>');
 
-      const player = await Player.get(p.sender.uuid);
-      if (player) {
-        await player.teleport(new Location(loc.x, loc.y, loc.z, 0, 0, loc.world));
-        p.sender.sendMessage('<green>Teleported to death location</green>');
-      }
+      await player.teleport(new Location(loc.x, loc.y, loc.z, 0, 0, loc.world));
+      await player.sendMessage('<green>Teleported to death location</green>');
     },
   });
 
@@ -151,6 +150,7 @@ Property access (`player.ping`, `world.time`) is always synchronous.
 | Register command + Tab completion | `registerCommand()` or `Command.create()`                      | [Command](api/command.md) |
 | Read/write plugin data files     | `fs.readFileSync()` / `fs.writeFileSync()`                     | [FS](api/fs.md)           |
 | Read packaged resources          | `getAssetsPath()` (`yeow-dev`) + `assetsReadSync()`            | [Assets](api/assets.md)   |
+| Read/write player/block persistent data | `player.setPdc()` / `player.getPdc()`                  | [PDC](api/pdc.md)         |
 | Inter-plugin communication / native programs | `registerService()` / `registerNativeService()`        | [Service](api/service.md) |
 | Logging                          | `log.info()` / `console.log()`                                 | [Log](api/log.md)         |
 

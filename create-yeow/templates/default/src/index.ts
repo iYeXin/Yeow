@@ -1,6 +1,6 @@
 import {
   onInit, onLoad, onUnload, registerCommand, eventOn,
-  Location, pdcSet, pdcGet, log,
+  Location, log,
 } from 'yeow-api';
 import type { PlayerDeathEvent } from 'yeow-api';
 
@@ -13,7 +13,7 @@ onLoad(() => {
     const loc = e.player.location;
     if (!loc) return;
     // PDC 自动 JSON 序列化：直接存取对象（无需手写 JSON.stringify/parse）
-    pdcSet(e.player.uuid, 'back.deathLocation', { x: loc.x, y: loc.y, z: loc.z, world: loc.world || e.player.world });
+    await e.player.setPdc('back.deathLocation', { x: loc.x, y: loc.y, z: loc.z, world: loc.world || e.player.world });
     await e.player.sendMessage(
       '<red>You died!</red> <gray>Use</gray> <click:run_command:/back><aqua><u>/back</u></aqua></click> <gray>to return</gray>',
     );
@@ -25,7 +25,7 @@ onLoad(() => {
     executor: async (p) => {
       if (p.sender === 'CONSOLE') return;
       const player = p.sender;                           // 已确认非 CONSOLE → Player
-      const loc = await pdcGet<{ x: number; y: number; z: number; world: string }>(player.uuid, 'back.deathLocation');
+      const loc = await player.getPdc<{ x: number; y: number; z: number; world: string }>('back.deathLocation');
       if (!loc) return player.sendMessage('<red>No death location recorded</red>');
 
       await player.teleport(new Location(loc.x, loc.y, loc.z, 0, 0, loc.world));

@@ -75,36 +75,35 @@ my-plugin/
 实现 `/back`：记录玩家死亡位置，输入 `/back` 传送回去。
 
 ```ts
-import {
-  onLoad, onUnload, registerCommand, eventOn,
-  Player, Location, pdcSet, pdcGet, log,
-} from 'yeow-api';
+import { onLoad, onUnload, registerCommand, eventOn, Location, log } from 'yeow-api';
+import type { PlayerDeathEvent } from 'yeow-api';
 
 onLoad(() => {
   // 记录所有死亡位置，并通知玩家
-  eventOn('playerDeath', async (e) => {
+  eventOn('playerDeath', async (e: PlayerDeathEvent) => {
     const loc = e.player.location;
-    if (loc) {
-      // PDC 自动 JSON 序列化：直接存取对象（无需手写 JSON.stringify/parse）
-      pdcSet(e.player.uuid, 'back.deathLocation', { x: loc.x, y: loc.y, z: loc.z, world: loc.world || e.player.world });
-      await e.player.sendMessage(
-        `<red>You died!</red> <gray>Use</gray> <click:run_command:/back><aqua><u>/back</u></aqua></click> <gray>to return</gray>`,
-      );
-    }
+    if (!loc) return;
+    // PDC 自动 JSON 序列化：直接存取对象（无需手写 JSON.stringify/parse）
+    await e.player.setPdc('back.deathLocation', {
+      x: loc.x, y: loc.y, z: loc.z, world: loc.world || e.player.world,
+    });
+    await e.player.sendMessage(
+      `<red>You died!</red> <gray>Use</gray> <click:run_command:/back><aqua><u>/back</u></aqua></click> <gray>to return</gray>`,
+    );
   });
 
   // /back — 返回死亡位置
   registerCommand('back', {
     description: 'Teleport to your death location',
+    permission: { node: 'back.use', default: 'all' },   // 声明权限节点：普通玩家默认可用，服主可经权限插件管理
     executor: async (p) => {
-      const loc = await pdcGet(p.sender.uuid, 'back.deathLocation');
-      if (!loc) return p.sender.sendMessage('<red>No death location recorded</red>');
+      if (p.sender === 'CONSOLE') return;
+      const player = p.sender;                           // 已确认非 CONSOLE → Player
+      const loc = await player.getPdc<{ x: number; y: number; z: number; world: string }>('back.deathLocation');
+      if (!loc) return player.sendMessage('<red>No death location recorded</red>');
 
-      const player = await Player.get(p.sender.uuid);
-      if (player) {
-        await player.teleport(new Location(loc.x, loc.y, loc.z, 0, 0, loc.world));
-        p.sender.sendMessage('<green>Teleported to death location</green>');
-      }
+      await player.teleport(new Location(loc.x, loc.y, loc.z, 0, 0, loc.world));
+      await player.sendMessage('<green>Teleported to death location</green>');
     },
   });
 
@@ -151,6 +150,7 @@ const q = Player.getSync('Notch');
 | 注册命令 + Tab 补全      | `registerCommand()` 或 `Command.create()`                    | [Command](api/command.md) |
 | 读写插件数据文件         | `fs.readFileSync()` / `fs.writeFileSync()`                   | [FS](api/fs.md)           |
 | 读取打包资源             | `getAssetsPath()`（`yeow-dev`）+ `assetsReadSync()`          | [Assets](api/assets.md)   |
+| 读写玩家/方块持久数据    | `player.setPdc()` / `player.getPdc()`                       | [PDC](api/pdc.md)         |
 | 插件间通信 / 原生程序    | `registerService()` / `registerNativeService()`              | [Service](api/service.md) |
 | 日志                     | `log.info()` / `console.log()`                               | [Log](api/log.md)         |
 
