@@ -32,30 +32,30 @@ Yeow v1 is the matured output of a **proof of concept**: limited by personal cap
 
 ### Yeow v2 — Full-Stack Mod Development (Client Capabilities)
 
-Yeow v2 will attempt to introduce **client capabilities** (full-stack mod development). In Yeow's vision, mod development is divided into **two clearly distinct parts** — server-side and client-side — because Minecraft itself is a classic C/S (client-server) model:
+Yeow v2 will introduce **client capabilities** (full-stack mod development). In Yeow's vision, mod development is divided into **two clearly distinct parts** — server-side and client-side — because Minecraft itself is a classic C/S (client-server) model:
 
 - **Server-side** handles game logic.
 - **Client-side** handles local resources, rendering, sound effects, and key input.
 
+**Core vision: joining a server is like visiting a website with a browser.**
+
+- A Yeow plugin can contain both **server-side logic** and **client-side logic**: server-side logic runs only on the server; client-side logic is **pushed down** by the server and executed in the client's **Yeow-Client**.
+- **Yeow-Client is the core component of Yeow v2** — a complete Yeow mod includes both the server runtime and the client runtime. Yeow-Client executes the pushed-down client JS logic inside a **restricted sandbox** (similar to a browser sandbox).
+- Server-side and client-side logic communicate via **standardized network channels** — differences in transport (real network / internal network) are **transparent** to plugins.
+
 Key design:
 
-- **A mod's client-side part and server-side part run on different JS threads**, communicating via **standardized network messaging**.
-- **Yeow treats singleplayer the same way**: Minecraft singleplayer mode essentially launches an internal integrated server — Yeow provides a new way to end the chaos of previous mod development (split between logic side and physical side), **avoiding the "works in singleplayer, crashes on a server" scenario** (mixed client-only classes).
+- **A mod's client-side part and server-side part run on different JS threads**, communicating via **standardized network channels**.
+- **Yeow treats singleplayer the same way**: Minecraft singleplayer mode essentially launches an internal integrated server — server-side and client-side logic run **simultaneously in the same host but on different threads**, communicating over an **internal network**; transport differences are transparent to plugins — avoiding the "works in singleplayer, crashes on a server" scenario (mixed client-only classes).
 - **On-demand loading**: A mod only runs the server-side part on the server and only the client-side part on the client; in singleplayer, both **run simultaneously** in different threads.
 - **Not trying to do everything**: Yeow will not attempt an all-encompassing approach (e.g., allowing manipulation of the rendering pipeline), but instead will provide **basic and commonly used interfaces** (key listeners, HUD rendering, client-side sound effects, etc.), leaving low-level scenarios to native development.
 - **Project structure**: Similar to having `server/` and `client/` directories, with developers importing `@yeow/server-api` and `@yeow/client-api` respectively.
 - **Build output**: Still `.yeow.zip` — **Yeow v1 plugins can be considered mods that only contain the server-side part**.
+- **Install once, use everywhere**: A client only needs Yeow-Client installed once to enjoy enhanced client-side capabilities **on any server** (if a corresponding Yeow plugin exists); v2 plugins directly use the **universal client capabilities** provided by Yeow-Client without developing a dedicated client per server.
 
 ### WASM Native Support
 
 Yeow is experimenting with introducing **WASM**: to address **performance limitations** of JS in specific scenarios, and to explore **efficient interoperability solutions** (platform layer ↔ WASM modules) and **dependency package integration** (npm packages carrying `.wasm` artifacts), preparing for future high-performance scenarios.
-
-### Yeow Client Lite — Universal Client Capabilities
-
-During the transition from v1 to v2, Yeow is considering developing **Yeow Client Lite** (a client mod) and **standardizing its specification**, providing consistent interfaces across different platforms (drawing simple HUDs, listening to client-side key presses, playing sound effects, etc.) for server-side invocation:
-
-- As long as a client has Yeow Client Lite installed, it can enjoy enhanced client-side capabilities **on any server** (if a corresponding Yeow plugin exists).
-- In Yeow v1 and v2 server-side development, you can use **universal client capabilities** provided by Yeow Client Lite without needing to develop a dedicated client.
 
 ### A Better Protocol
 
