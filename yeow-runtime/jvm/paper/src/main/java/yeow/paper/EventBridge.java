@@ -268,14 +268,58 @@ public class EventBridge implements Listener {
      * Component → Message 对象（协议层可翻译组件载荷）：
      * 可翻译组件 → `{ "key", "args", "text" }`（key 本地化 + text 纯文本兜底，同时传递）；
      * 否则 → `{ "text" }`。null → null。
+     *
+     * args()/arguments() 通过反射获取——Adventure 4.20+ 将 args() 改为基于
+     * ComponentLike.asComponents() 转换（对 TranslationArgument 列表返回空），
+     * 实际数据在 arguments() 中；旧版 args() 直接返回 Component 列表。
+     * 先尝试 args()（旧版行为），空列表则 fallback arguments()（4.20+）。
      */
+    private static java.lang.reflect.Method TC_ARGS, TC_ARGUMENTS;
+    private static final net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer PLAIN = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText();
+    static {
+        try { TC_ARGS = net.kyori.adventure.text.TranslatableComponent.class.getMethod("args"); } catch (Exception ignored) {}
+        try { TC_ARGUMENTS = net.kyori.adventure.text.TranslatableComponent.class.getMethod("arguments"); } catch (Exception ignored) {}
+    }
+
+    private static java.util.List<String> resolveArgs(net.kyori.adventure.text.TranslatableComponent tc) {
+        // 尝试旧版 args()（返回 List<Component>）
+        try {
+            if (TC_ARGS != null) {
+                var raw = TC_ARGS.invoke(tc);
+                if (raw instanceof java.util.List<?> list && !list.isEmpty()) {
+                    var out = new java.util.ArrayList<String>();
+                    for (var a : list) {
+                        if (a instanceof net.kyori.adventure.text.Component comp) out.add(PLAIN.serialize(comp));
+                        else if (a != null) out.add(a.toString());
+                    }
+                    return out;
+                }
+            }
+        } catch (Exception ignored) {}
+        // Fallback: 4.20+ arguments()（返回 List<TranslationArgument>）
+        try {
+            if (TC_ARGUMENTS != null) {
+                var raw = TC_ARGUMENTS.invoke(tc);
+                if (raw instanceof java.util.List<?> list) {
+                    var out = new java.util.ArrayList<String>();
+                    for (var a : list) {
+                        var val = a instanceof net.kyori.adventure.text.TranslationArgument ta ? ta.value() : a;
+                        if (val instanceof net.kyori.adventure.text.Component comp) out.add(PLAIN.serialize(comp));
+                        else if (val instanceof net.kyori.adventure.text.ComponentLike cl) out.add(PLAIN.serialize(cl.asComponent()));
+                        else if (val != null) out.add(val.toString());
+                    }
+                    return out;
+                }
+            }
+        } catch (Exception ignored) {}
+        return java.util.List.of();
+    }
+
     static Object componentToMessage(net.kyori.adventure.text.Component c) {
         if (c == null) return null;
         var text = TextUtil.toLegacy(c);
         if (c instanceof net.kyori.adventure.text.TranslatableComponent tc) {
-            var args = new java.util.ArrayList<String>();
-            for (var a : tc.args()) args.add(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(a));
-            return Map.of("key", tc.key(), "args", args, "text", text);
+            return Map.of("key", tc.key(), "args", resolveArgs(tc), "text", text);
         }
         return Map.of("text", text);
     }
