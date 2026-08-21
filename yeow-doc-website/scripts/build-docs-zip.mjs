@@ -35,6 +35,11 @@ const out = join(PUBLIC, 'docs.zip');
 writeFileSync(out, buf);
 console.log(`docs.zip: ${files.length} markdown files → ${out} (${buf.length} bytes)`);
 
+// 复制一份到 packages/yeow-docs（主仓库文档包，供 AI 离线查阅 / 下载）
+const YEOW_DOCS_PKG = resolve(root, '..', 'packages', 'yeow-docs');
+copyFileSync(out, join(YEOW_DOCS_PKG, 'docs.zip'));
+console.log(`docs.zip → packages/yeow-docs synced`);
+
 // 同步 sitemap.md 到 create-yeow 模板项目（避免手动复制遗漏）
 copyFileSync(join(DOCS, 'sitemap.md'), TEMPLATE_SITEMAP);
 console.log(`sitemap.md → template synced (${TEMPLATE_SITEMAP})`);
