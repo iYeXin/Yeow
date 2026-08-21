@@ -172,7 +172,7 @@ This fulcrum is exactly why the pure L approach works — during an event, the p
 
 **Identical to Paper**:
 
-1. Place the Folia runtime jar (`yeow-runtime-folia-0.5.0.jar`) into the server's `plugins/`
+1. Place the Folia runtime jar (`yeow-runtime-folia-0.5.1.jar`) into the server's `plugins/`
 2. Place plugin packages (`.yeow.zip` or template JAR) into `plugins/Yeow/` (auto-scanned) or load dynamically via `/yeow load <path>`
 3. Plugin data, `/yeow` admin commands, hot reload, etc. behave the same as Paper
 

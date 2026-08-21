@@ -4,6 +4,12 @@
 
 ---
 
+## 2026-08-21
+
+- yeow-runtime 0.5.0 → 0.5.1: Fix Adventure 4.20+ TranslatableComponent.args() NoSuchMethodError (Paper 26.2 compat)
+- yeow-template 0.5.0 → 0.5.1: Depends on runtime 0.5.1
+- Template jars synced to 0.5.1
+
 ## 2026-08-20
 
 - Version 0.5.0: yeow-api / create-yeow / yeow-runtime / yeow-template full version upgrade (BossBar/Scoreboard OOP + breaking change eliminating uuid friction; template depends on yeow-api ^0.5.0)

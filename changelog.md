@@ -4,15 +4,18 @@
 
 ---
 
+## 2026-08-21
+
+### yeow-runtime 0.5.1（Adventure 兼容修复 + 版本升版）
+
+- **yeow-runtime 0.5.0 → 0.5.1**（Maven core/paper/folia）：运行时版本随 `plugin.yml` 提升——`yeow-runtime-0.5.1.jar` / `yeow-runtime-folia-0.5.1.jar`
+- **yeow-template 0.5.0 → 0.5.1**：依赖 runtime 0.5.1；`yeow-template-0.5.1.jar`
+- 模板：`create-yeow` 内置三个 jar 同步至 0.5.1；build.js / dev-server.js 引用更新
+- 修复：EventBridge `TranslatableComponent.args()` 在 Paper 26.2 上 `NoSuchMethodError`（Adventure 4.20+ args 存储重构兼容）
+- 文档：AGENTS.md / CONTRIBUTING.md / README.md / getting-started.md / folia.md 中 jar 版本号同步
+- 文档站 changelog（cn + en）同步更新
+
 ## 2026-08-20
-
-### 修复：EventBridge TranslatableComponent.args() 在 Paper 26.2 上 NoSuchMethodError
-
-- **根因**：Adventure 4.20+ 重构了 `TranslatableComponent` 的 `args()` getter——底层数据类型从 `List<Component>` 变更为 `List<TranslationArgument>`（字段重命名），`args()` 成为兼容桥接（通过 `ComponentLike.asComponents()` 转换）；而 `.args(list)` setter 已转发到 `arguments(list)`——在某些 Paper 版本（26.2+）上运行时类路径的 Adventure 版本与编译时不一致，`args()` 方法签名变化导致 `NoSuchMethodError`，**PlayerDeathEvent 等含死亡消息的事件全部失败**
-- **修复**：EventBridge（paper + folia）的 `componentToMessage` 与 TextUtilTest 的 `argsOf` 统一改为**反射双路径**：先尝试 `args()`（旧版行为，返回 `List<Component>`，非空则直接使用）；空列表或异常时 fallback `arguments()`（4.20+，返回 `List<TranslationArgument>`，逐个提取 `value()` 并序列化）——通过**接口**（`TranslatableComponent.class.getMethod(...)`）反射，避免模块系统对 Adventure 内部实现类的 `IllegalAccessException`
-- 兼容性：编译时 Paper 1.21.4（Adventure 4.20.0）与运行时 Paper 26.2+（Adventure 版本可能更高）均可安全运行
-- 模板 jar 同步：`yeow-runtime-0.5.0.jar`（2803343 bytes）
-- 验证：`mvn clean install` 全绿（16 测试 + Folia 路由测试）
 
 ### 版本 0.5.0（破坏性重构后首次大版本）
 
