@@ -200,6 +200,9 @@ eventOn('blockBreak', (e) => {
 });
 ```
 
+> [!TIP]
+> **`serverPing` 的 `motd` 回写不持久化**：只影响该次 ping 响应。而 [`setMotd`](server.md) 会写入 `server.properties`（重启后仍生效）——需要动态 MOTD 且不覆盖服主配置时，用 `serverPing` 回写代替 `setMotd`。
+
 > **支持回写的字段**（运行时实际应用；其余字段赋值会被发送但运行时忽略——只读字段）：
 >
 > | 事件 | 可回写字段 | 说明 |

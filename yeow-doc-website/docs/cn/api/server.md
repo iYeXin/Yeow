@@ -25,9 +25,12 @@ await setMotd('<red>New MOTD</red>')    // Promise — 支持 MiniMessage
 setMotdSync('A Minecraft Server')       // void — 同步
 ```
 
+> [!WARNING]
+> **`setMotd` 会持久化**：此操作在 Paper 系服务端中会写入 `server.properties` 的 `motd` 字段（服务器重启后仍生效），且会覆盖服主手工配置的值。若只想临时展示动态 MOTD（如欢迎语、状态展示），请改用下方 **`serverPing` 事件回写**——只影响该次 ping 响应，不落盘。
+
 ## 服务器列表响应（serverPing 事件）
 
-**服务器列表（MOTD / 图标 / 人数）按次回写请在 `serverPing` 事件中修改**——`setMotd` 设置的是**全局默认 MOTD**（持久，所有客户端可见）；`serverPing` 的回写只影响**该次** ping 响应，**优先级更高，覆盖 `setMotd`/`server-icon.png` 的结果**：
+**服务器列表（MOTD / 图标 / 人数）按次回写请在 `serverPing` 事件中修改**——`setMotd` 设置的是**全局默认 MOTD**（持久，所有客户端可见）；`serverPing` 的回写只影响**该次** ping 响应，**优先级更高，覆盖 `setMotd`/`server-icon.png` 的结果**。需要"修改 MOTD 但不持久化"时也用此方式：
 
 ```js
 eventOn('serverPing', (e) => {

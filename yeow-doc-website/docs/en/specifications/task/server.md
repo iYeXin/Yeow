@@ -4,14 +4,14 @@ Server global operations.
 
 ---
 
-| Task | Request | Returns |
-|------|---------|---------|
-| `server.broadcast` | `{ "message": <Message> }` | `true` | `message` is a [Message object](../task/player.md#message-translatable-component) or plain text |
-| `server.getMotd` | `{}` | `string` |
-| `server.setMotd` | `{ "motd": "<text>" }` | `true` |
-| `server.getVersion` | `{}` | `string` |
-| `server.getTps` | `{}` | `{ "tps1m": <double>, "tps5m": <double>, "tps15m": <double> }` |
-| `server.getMaxPlayers` | `{}` | `number` |
+| Task                   | Request                    | Returns                                                        |
+| ---------------------- | -------------------------- | -------------------------------------------------------------- |
+| `server.broadcast`     | `{ "message": <Message> }` | `true`                                                         | `message` is a [Message object](../task/player.md#message-translatable-component) or plain text |
+| `server.getMotd`       | `{}`                       | `string`                                                       |
+| `server.setMotd`       | `{ "motd": "<text>" }`     | `true`                                                         |
+| `server.getVersion`    | `{}`                       | `string`                                                       |
+| `server.getTps`        | `{}`                       | `{ "tps1m": <double>, "tps5m": <double>, "tps15m": <double> }` |
+| `server.getMaxPlayers` | `{}`                       | `number`                                                       |
 
 > **`server.getTps` is not guaranteed across platforms**: TPS is a host platform runtime metric (Paper platform uses `Bukkit.getTPS`) — other platform runtimes do not guarantee support, and the TPS concept may change in the future; callers must handle degradation themselves.
 
@@ -32,11 +32,11 @@ Get all registered Material data.
 ]
 ```
 
-| Return field | Type | Description |
-|-------------|------|-------------|
-| `key` | string | Material namespace key (e.g. `minecraft:stone`) |
-| `isBlock` | boolean | Whether it is a block type |
-| `isItem` | boolean | Whether it is an item type |
+| Return field | Type    | Description                                     |
+| ------------ | ------- | ----------------------------------------------- |
+| `key`        | string  | Material namespace key (e.g. `minecraft:stone`) |
+| `isBlock`    | boolean | Whether it is a block type                      |
+| `isItem`     | boolean | Whether it is an item type                      |
 
 ### `server.getBlocks`
 

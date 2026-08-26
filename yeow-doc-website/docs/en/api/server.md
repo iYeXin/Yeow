@@ -25,9 +25,12 @@ await setMotd('<red>New MOTD</red>')    // Promise — supports MiniMessage
 setMotdSync('A Minecraft Server')       // void — sync
 ```
 
+> [!WARNING]
+> **`setMotd` persists**: it writes the `motd` field in `server.properties` (survives server restarts) and overwrites the value configured by the server owner. To display a dynamic MOTD (welcome text, status, etc.) without persisting, use the **`serverPing` event write-back** below — it only affects that ping response and never touches disk.
+
 ## Server list response (serverPing event)
 
-**To override the server list (MOTD / icon / player count) per-ping, modify it in the `serverPing` event** — `setMotd` sets the **global default MOTD** (persistent, visible to all clients); the write-back in `serverPing` only affects **that** ping response and has **higher priority, overriding the result of `setMotd`/`server-icon.png`**:
+**To override the server list (MOTD / icon / player count) per-ping, modify it in the `serverPing` event** — `setMotd` sets the **global default MOTD** (persistent, visible to all clients); the write-back in `serverPing` only affects **that** ping response and has **higher priority, overriding the result of `setMotd`/`server-icon.png`**. Use this approach when you need to change the displayed MOTD **without persisting it**:
 
 ```js
 eventOn('serverPing', (e) => {

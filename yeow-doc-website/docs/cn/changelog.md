@@ -6,6 +6,7 @@
 
 ## 2026-08-26
 
+- 文档：`setMotd` 会写入 `server.properties` 持久化——动态 MOTD 请用 `serverPing` 事件回写（不落盘）
 - yeow-runtime 0.5.1 → 0.5.2：挂起自恢复（30s告警/120s自动重载，默认启用，冷却300s/最大3次）+ BudgetScaler 编码修复；yeow-template 同步至 0.5.2
 
 ## 2026-08-21

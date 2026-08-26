@@ -6,6 +6,7 @@
 
 ## 2026-08-26
 
+- Docs: `setMotd` persists to `server.properties` — use the `serverPing` event write-back for dynamic MOTD (not persisted)
 - yeow-runtime 0.5.1 → 0.5.2: hung auto-reload (30s warn / 120s reload, enabled by default, cooldown 300s / max 3 retries) + BudgetScaler encoding fix; yeow-template synced to 0.5.2
 
 ## 2026-08-21

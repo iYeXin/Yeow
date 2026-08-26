@@ -36,7 +36,7 @@
 | ----------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | API 索引    | `https://cn.yexin.wiki/yeow/v1/api/`            | 全部 API 模块的分组索引                                                                                                                                                          |
 | Player      | `https://cn.yexin.wiki/yeow/v1/api/player`      | 玩家：属性（血量/饥饿/经验/飞行等）、位置、消息（Message 对象）、Title/ActionBar、音效、资源包、传送、权限、`performCommand`、手持物品（ItemStack 快照）                         |
-| Server      | `https://cn.yexin.wiki/yeow/v1/api/server`      | 服务器级：广播、MOTD（setMotd 全局默认）、serverPing 事件回写（按次覆盖 motd/icon/人数）、版本、TPS、最大玩家数                                                                  |
+| Server      | `https://cn.yexin.wiki/yeow/v1/api/server`      | 服务器级：广播、MOTD（setMotd 全局默认，⚠ 写入 server.properties 持久化）、serverPing 事件回写（按次覆盖 motd/icon/人数，不持久化）、版本、TPS、最大玩家数                                                                  |
 | Env         | `https://cn.yexin.wiki/yeow/v1/api/env`         | 运行时环境信息（同步）：CPU 核心数、内存、系统架构、Minecraft 版本、Yeow 运行时信息、epoch 微秒时间戳                                                                            |
 | Permission  | `https://cn.yexin.wiki/yeow/v1/api/permission`  | 权限：`registerPermission`（default: all/op/none）、命令权限、检查流程、`permissionCheck` Yeow 生态钩子（优先级/触发范围/无限循环提醒）、Paper 兼容（permissions.yml/LuckPerms） |
 | World       | `https://cn.yexin.wiki/yeow/v1/api/world`       | 世界：时间/天气/难度/规则、方块（getBlock/setBlock，Block 对象）、区块、光照、生物群系、实体查询、掉落/闪电/爆炸/生成                                                            |

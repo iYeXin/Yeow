@@ -6,6 +6,11 @@
 
 ## 2026-08-26
 
+### 文档：setMotd 持久化行为说明
+
+- **`server.setMotd` 会写入 `server.properties` 的 `motd` 字段**（重启后仍生效，并覆盖服主手工配置）——api/server.md（cn/en）MOTD 节新增 WARNING 说明；需要动态 MOTD 且不落盘时改用 `serverPing` 事件回写（按次生效、不持久化）
+- 同步：specifications/task/server.md（任务表注）、specifications/event/server-events.md（motd 回写条目标注「不落盘」并交叉引用）、api/event.md（cn/en 回写字段 TIP）、sitemap ×2 + 模板 sitemap（Server 行摘要）
+
 ### yeow-runtime 0.5.2（挂起自恢复 + 编码修复）
 
 - **yeow-runtime 0.5.1 → 0.5.2**（Maven core/paper/folia）：新增挂起自恢复——`suspend-warn 30s` 仅告警，`auto-reload-hung 120s` 自动重载（默认启用，`auto-reload-enabled: true`，冷却 `300s`/`max-retries 3`，Worker/dev 模式跳过，二次校验防误触）+ `ProfileConfig:16`/`YeowConfig:101`/`RecoveryManager:31` / `Profiler:54` / `RuntimeCore:141` / `PluginHungDetector:51`；防 `pending` 去重与 `5s waitForExit` 强杀重建复用，已有 `generation` 隔离

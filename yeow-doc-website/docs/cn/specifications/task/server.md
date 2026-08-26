@@ -4,14 +4,14 @@
 
 ---
 
-| 任务 | 请求 | 返回 |
-|------|------|------|
-| `server.broadcast` | `{ "message": <Message> }` | `true` | `message` 为 [Message 对象](../task/player.md#message-对象可翻译组件) 或纯文本 |
-| `server.getMotd` | `{}` | `string` |
-| `server.setMotd` | `{ "motd": "<text>" }` | `true` |
-| `server.getVersion` | `{}` | `string` |
-| `server.getTps` | `{}` | `{ "tps1m": <double>, "tps5m": <double>, "tps15m": <double> }` |
-| `server.getMaxPlayers` | `{}` | `number` |
+| 任务                   | 请求                       | 返回                                                           |
+| ---------------------- | -------------------------- | -------------------------------------------------------------- |
+| `server.broadcast`     | `{ "message": <Message> }` | `true`                                                         | `message` 为 [Message 对象](../task/player.md#message-对象可翻译组件) 或纯文本 |
+| `server.getMotd`       | `{}`                       | `string`                                                       |
+| `server.setMotd`       | `{ "motd": "<text>" }`     | `true`                                                         |
+| `server.getVersion`    | `{}`                       | `string`                                                       |
+| `server.getTps`        | `{}`                       | `{ "tps1m": <double>, "tps5m": <double>, "tps15m": <double> }` |
+| `server.getMaxPlayers` | `{}`                       | `number`                                                       |
 
 > **`server.getTps` 跨平台不保证可用**：TPS 是宿主平台的运行指标（Paper 平台基于 `Bukkit.getTPS`）——其他平台运行时不保证支持，且未来 TPS 这一概念可能发生变化；调用方需自行降级处理。
 
@@ -32,11 +32,11 @@
 ]
 ```
 
-| 返回字段 | 类型 | 说明 |
-|---------|------|------|
-| `key` | string | Material 命名空间 key（如 `minecraft:stone`） |
-| `isBlock` | boolean | 是否为方块类型 |
-| `isItem` | boolean | 是否为物品类型 |
+| 返回字段  | 类型    | 说明                                          |
+| --------- | ------- | --------------------------------------------- |
+| `key`     | string  | Material 命名空间 key（如 `minecraft:stone`） |
+| `isBlock` | boolean | 是否为方块类型                                |
+| `isItem`  | boolean | 是否为物品类型                                |
 
 ### `server.getBlocks`
 

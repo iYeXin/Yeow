@@ -200,6 +200,9 @@ eventOn('blockBreak', (e) => {
 });
 ```
 
+> [!TIP]
+> **The `motd` write-back in `serverPing` is not persisted**: it only affects that ping response. Meanwhile [`setMotd`](server.md) writes to `server.properties` (survives restarts) — when you need a dynamic MOTD without overwriting the owner's configuration, use the `serverPing` write-back instead of `setMotd`.
+
 > **Fields supporting writeback** (runtime actually applies; other field assignments sent but runtime ignores — read-only fields):
 >
 > | Event | Writeable Fields | Description |
