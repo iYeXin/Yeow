@@ -46,7 +46,7 @@ npm run build                  # 生产产物 → dist/<name>-<version>.jar + .y
 
 三种部署方式（任选其一）：
 
-1. **JAR 方式**：把 `yeow-runtime-0.5.1.jar` 和插件 JAR 一同放入 `plugins/`（与原生 Java 插件部署一致）
+1. **JAR 方式**：把 `yeow-runtime-0.5.2.jar` 和插件 JAR 一同放入 `plugins/`（与原生 Java 插件部署一致）
 2. **自动扫描**：把插件 `.yeow.zip` 放入 `plugins/Yeow/`，服务器启动时自动加载
 3. **命令加载**：服务器运行中执行 `/yeow load <path>`（本地临时加载）、`/yeow load <url>`（下载临时加载）、`/yeow install <url>`（下载并安装到 `plugins/Yeow/`）、`/yeow update <url>`（替换旧版本）
 

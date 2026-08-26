@@ -104,6 +104,10 @@ public class YeowConfig {
     public boolean profileScalerEnabled() { return getBool("profile.scaler.enabled", true); }
     public double profileScalerFactor() { return getDouble("profile.scaler.expansion-factor", 1.3); }
     public double profileScalerMax() { return getDouble("profile.scaler.max-multiplier", 3.0); }
+    public boolean profileAutoReloadEnabled() { return getBool("profile.auto-reload-enabled", true); }
+    public int profileAutoReloadHungSeconds() { return getInt("profile.auto-reload-hung-seconds", 120); }
+    public int profileAutoReloadCooldownSeconds() { return getInt("profile.auto-reload-cooldown-seconds", 300); }
+    public int profileAutoReloadMaxRetries() { return getInt("profile.auto-reload-max-retries", 3); }
 
     /** 同步 task 调用超时（毫秒），默认 10000。 */
     public long taskSyncTimeoutMs() { return getInt("task-sync-timeout-ms", 10000); }
@@ -165,6 +169,10 @@ public class YeowConfig {
         profile.put("tab-slow-threshold-ms", 500);
         profile.put("warn-cooldown-seconds", 1800);
         profile.put("suspend-warn-seconds", 30);
+        profile.put("auto-reload-enabled", true);
+        profile.put("auto-reload-hung-seconds", 120);
+        profile.put("auto-reload-cooldown-seconds", 300);
+        profile.put("auto-reload-max-retries", 3);
         profile.put("backlog-threshold", 35);
         profile.put("backlog-window-ticks", 40);
         profile.put("scheduler-saturation-pct", 80);

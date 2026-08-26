@@ -15,6 +15,10 @@ public final class ProfileConfig {
     private final int callbackTimeoutEventMs;
     private final int callbackTimeoutTabMs;
     private final int suspendWarnSec;
+    private final boolean autoReloadEnabled;
+    private final int autoReloadHungSec;
+    private final int autoReloadCooldownSec;
+    private final int autoReloadMaxRetries;
     private final int backlogThreshold;
     private final int backlogWindowTicks;
     private final int saturationPct;
@@ -32,6 +36,10 @@ public final class ProfileConfig {
         this.callbackTimeoutEventMs = c.profileCallbackTimeoutEventMs();
         this.callbackTimeoutTabMs = c.profileCallbackTimeoutTabCompleteMs();
         this.suspendWarnSec = c.profileSuspendWarnSeconds();
+        this.autoReloadEnabled = c.profileAutoReloadEnabled();
+        this.autoReloadHungSec = c.profileAutoReloadHungSeconds();
+        this.autoReloadCooldownSec = c.profileAutoReloadCooldownSeconds();
+        this.autoReloadMaxRetries = c.profileAutoReloadMaxRetries();
         this.backlogThreshold = c.profileBacklogThreshold();
         this.backlogWindowTicks = c.profileBacklogWindowTicks();
         this.saturationPct = c.profileSaturationPct();
@@ -66,6 +74,11 @@ public final class ProfileConfig {
     public int callbackTimeoutTabMs() { return callbackTimeoutTabMs; }
 
     public int suspendWarnSec() { return suspendWarnSec; }
+
+    public boolean autoReloadEnabled() { return autoReloadEnabled; }
+    public int autoReloadHungSec() { return autoReloadHungSec; }
+    public int autoReloadCooldownSec() { return autoReloadCooldownSec; }
+    public int autoReloadMaxRetries() { return autoReloadMaxRetries; }
 
     /** 扩容信号：滑动窗口内 HIGH/NORMAL 积压 tick 数阈值（默认 35）。 */
     public int backlogThreshold() { return backlogThreshold; }

@@ -4,6 +4,10 @@
 
 ---
 
+## 2026-08-26
+
+- yeow-runtime 0.5.1 → 0.5.2: hung auto-reload (30s warn / 120s reload, enabled by default, cooldown 300s / max 3 retries) + BudgetScaler encoding fix; yeow-template synced to 0.5.2
+
 ## 2026-08-21
 
 - yeow-runtime 0.5.0 → 0.5.1: Fix Adventure 4.20+ TranslatableComponent.args() NoSuchMethodError (Paper 26.2 compat)

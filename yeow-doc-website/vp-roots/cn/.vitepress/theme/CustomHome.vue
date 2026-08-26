@@ -67,7 +67,7 @@ const lines = [
             </p>
             <div class="cta">
                 <a class="btn primary" :href="withBase('/getting-started')">快速开始</a>
-                <a class="btn ghost" href="https://modrinth.com/plugin/yeow">下载运行时</a>
+                <a class="btn ghost" href="https://hangar.papermc.io/iYeXin/Yeow/versions">下载运行时</a>
             </div>
         </section>
 
@@ -110,7 +110,7 @@ const lines = [
         <section class="admin">
             <span class="admin-icon" v-html="icons.terminal"></span>
             <p>
-                服务器管理员：安装 <a href="https://modrinth.com/plugin/yeow">Yeow 运行时</a> 后，
+                服务器管理员：安装 <a href="https://hangar.papermc.io/iYeXin/Yeow/versions">Yeow 运行时</a> 后，
                 插件包放入 <code>plugins/Yeow/</code> 自动加载，或
                 <code>/yeow install &lt;your-plugin-url&gt;</code> 一键安装。
                 Folia 服务器请使用 Folia 版运行时——插件包与 Paper 完全通用。
@@ -121,7 +121,7 @@ const lines = [
             <a :href="withBase('/overview')">概览</a>
             <a :href="withBase('/distribution')">构建与分发</a>
             <a href="https://github.com/iyexin/yeow">GitHub</a>
-            <a href="https://modrinth.com/plugin/yeow">Modrinth</a>
+            <a href="https://hangar.papermc.io/iYeXin/Yeow/versions">Modrinth</a>
         </footer>
     </div>
 </template>

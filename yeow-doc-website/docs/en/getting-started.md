@@ -46,7 +46,7 @@ npm run build                  # Production artifacts → dist/<name>-<version>.
 
 Three deployment methods (choose one):
 
-1. **JAR Method**: Place `yeow-runtime-0.5.1.jar` and plugin JAR together in `plugins/` (same as native Java plugin deployment)
+1. **JAR Method**: Place `yeow-runtime-0.5.2.jar` and plugin JAR together in `plugins/` (same as native Java plugin deployment)
 2. **Auto-scan**: Place plugin `.yeow.zip` in `plugins/Yeow/`, automatically loaded on server startup
 3. **Command Load**: While server is running, execute `/yeow load <path>` (local temporary load), `/yeow load <url>` (download temporary load), `/yeow install <url>` (download and install to `plugins/Yeow/`), `/yeow update <url>` (replace old version)
 

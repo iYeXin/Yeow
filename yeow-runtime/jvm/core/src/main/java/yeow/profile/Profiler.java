@@ -46,6 +46,7 @@ public final class Profiler implements AutoCloseable {
     private final File reportDir;
     private final WarningEngine warnings;
     private final WindowCollector collector;
+    private final RecoveryManager recovery;
     private final Deque<WindowMetrics> ring = new ArrayDeque<>();
     private final CompositeSink sink = new CompositeSink();
     private final Map<String, PluginEntity> plugins = new ConcurrentHashMap<>();
@@ -56,6 +57,7 @@ public final class Profiler implements AutoCloseable {
         this.reportDir = reportDir;
         this.warnings = new WarningEngine(cfg, plugins::get);
         this.collector = new WindowCollector(cfg, this::onWindow);
+        this.recovery = new RecoveryManager(cfg, plugins::get);
         if (cfg.warningsEnabled()) {
             warnings.register(new HeartbeatTimeoutDetector(cfg));
             warnings.register(new PluginHungDetector(cfg));
@@ -84,16 +86,23 @@ public final class Profiler implements AutoCloseable {
         plugins.put(pt.name(), pt);
     }
 
+    public void setAutoReloadAction(java.util.function.Consumer<String> action) {
+        recovery.setReloadAction(action);
+    }
+
     /** 插件卸载时注销。 */
     public void unregisterPlugin(String name) {
         plugins.remove(name);
         collector.removePlugin(name);
+        recovery.onPluginRemoved(name);
     }
 
     private void onWindow(WindowMetrics w) {
         ring.addLast(w);
         while (ring.size() > RING_CAPACITY) ring.removeFirst();
         if (cfg.warningsEnabled()) warnings.process(w);
+        // 挂起自恢复：告警 30s 后仅告警，重载 120s 后异步重载（默认启用）
+        recovery.maybeRecover(w);
 
         // 心跳探测：插件实体管理 in-flight（ping() 返回 null 表示已有未返回的 ping），
         // Profiler 只标记期望响应并收集往返指标。
@@ -161,6 +170,7 @@ public final class Profiler implements AutoCloseable {
 
     @Override
     public void close() {
+        recovery.shutdown();
         plugins.clear();
         ring.clear();
         track = null;

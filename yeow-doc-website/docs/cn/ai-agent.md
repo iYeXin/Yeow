@@ -40,13 +40,13 @@ npm run dev -- --eula --keep --timeout=2m --wait=30s --outfile=log.txt
 
 ## 如何查阅文档
 
-| 资料                                           | 地址                                            |
-| ---------------------------------------------- | ----------------------------------------------- |
-| **站点地图**（全部页面标题 + 摘要 + URL）      | https://yexin.wiki/yeow/v1/sitemap         |
-| **文档压缩包**（全量 Markdown，可直接喂给 AI） | https://yexin.wiki/yeow/v1/docs.zip        |
-| 快速开始                                       | https://yexin.wiki/yeow/v1/getting-started |
-| API 参考（索引）                               | https://yexin.wiki/yeow/v1/api/            |
-| 进阶（架构/线程/调度器）                       | https://yexin.wiki/yeow/v1/advanced        |
-| 平台规范（协议层）                             | https://yexin.wiki/yeow/v1/specifications/ |
+| 资料                                           | 地址                                          |
+| ---------------------------------------------- | --------------------------------------------- |
+| **站点地图**（全部页面标题 + 摘要 + URL）      | https://cn.yexin.wiki/yeow/v1/sitemap         |
+| **文档压缩包**（全量 Markdown，可直接喂给 AI） | https://cn.yexin.wiki/yeow/v1/docs.zip        |
+| 快速开始                                       | https://cn.yexin.wiki/yeow/v1/getting-started |
+| API 参考（索引）                               | https://cn.yexin.wiki/yeow/v1/api/            |
+| 进阶（架构/线程/调度器）                       | https://cn.yexin.wiki/yeow/v1/advanced        |
+| 平台规范（协议层）                             | https://cn.yexin.wiki/yeow/v1/specifications/ |
 
 > **策略**：在任何 Harness 产品（Codex、OpenCode、Zcode、Trae 等）中，复制**此页面内容或站点地图**发送给 AI，描述你的需求（如"创建一个带 /back 命令的插件"），AI 将带领你完成项目创建、开发与调试。

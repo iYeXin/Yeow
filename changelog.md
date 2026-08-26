@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-08-26
+
+### yeow-runtime 0.5.2（挂起自恢复 + 编码修复）
+
+- **yeow-runtime 0.5.1 → 0.5.2**（Maven core/paper/folia）：新增挂起自恢复——`suspend-warn 30s` 仅告警，`auto-reload-hung 120s` 自动重载（默认启用，`auto-reload-enabled: true`，冷却 `300s`/`max-retries 3`，Worker/dev 模式跳过，二次校验防误触）+ `ProfileConfig:16`/`YeowConfig:101`/`RecoveryManager:31` / `Profiler:54` / `RuntimeCore:141` / `PluginHungDetector:51`；防 `pending` 去重与 `5s waitForExit` 强杀重建复用，已有 `generation` 隔离
+- **yeow-template 0.5.1 → 0.5.2**：依赖 runtime 0.5.2；`yeow-template-0.5.2.jar`
+- **修复**：`Paper/BudgetScaler.java:5` 注释 `GBK→UTF-8` 编码损坏（`鈥?` → `—`）
+- **模板**：`create-yeow` 内置三个 jar 同步至 0.5.2；`build.js:117` / `dev-server.js:37` 引用更新；`README:59`/`CONTRIBUTING:83`/`AGENTS:8`/`getting-started:49`/`folia:175` 同步
+- **文档**：`yeow-doc-website/docs/cn|en/changelog.md` 新增 0.5.2 条目
+- 验证：`mvn -pl core test` 54项通过；`mvn -pl paper -am compile` 通过
+
 ## 2026-08-21
 
 ### yeow-runtime 0.5.1（Adventure 兼容修复 + 版本升版）

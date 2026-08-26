@@ -4,6 +4,10 @@
 
 ---
 
+## 2026-08-26
+
+- yeow-runtime 0.5.1 → 0.5.2：挂起自恢复（30s告警/120s自动重载，默认启用，冷却300s/最大3次）+ BudgetScaler 编码修复；yeow-template 同步至 0.5.2
+
 ## 2026-08-21
 
 - yeow-runtime 0.5.0 → 0.5.1：修复 Adventure 4.20+ TranslatableComponent.args() NoSuchMethodError（Paper 26.2 兼容）

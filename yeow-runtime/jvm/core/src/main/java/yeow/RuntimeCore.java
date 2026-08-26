@@ -53,6 +53,7 @@ public class RuntimeCore {
         this.serviceManager = new yeow.service.ServiceManager(this::getPlugin);
         this.approvals = new ApprovalStore(host.dataFolder());
         this.profiler = yeow.profile.Profiler.create(yeow.profile.ProfileConfig.from(config), host.dataFolder());
+        this.profiler.setAutoReloadAction(this::handleAutoReload);
         // 调度器插桩（ProfileSink/BudgetScaler）由平台在构造其调度器时装配
         // 引导脚本：polyfill.js（TextEncoder/TextDecoder/fetch 等纯 JS Polyfill）在前，
         // init.js（桥闭包/回调注册表/消息循环）在后——单脚本顺序执行，共享同一脚本作用域。
@@ -135,6 +136,36 @@ public class RuntimeCore {
     public void unregisterPluginEntity(String name) {
         var pt = plugins.remove(name);
         if (pt != null && profiler != null) profiler.unregisterPlugin(name);
+    }
+
+    /**
+     * 挂起自恢复回调：由 {@link yeow.profile.RecoveryManager} 异步调用（非主线程）。
+     * 语义：基于与告警分离的重载阈值（默认 120s），超过阈值自动重载。
+     * 已在 RecoveryManager 完成阈值/冷却/重试/去重校验，此处仅执行重载。
+     */
+    private void handleAutoReload(String name) {
+        // dev 模式下由 dev-server 热重载接管，跳过自动重载
+        if (devMode) {
+            LOG.info("[Yeow] auto-reload skipped for " + name + " (dev mode)");
+            return;
+        }
+        var entity = plugins.get(name);
+        if (entity == null) {
+            LOG.warning("[Yeow] auto-reload: plugin not found: " + name);
+            return;
+        }
+        if (entity.isVirtual()) {
+            LOG.info("[Yeow] auto-reload skipped for virtual plugin: " + name);
+            return;
+        }
+        LOG.warning("[Yeow] auto-reload: reloading hung plugin " + name);
+        boolean ok = reloadPlugin(name, null);
+        if (ok) {
+            LOG.info("[Yeow] auto-reload: " + name + " reloaded successfully");
+        } else {
+            LOG.warning("[Yeow] auto-reload: " + name + " reload failed — will retry after cooldown (max "
+                + config.profileAutoReloadMaxRetries() + " attempts)");
+        }
     }
 
     /** 非虚拟插件名列表（/yeow 管理命令不覆盖虚拟插件/Worker）。 */

@@ -68,7 +68,7 @@ const lines = [
             </p>
             <div class="cta">
                 <a class="btn primary" :href="withBase('/getting-started')">Quick Start</a>
-                <a class="btn ghost" href="https://modrinth.com/plugin/yeow">Download Runtime</a>
+                <a class="btn ghost" href="https://hangar.papermc.io/iYeXin/Yeow/versions">Download Runtime</a>
             </div>
         </section>
 
@@ -111,7 +111,7 @@ const lines = [
         <section class="admin">
             <span class="admin-icon" v-html="icons.terminal"></span>
             <p>
-                Server administrators: after installing the <a href="https://modrinth.com/plugin/yeow">Yeow runtime</a>,
+                Server administrators: after installing the <a href="https://hangar.papermc.io/iYeXin/Yeow/versions">Yeow runtime</a>,
                 drop plugin packages into <code>plugins/Yeow/</code> for automatic loading, or use
                 <code>/yeow install &lt;your-plugin-url&gt;</code> for one-click installation.
                 Folia servers should use the Folia version of the runtime — plugin packages are fully interchangeable with Paper.
@@ -122,7 +122,7 @@ const lines = [
             <a :href="withBase('/overview')">Overview</a>
             <a :href="withBase('/distribution')">Build & Distribution</a>
             <a href="https://github.com/iyexin/yeow">GitHub</a>
-            <a href="https://modrinth.com/plugin/yeow">Modrinth</a>
+            <a href="https://hangar.papermc.io/iYeXin/Yeow/versions">Modrinth</a>
         </footer>
     </div>
 </template>
