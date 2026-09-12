@@ -124,6 +124,12 @@ public class YeowConfig {
     public boolean assetsCacheEnabled() { return getBool("assets.cache-enabled", true); }
 
     /**
+     * 插件包内存缓存阈值（字节，默认 30 MiB）：包大小超过此值时不缓存到内存，
+     * 回退 ZipFile 直读。`<= 0` 表示不限制。
+     */
+    public long assetsCacheMaxBytes() { return getInt("assets.cache-max-bytes", 30 * 1024 * 1024); }
+
+    /**
      * 是否允许加载不可信原生服务（默认 true）。
      * true = 声明原生服务的插件正常加载，加载时打印醒目的不可信警告；
      * false = 申请了 `service:registerNative` 权限的插件拒绝加载。
@@ -152,6 +158,9 @@ public class YeowConfig {
     public int migrationThreshold() { return getInt("folia.migration-threshold", 2); }
 
     public boolean nativeServiceAllowUntrusted() { return getBool("native-service-allow-untrusted", true); }
+
+    /** service 请求超时（毫秒，默认 30000）；超时后挂起请求被拒绝。 */
+    public long serviceRequestTimeoutMs() { return getInt("service-request-timeout-ms", 30000); }
 
     // ── 默认值 / 合并 / 落盘 ────────────────────────────────────────
 
@@ -196,8 +205,10 @@ public class YeowConfig {
         m.put("profile", profile);
         var assets = new LinkedHashMap<String, Object>();
         assets.put("cache-enabled", true);               // 插件包内存缓存（assets 通道/原生解压走内存）
+        assets.put("cache-max-bytes", 30 * 1024 * 1024); // 超过此大小不再缓存到内存（回退 ZipFile 直读）；<=0 = 不限制
         m.put("assets", assets);
         m.put("native-service-allow-untrusted", true);   // 允许加载不可信原生服务（默认允许并警告；false = 申请 registerNative 权限的插件拒绝加载）
+        m.put("service-request-timeout-ms", 30000);      // service 请求超时（超时后挂起请求被拒绝）
 
         // ── Folia 专用 section（仅 Folia 生成）：语义与 Paper 不同或仅 Folia 使用的参数 ──
         if (folia) {

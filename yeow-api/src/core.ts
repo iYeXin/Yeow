@@ -80,8 +80,8 @@ export { get as pdcGet, set as pdcSet, has as pdcHas, remove as pdcRemove, keys 
 export { add as addRecipe, remove as removeRecipe, getForItem as getRecipesForItem } from './recipe.js';
 export { Material, getMaterials, getBlocks, getItems } from './material.js';
 export type { MaterialInfo } from './material.js';
-export { registerService, registerNativeService, request as serviceRequest, subscribe as serviceSubscribe, publish as servicePublish } from './service.js';
-export type { ServiceResult, NativeServiceResult } from './service.js';
+export { Service, PluginService, NativeService, ServiceReply, registerService, registerNativeService, getService, hasService } from './service.js';
+export type { ServiceKind, ServiceRequestOptions, ServiceResponse, NativeTerminateInfo, NativePlatforms } from './service.js';
 export { log, Logger } from './log.js';
 export type { Message } from './message.js';
 export { getEnv } from './env.js';

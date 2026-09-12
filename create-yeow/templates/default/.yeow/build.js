@@ -88,10 +88,23 @@ async function main() {
     }
 
     // ── 原生服务可信性声明（native manifest：打包后路径 → SHA-256）──
+    // 合并来源：主项目 + 每个依赖包各自的 yeow.config.json（依赖包在自身 native 中声明）
     const nativeManifest = computeNativeManifest(prepared);
     if (nativeManifest.length > 0) {
         const fileCount = nativeManifest.reduce((n, e) => n + e.files.length, 0);
         console.log('  \u2713 Native manifest (' + nativeManifest.length + ' services, ' + fileCount + ' files, SHA-256)');
+        for (const e of nativeManifest) {
+            console.log('      - ' + e.serviceId + '  (' + e.files.length + ' file' + (e.files.length > 1 ? 's' : '') + ')');
+        }
+    }
+    // ── 强制声明：任一包申请了原生服务权限，合并后的 native 清单就不能为空（构建即失败，避免运行期拒绝加载）──
+    const wantsNative = mergedPerms.some(p => p === 'service:registerNative' || p === 'service:*');
+    if (wantsNative && nativeManifest.length === 0) {
+        console.error('\n  \u2717 `service:registerNative` is declared (by the main project or a dependency package)');
+        console.error('    but the merged `native` manifest is empty.');
+        console.error('    Declare `native` in the declaring package\'s yeow.config.json (serviceId + binary');
+        console.error('    files) so every native binary is pinned by SHA-256, then rebuild.\n');
+        process.exit(1);
     }
 
     // ── 打包 ──
@@ -114,7 +127,7 @@ async function main() {
     console.log('  \u2713 Bundled (' + (statSync(resolve(outDir, 'main.js')).size / 1024).toFixed(1) + ' KB)');
 
     // ── 组装 JAR ──
-    const zip = new AdmZip(resolve(root, '.yeow', 'assets', 'yeow-template-0.5.3.jar'));
+    const zip = new AdmZip(resolve(root, '.yeow', 'assets', 'yeow-template-0.6.0.jar'));
     zip.updateFile('plugin.yml', Buffer.from(
         'name: ' + name + '\n' +
         'version: ' + version + '\n' +

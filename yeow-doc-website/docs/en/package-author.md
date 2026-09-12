@@ -100,11 +100,11 @@ import { getAssetsPath } from 'yeow-dev';   // Build-time virtual module
 export const IMAGE_SERVICE = 'iyexin.image-svc.v1';
 
 export async function registerImageService(): Promise<string> {
-    const { serviceId, ready } = await registerNativeService(IMAGE_SERVICE, {
+    const svc = await registerNativeService(IMAGE_SERVICE, {
         windows: getAssetsPath('image-svc.exe'),
     });
-    await ready();
-    return serviceId;
+    await svc.ready();
+    return svc.id;
 }
 ```
 
@@ -116,28 +116,17 @@ export async function registerImageService(): Promise<string> {
 - `getAssetsPath('image-svc.exe')` after build returns `"assets/<id>/image-svc.exe"` (real path)
 - **No additional configuration needed** — build plugin automatically scans all dependency packages (see "Dependency Identification" below)
 
-### Directory Resources
+### Single File & Self-Contained
 
-If entry script needs to reference sibling files in same directory (relative references within script), use directory-level path:
+Native services support **single file only** (`string` / `{ file }`):
 
 ```ts
 const svc = await registerNativeService('my-svc', {
-    windows: { dir: getAssetsPath('native/'), entry: 'win/start.ps1' },
+    windows: getAssetsPath('native/win/my-svc.exe'),
 });
 ```
 
-**No hashing**: All files **keep original names** (including nested subdirectories) — any relative references (`./`, `../`) within `assets/` (including cross-directory) are **always valid**, no more "directory should be self-contained" or "cross-top-level directory breaks" limitations.
-
-### Directory Boundary
-
-**`dir` points to top-level directory containing all dependencies**, `entry` uses relative sub-path:
-
-```ts
-// ✅ Extract entire native/, internal references complete
-{ dir: getAssetsPath('native/'), entry: 'win/start.bat' }
-```
-
-**`{ file }` only extracts single file** — that file's references to other files in directory will fail (not extracted). For self-containment use `{ dir, entry }`.
+The runtime extracts only that file to a temp directory (other files in the same directory are not extracted), so the native binary must be **self-contained** (statically linked, or dependencies packed into a single executable). Directory mode (`{ dir, entry }`) has been removed.
 
 ---
 
@@ -159,7 +148,7 @@ Scans main project + all dependency packages' `assets/`, deploys into JAR by nam
 
 Builder scans `node_modules` top-level directory (including `@scope/name` two-level), identifies dependencies with `<name>-<version>` as key:
 
-- **Identification condition**: Package has `assets/` directory, and `peerDependencies` contains `yeow-api` key
+- **Identification condition**: Package has an `assets/` directory and satisfies one of — `peerDependencies` contains the `yeow-api` key, or it ships a `yeow.config.json` with `permissions` / `native` declarations (native-only / resource packages are identified even without a `yeow-api` dependency; their `native` participates in the merge and their `assets` are deployed)
 - **Main project**: Has `assets/` participates (always assigned id)
 - **Same-name conflict**: Each dependency has independent namespace, same-name files don't overwrite each other
 - **Compatibility**: npm / pnpm flat layout well supported; yarn hoisting differences may cause dependencies not in expected location, if issues please use npm or pnpm
@@ -208,7 +197,7 @@ Each permission shows which package declared it, facilitating troubleshooting of
 
 ### Native Service Trust Declaration (native)
 
-When dependency package carries native service binary, recommend declaring `native` field in `yeow.config.json` to fix SHA-256:
+When a dependency package carries native service binaries, it **must** declare the `native` field in its own `yeow.config.json` (serviceId + binary files), fixing the SHA-256 at build time:
 
 ```json
 {
@@ -223,8 +212,8 @@ When dependency package carries native service binary, recommend declaring `nati
 ```
 
 - `files` are **this package**'s `assets/` binary original paths (same as paths used by `getAssetsPath`)
-- Build automatically maps to packaged paths (`assets/<id>/...`) and computes SHA-256, writes to `yeow.json`'s `native` field; main project and dependency package declaring same `serviceId` merge (files consolidated)
-- Runtime verifies hash when registering native service: mismatch → refuses to load (Promise reject); risk log printed regardless of declaration. See [Permissions & Native Service Trust](permissions.md#2-native-service-trust-declaration)
+- At build time the builder walks **the main project + every dependency package**'s native declarations, maps them to packaged paths (`assets/<id>/...`) under each namespace and computes SHA-256, merging the result into `yeow.json`'s `native` field; the same `serviceId` is merged (files consolidated)
+- When registering that native service at runtime it verifies: serviceId undeclared / binary path undeclared / SHA-256 mismatch → **registration refused** (Promise reject). **Declaration ≠ trusted** — a risk log is still printed. See [Permissions & Native Service Trust](permissions.md#2-native-service-trust-declaration)
 
 ---
 
@@ -242,7 +231,7 @@ Using `yeow-image` package as example (corresponding to `Yeow-Test/test/yeow-ima
 
 ```ts
 // src/index.ts
-import { registerNativeService, serviceRequest } from 'yeow-api';
+import { registerNativeService } from 'yeow-api';
 import { getAssetsPath } from 'yeow-dev';
 
 export const IMAGE_SERVICE = 'iyexin.image-svc.v1';
@@ -261,24 +250,22 @@ export interface ImageRenderer {
 }
 
 export async function initRenderer(): Promise<ImageRenderer> {
-    const { serviceId, ready } = await registerNativeService(IMAGE_SERVICE, {
+    const svc = await registerNativeService(IMAGE_SERVICE, {
         'linux-x64':   getAssetsPath('native/linux-x64/image-svc'),
         'linux-arm64': getAssetsPath('native/linux-arm64/image-svc'),
         'windows-x64': getAssetsPath('native/windows-x64/image-svc.exe'),
         'macos-x64':   getAssetsPath('native/macos-x64/image-svc'),
         'macos-arm64': getAssetsPath('native/macos-arm64/image-svc'),
     });
-    await ready();
+    await svc.ready();
 
     return {
-        serviceId,
+        serviceId: svc.id,
         async render(width, height, pixels) {
             const base64 = pixels.toBase64(); // ES2026 native
-            return serviceRequest(serviceId, '/imageRender', {
-                width,
-                height,
-                base64,
-            }) as Promise<RenderResult>;
+            return (await svc.request('/imageRender', {
+                body: { width, height, base64 },
+            })).json() as Promise<RenderResult>;
         },
     };
 }

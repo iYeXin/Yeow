@@ -246,7 +246,7 @@ function reportError(e) {
 
 // ── InstanceId GC ──────────────────────────────────────────────────
 // FinalizationRegistry callbacks fire as JS_PendingJob microtasks
-// during ctx.executePendingJob(). They push collected ids here.
+// during ctx.drainJobs(). They push collected ids here.
 // Flushed at end of each $hm dispatch cycle.
 const _gcCollected = [];
 globalThis.__yeowGcQueue = _gcCollected;

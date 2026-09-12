@@ -1,8 +1,8 @@
 # Service 通道
 
-服务注册、请求、订阅和发布。
+服务注册、查询、卸载、请求、订阅和发布。
 
-> **权限**：`service:registerNative`（spawn 原生子进程）**默认拒绝**，插件必须在 `yeow.json` 的 `permissions` 中声明。其余 service 节点（`register`/`request`/`subscribe`/`publish`/`response`/`awaitReady`/`registerNativeTerminate`）默认允许。未声明调用返回 `Permission denied: service:registerNative`。
+> **权限**：`service:registerNative`（spawn 原生子进程）**默认拒绝**，插件必须在 `yeow.json` 的 `permissions` 中声明。其余 service 节点（`register`/`registerNative`/`info`/`unregister`/`request`/`subscribe`/`unsubscribe`/`publish`/`response`/`awaitReady`/`registerNativeTerminate`）默认允许。未声明调用返回 `Permission denied: service:registerNative`。
 
 ## 概述
 
@@ -25,7 +25,7 @@
 
 **重复注册**：若 `public: true` 且同名服务已存在，返回 `{ "err": "Service already registered: <id>", "serviceId": "<id>" }`。`onRequest` 不生效；调用方应使用返回的 `serviceId` 以调用者身份接入既有服务（request / subscribe），token 不会对外返回。
 
-当有请求到达时，通过 `cb` 通道向 `onRequest` 投递：
+当有请求到达时，通过 `cb` 通道向 `onRequest` 投递（`body` 为原生 JSON 值；二进制请求为 `{ "contentType", "headers", "base64" }` 承载对象）：
 
 ```json
 {
@@ -33,7 +33,9 @@
   "requestId": "svcreq_1",
   "consumer": "<consumerPlugin>",
   "path": "/api/hello",
-  "body": "{\"key\":\"value\"}"
+  "headers": {"content-type": "application/json"},
+  "contentType": "application/json",
+  "body": {"key": "value"}
 }
 ```
 
@@ -43,42 +45,64 @@
 
 - **请求**：`{ "t": "registerNative", "refName": "<name>", "platforms": {"windows": <PlatformConfig>}, "public": <bool> }`
 
-`PlatformConfig` 可以是：
-- **字符串**：`"native/win/app.exe"` — 单文件，向后兼容
-- **对象 (file)**：`{ "file": "native/win/app.exe" }` — 显式单文件
-- **对象 (dir+entry)**：`{ "dir": "native/win/", "entry": "start.ps1" }` — 提取整个目录到临时空间，运行入口文件
+`PlatformConfig` 仅支持**单文件**（目录模式已移除）：
+- **字符串**：`"native/win/app.exe"`
+- **对象 (file)**：`{ "file": "native/win/app.exe" }`
 - **返回**：`{ "serviceId": "<id>" }` \| `{ "err": "<msg>" }` \| `{ "err": "<msg>", "serviceId": "<id>" }`
 
 行为：
-1. 根据当前平台从 `platforms` 选取对应二进制路径
-2. 从插件 JAR 的 `assets/` 中解压二进制到临时目录
-3. `spawn(binary, nativePort, serviceId)` 启动子进程
-4. 等待子进程连接 TCP 并发送就绪消息
+1. **强制校验**：`refName` 与所选二进制打包路径必须已在插件包 `native` 清单中声明（否则返回 err）；SHA-256 不符同样拒绝
+2. 根据当前平台从 `platforms` 选取对应二进制路径
+3. 从插件 JAR 的 `assets/` 中解压二进制到临时目录
+4. `spawn(binary, nativePort, serviceId)` 启动子进程
+5. 等待子进程连接 TCP 并发送就绪消息
 
 **重复注册**：若 `public: true` 且同名服务已存在，返回 `{ "err": "Service already registered: <id>", "serviceId": "<id>" }`，不会重复 spawn 进程。调用方用 `serviceId` 以调用者身份接入既有服务。
 
+### `info` — 查询服务是否存在
+
+- **请求**：`{ "t": "info", "serviceId": "<id>" }`
+- **返回**：`{ "exists": <bool>, "kind": "plugin" | "native" | null }`（**同步返回，无 `cb`**）
+
+`exists` 表示服务是否存在；`kind` 为服务类型，不存在时为 `null`。JS 侧 `getService` / `hasService` 基于此操作实现。
+
+### `unregister` — 卸载服务
+
+- **请求**：`{ "t": "unregister", "serviceId": "<id>", "token": "<tok>"? }`
+- **返回**：`{ "ok": true }` \| `{ "err": "<msg>" }`（**同步返回**）
+
+- **Plugin Service 必须携带属主 `token`**（注册时返回）；缺失或不匹配返回 `{ "err": "Permission denied: unregister requires the owner token for plugin service <id>" }`
+- **Native Service 无需 `token`，但调用方必须是属主插件**；否则返回 `{ "err": "Permission denied: only the owner may unregister native service <id>" }`
+- 服务不存在返回 `{ "err": "Service not found: <id>" }`
+
+卸载后该服务的订阅被清理、挂起请求被拒绝（`Native service <id> terminated (unregistered)`），Native 子进程被终止并触发属主终止钩子。
+
 ### `request` — 请求服务
 
-- **请求**：`{ "t": "request", "serviceId": "<id>", "path": "<path>", "body": <obj>, "requestId": "<reqId>" }`
+- **请求**：`{ "t": "request", "serviceId": "<id>", "path": "<path>", "headers": {...}?, "contentType": "<ct>?", "body": <value>, "bodyEncoding": "base64"?, "timeout": <ms>?, "requestId": "<reqId>" }`
 - **返回**：`null`（异步）
 
-`requestId` 同时作为回调 ID。服务处理完毕后通过该 ID 投递结果：
+`headers` 为 **app 级键值对**（如 `{"content-type": "application/json", "x-trace-id": "..."}`）；`contentType` 是 `headers['content-type']` 的便捷别名，缺省 `application/json`，body 为 JSON 值。传二进制时：`contentType: "application/octet-stream"`、`body` 为 base64 字符串、`bodyEncoding: "base64"`（运行时解码后以原始字节转发）。
+
+`timeout`（毫秒）可选；缺省用运行时配置 `service-request-timeout-ms`（默认 30000）。超时后消费者收到 `respond(requestId, consumer, { "err": "Service request timed out after <ms>ms: <id>" })`。
+
+`requestId` 同时作为回调 ID。服务处理完毕后通过该 ID 投递**响应体**：
 
 ```json
-{ "t": "cb", "p": "<requestId>", "r": <result> }
+{ "t": "cb", "p": "<requestId>", "r": { "contentType": "<ct>", "headers": {...}, "base64": "<响应字节 base64>" } }
 ```
 
-若 `result` 包含 `err` 字段，表示请求失败。
+若 `r` 含 `err` 字段，表示请求失败。JS 侧把回调结果包装为 fetch 风格 `ServiceResponse`（`json()` / `text()` / `bytes()` / `arrayBuffer()` / `base64()`；`headers` 为响应头，`contentType` 为其便捷视图）。
 
 **Plugin Service** 的处理方式：
 - ServiceManager 定位服务所在插件线程
-- 通过该线程的 `onRequestCb` 投递请求
-- 服务方通过 `response` 操作回复
+- 通过该线程的 `onRequestCb` 投递请求（JSON 值原生投递；二进制为 `{contentType, headers, base64}` 承载对象）
+- 服务方通过 `response` 操作回复（JSON 响应体由运行时序列化为字节）
 
 **Native Service** 的处理方式：
-- ServiceManager 通过 TCP 向子进程发送请求
-- 子进程处理后通过 TCP 返回响应
-- ServiceManager 转换响应格式并投递到消费者
+- ServiceManager 通过**帧协议**（header JSON + raw body，见 [Native Service 规范](../native-service/index.md)）向子进程发送请求；帧 header 形如 `{"type":"request","id":"...","path":"...","headers":{...},"contentType":"..."}`
+- 子进程处理后以同协议返回响应（帧 header 形如 `{"type":"response","id":"...","headers":{...},"contentType":"..."}` + 原始字节）
+- ServiceManager 把响应体（字节 + headers + contentType）投递到消费者
 
 **挂起请求**：服务在请求挂起期间终止（连接断开 / 进程退出 / 卸载 / 运行时关闭）时，运行时拒绝该服务的所有挂起请求：`respond(requestId, consumer, { "err": "Native service <id> terminated (<reason>)" })`，消费者 Promise reject。
 
@@ -115,10 +139,10 @@
 
 ### `response` — 回复请求（服务方）
 
-- **请求**：`{ "t": "response", "requestId": "<reqId>", "body": <result> }`
+- **请求**：`{ "t": "response", "requestId": "<reqId>", "headers": {...}?, "contentType": "<ct>?", "body": <result>, "bodyEncoding": "base64"? }`
 - **返回**：`null`
 
-仅用于 Plugin Service。服务方收到请求后通过此操作回复消费者。
+仅用于 Plugin Service。服务方收到请求后通过此操作回复消费者。`headers` 为 app 级响应头（`contentType` 是其 `content-type` 便捷别名）；`contentType` 缺省 `application/json`（`body` 为 JSON 值，运行时序列化为字节）；返回二进制时 `bodyEncoding: "base64"`、`body` 为 base64 字符串、`contentType: "application/octet-stream"`。
 
 ### `subscribe` — 订阅事件
 

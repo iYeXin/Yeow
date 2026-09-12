@@ -13,6 +13,10 @@ const worker = createWorker({
     name: 'web-worker',                        // 必填；不允许 'main'；同主插件内唯一（全局可重复）
     entry: getAssetsPath('worker/web-worker.js'),  // 资源路径（经 getAssetsPath）；与 code 互斥
     // code: '...',                             // 代码字符串；与 entry 互斥
+    permissions: {                             // 可选：收紧 Worker 权限（默认继承主插件）
+        deny: ['fs:*', 'http:*'],              // 黑名单（优先级最高）
+        // allow: ['task:player.*'],           // 白名单（只允许命中的节点；不可提权）
+    },
 });
 // createWorker 仅注册到注册表并返回句柄——worker.load() 才真正启动
 
@@ -24,7 +28,21 @@ await worker.postMessage({ task: 'compute', data: [...] });   // 发送给 Worke
 await worker.reload();          // 重载代码（需已 load；旧上下文销毁、重新加载）
 await worker.unload();          // 卸载（物理销毁 JS 上下文并清理其事件/命令/服务/任务）
 await worker.load();            // 卸载后句柄保留——可重新加载
+await worker.destroy();         // 彻底销毁：移除注册、句柄作废、同名可重建
 ```
+
+### 权限覆盖
+
+`createWorker({ permissions: { allow?, deny? } })`——**默认继承主插件全部权限**：
+
+- `deny`：黑名单，**优先级最高**（先于 `allow` 与继承判定）。`deny: ['*']` 只允许标准 ES 代码；`deny: ['fs:*', 'http:*']` 仅禁用这两类
+- `allow`：白名单，只有命中的节点允许；**不能提权**——主插件未声明的权限，`allow` 无效（仍按默认拒绝）
+- 节点格式 `channel:op`（如 `fs:server.readFile`、`http:*`、`task:player.*`、`*`）；`task:*` 默认拥有
+- 统一门控作用于所有消息节点（含 task/fs/http/service/timer/assets/log/env）；`worker`/`debug`/`lifecycle` 为运行时内部通道，不受影响
+
+### 彻底销毁
+
+`worker.destroy()` 与 `unload()` 的区别：`unload()` 只卸载（句柄保留，可重新 `load()`）；`destroy()` **移除注册并作废句柄**——之后 `load()` / `postMessage()` / `reload()` 均 reject，同名 Worker 可重新 `createWorker`。
 
 校验：`entry` 与 `code` 不可同时传递（抛错）；`name` 必填、非 `'main'`、同主插件内重复创建抛错。
 
@@ -52,9 +70,9 @@ Worker 与普通插件开发类似：可调用全部 yeow-api（task/fs/http/ass
 | 独立实体 | 事件/命令/服务以独立实体注册（`<主插件>.<worker>`）；调度器任务独立统计/清理                                                            |
 | 数据目录 | **共享主插件数据目录**（fs 的 plugin 级 = `plugins/<主插件>/`）                                                                         |
 | 资源     | **共享主插件资源**（assets 通道同一命名空间）                                                                                           |
-| 权限     | **共享主插件权限**（无独立声明）                                                                                                        |
+| 权限     | 默认**继承主插件权限**；可用 `permissions.allow` / `permissions.deny` 收紧（不可提权，`deny` 优先）                                                                                                        |
 | 嵌套     | **不能创建新的 Worker**（worker 通道被拒绝）                                                                                            |
-| 生命周期 | 主插件卸载/热重载时**连带卸载**全部 Worker；**Worker 创建后无法销毁，只能卸载**（`unload` 物理销毁 JS 上下文，句柄保留，可重新 `load`） |
+| 生命周期 | 主插件卸载/热重载时**连带卸载**全部 Worker；`unload()` 卸载（句柄保留可重载）；`destroy()` 彻底销毁（移除注册、句柄作废、同名可重建） |
 | 管理命令 | `/yeow` 管理命令**不覆盖** Worker                                                                                                       |
 | 性能监控 | profiler 统计 Worker（标记 `(worker of <主插件>)`），告警同样检测                                                                       |
 | 错误回传 | Worker 的 JS 错误与主插件同样回传（dev 模式 source-map 定位，显示 `JS Error in Worker <name>`）                                         |

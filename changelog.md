@@ -4,6 +4,29 @@
 
 ---
 
+## 2026-09-12
+
+### quickjs-wrapper 重写（C + Zig）+ 统一权限门控 + 原生服务协议 v2 / 强制声明 + service OOP + 0.6.0
+
+- **quickjs-wrapper 重写**：由 fork 自外部代码的 C++ 通用包装器改为 Yeow 专用 JNI 桥——原生层用 C 重写（`native/src/{bridge,context,convert}.c`），构建统一为 **Zig 0.16**（`build.zig`），单工具链交叉编译 linux/macos/windows × x86_64/arm64 六平台；移除 CMake / Gradle / MinGW 与 ESModule、字节码、二进制解析、内存诊断等未被 Yeow 使用的部分
+- **Java API 精简**：包名 `com.whl.quickjs.wrapper` → **`wiki.yexin.quickjs`**；只保留 create/destroy、evaluate（带返回值）、setGlobalFunction（JS → Java 上行）、callGlobal / hasGlobalFunction（Java → JS 下行）、bindGlobal / callHandle（绑定句柄复用）、drainJobs（微任务泵）、interrupt；JNI 字符串改为标准 UTF-8（非 BMP 安全）；Java 层不再持有 JS 对象句柄
+- **Maven 组重命名**：新构件 `wiki.yexin:yeow-quickjs:0.6.0`（替代 `com.whl.quickjs:quickjs-java-wrapper`）
+- **版本 0.5.3 → 0.6.0**（runtime core/paper/folia、yeow-template、create-yeow）；模板内置 jar 同步为 `yeow-runtime-0.6.0.jar` / `yeow-runtime-folia-0.6.0.jar` / `yeow-template-0.6.0.jar`
+- **原生 polyfill**：新增 `quickjs-wrapper/native/polyfill/`（C），随上下文创建注入原生全局 API 且不改动 QuickJS 源码；能力为 `performance.now()`（单调高精度毫秒，**零点为上下文创建时刻**）/ `performance.timeOrigin` 与原生 UTF-8 版 `TextEncoder` / `TextDecoder`（替换 polyfill.js 的"阈值 + util 通道"实现）；[环境能力](yeow-doc-website/docs/cn/environment.md)与[运行时环境标准](yeow-doc-website/docs/cn/specifications/runtime/index.md)同步
+- **yeow-api 0.5.0 → 0.6.0**：`global.d.ts` 新增 `performance` 全局声明（`now()` / `timeOrigin`）；`createWorker` 新增权限覆盖与 `destroy()`；模板依赖范围同步为 `^0.6.0`（0.x caret 锁次版本）
+- **JS↔Java 链路清理**（仅 JSON 路径，线程调度不变）：`$hm` 改为绑定句柄（`bindGlobal` / `callHandle`）免去每消息全局查找；微任务泵合并为单次 JNI `drainJobs()`；异步 `fs`/`assets`/`util`/`http`/`debug` 回调改用 `cbMessageRaw` 直接拼装结果 JSON（去掉「解析 → 再序列化」）；批量同步任务结果直接拼接数组（去掉逐个解析再整体序列化）；Java→JS 字符串对 ASCII/BMP 走 `NewStringUTF` 快路径；`MsgQueue` 移除未使用的信号量/唤醒钩子
+- **原生服务强制声明**：`yeow.config.json` 必须声明 `native`——构建时（`build.js` / `yeow-assets.mjs`）申请了 `service:registerNative` 权限但清单为空、或声明的文件缺失 → **构建失败**；加载时解析 `yeow.json` 的 `native` 存为插件元数据（`NativeManifest`：serviceId + 打包路径 → SHA-256），申请原生权限但清单为空 → **拒绝加载**；`registerNativeService` 时 serviceId 未声明 / 二进制路径未声明 / 目录模式 / SHA-256 不符 → **拒绝并抛错**（声明 ≠ 可信，`native-service-allow-untrusted` 开关保留不变）
+- **统一权限门控**（`PermissionGate`）：主插件与虚拟插件共用同一门控——节点 `channel:op`，模式 `*` / `channel:*` / `channel:x.*` / 精确；`task:*` 默认拥有，其余按默认策略；修复杂 `service:registerNative` 前缀误伤 `service:registerNativeTerminate`；主插件 task/timer/fs/assets/util/http/service/log/env 全部过门控（`worker`/`debug`/`lifecycle` 为运行时内部通道，豁免）
+- **Worker 权限覆盖 + 彻底销毁**：`createWorker({ permissions: { allow?, deny? } })`——默认继承主插件权限，`allow` 为白名单、`deny` 优先级最高，`allow` 不能提权（主插件未声明的权限 allow 无效；`deny:['*']` 只允许标准 ES 代码）；新增 `worker.destroy()`（worker 通道 `destroy`）——卸载并移除注册、句柄作废（load/post/reload reject），同名可重建
+- **原生服务协议 v2（破坏性）**：TCP 传输由 JSON line 改为**帧协议**（`[u32 headerLen][header JSON][u32 chunkLen][chunk]... [u32 0]`）——header 承载元数据，body 承载 raw 字节，支持原始二进制（去 base64）、大载荷与流式；`service.request` 改为返回 fetch 风格 `Response`（`json()` / `text()` / `bytes()` / `arrayBuffer()` / `base64()`，`body` 预留给未来可读流），请求体传 `Uint8Array` 即按原始二进制发送；事件仍为 JSON、分发语义不变。同步修复：出站帧加每连接写锁（消除并发交错损坏）、`shutdown` 改为完整帧（原缺换行）、header/body 大小上限校验
+- **service API 改 OOP（破坏性）**：`yeow-api` service 模块由函数式改为对象式——`registerService` / `registerNativeService` 返回 `PluginService` / `NativeService` 句柄（失败抛错），新增 `getService(id)`（不存在抛错）与 `hasService(id)`（文档警告：检查与注册非原子，必须 `try-catch` 注册后降级）；`Service` 基类提供 `request` / `subscribe` / `unregister`，`PluginService` 额外 `token` / `publish`，`NativeService` 额外 `ready` / `onTerminate`；`ServiceReply` 供服务方携带响应头；移除函数式 `serviceRequest` / `serviceSubscribe` / `servicePublish`。运行时 `service` 通道新增 `info`（`{exists,kind}`）与 `unregister`（插件需属主 token / 原生需属主）；`request` / `response` 支持 app 级 `headers`（`contentType` 为 `content-type` 别名），`request` 支持超时（`service-request-timeout-ms`，默认 30s，`options.timeout` 可覆盖）——未找到 / 超时 / 内部错误 / 服务终止均 reject
+- **移除实验性集成能力**：删除「插件适配器规范」（多语言 / 社区适配器）与「Java 插件集成」（其他 Java 插件 `requestService` / `subscribeService`）——同步清理相关代码（`RuntimeCore.registerPluginEntity(PluginEntity)` 便捷重载、`ServiceManager.requestJava` / `subscribeJava` 及 Java 回调字段）与文档 / 站点导航；未来可能并入主线
+- **`/yeow load` 增强**：`/yeow load <path>` 路径找不到时依次回退 `plugins/Yeow/<path>` 与 `plugins/Yeow/<name>-<version>.yeow.zip`（按名加载，忽略大小写、精确匹配优先、多版本取最新）；解析逻辑放 `RuntimeCore.resolveLoadTarget`（平台无关，含单测）
+- **插件包缓存阈值**：新增运行时配置 `assets.cache-max-bytes`（默认 30 MiB）——包大小超过阈值时不再缓存到内存，回退 `ZipFile` 直读（避免大包常驻）；`<= 0` 表示不限制
+- **CI 重写**：quickjs-wrapper 的 GitHub Actions 改为 Zig 构建（`zig build jar`）+ 冒烟测试；标签（`v*`）触发自动发布（GitHub Release 附带 `yeow-quickjs.jar`）
+- 文档：README / CONTRIBUTING / quickjs-wrapper README 同步；双语文档（worker API 与通道规范、permissions、native-service、service（OOP 句柄 + 三种使用场景）、changelog、sitemap）同步
+- 验证：`zig build jar`（六平台）；SmokeTest 21 项通过；`mvn test`（core 82 / paper 16 / folia 23）通过；`tsc --noEmit`（yeow-api）通过；模板 jar 含 `wiki/yexin/quickjs` 类与六平台原生库
+
 ## 2026-09-06
 
 ### yeow-runtime 0.5.3（资源内存缓存 + __plugin 修复 + 原生开关 + 配置平滑升级）

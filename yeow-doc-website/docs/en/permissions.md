@@ -47,6 +47,8 @@ Yeow implements **declarative permissions** for **sensitive message nodes**: plu
 
 > After modifying `permissions`, rebuild required — development mode hot reload will **reload permissions together** (build-time `computedPermissions` refreshes with hot reload message); production environment requires full plugin reload (`/yeow reload` or restart server).
 
+> **Unified gate**: All message nodes (`channel:op`) pass through a unified permission gate; `task:*` is owned by default (no declaration needed). A Worker can tighten this via `permissions.allow` / `permissions.deny` at `createWorker` time (see [Worker API · Permission Overrides](api/worker.md)): by default it inherits the main plugin's permissions, `deny` has the highest priority, and `allow` is a whitelist that **cannot escalate** (permissions not declared by the main plugin are ineffective via `allow`).
+
 ### Final Permissions (computedPermissions)
 
 Build automatically merges declarations from main project and dependency packages (dedup + wildcard normalization: `fs:*` overrides `fs:server.*`, `fs:server.readFile` etc.; `fs:server.*` overrides `fs:server.readFile`), writes results to `yeow.config.json`'s `computedPermissions` field and packages into `yeow.json`. Declaring `fs:*` is **automatically expanded** to `fs:outer.*, fs:server.*` (semantically equivalent, giving server admins clear perception of impact scope).
@@ -65,9 +67,9 @@ Use `npm run permissions` to view calculation process and permission source dist
 
 **Console Verification**: When runtime loads plugin, it prints permission list to server console (`Loaded plugin: <name> ... — permissions: ...`).
 
-## 2. Native Service Trust Declaration
+## 2. Native Service Trust Declaration (Mandatory)
 
-Plugins (or dependency packages) can declare `native` field in `yeow.config.json`, **fixing native service binary's SHA-256** — automatically computed during build and written to `yeow.json`; runtime verifies when registering native service, if hash doesn't match → **refuses to load** (Promise reject).
+Plugins (or dependency packages) **must** declare the `native` field in `yeow.config.json`, fixing native service binaries' SHA-256 — at build time the builder walks the main project and all dependency packages, computes the packaged hash under each namespace and merges the result into `yeow.json`; at runtime it stores this as plugin metadata and enforces verification when registering native services.
 
 ```json
 {
@@ -81,16 +83,22 @@ Plugins (or dependency packages) can declare `native` field in `yeow.config.json
 }
 ```
 
-- `serviceId`: Service name when registering `registerNativeService`; `files`: Original paths of binaries under this package's `assets/`; `source`: Source link (optional)
-- Both main project and dependency packages can declare; **same `serviceId` merges during build** (files consolidated)
+- `serviceId`: Service name when registering `registerNativeService`; `files`: Original paths of binaries under **this package**'s `assets/`; `source`: Source link (optional)
+- Main project and dependency packages each declare their own `native`; **the same `serviceId` merges during build** (files consolidated, keeping each namespace's paths)
 - Build artifact `yeow.json`'s `native` format: `[{ "serviceId": "...", "files": [{ "<packaged path>": "<sha256>" }, ...], "source": "..." }]`
+- **Single-file mode only** (`string` / `{file}`); directory mode (`{dir, entry}`) has been removed
 
-**Runtime Behavior**:
+**Mandatory declaration (build + load)**:
 
-- Declaration exists and matches → Normal load (log shows verification passed)
-- Declaration exists but doesn't match (file replaced/tampered) → **Refuses to load service**, `registerNativeService` Promise rejects
-- **Regardless of declaration**, loading native service always prints risk log: undeclared → Warns "no trusted SHA-256 declaration, treated as untrusted"; declared → Shows verification result
-- **Trust declaration only valid for single-file mode** (`string` / `{file}`); directory mode (`{dir, entry}`) currently doesn't support declaration and verification
+- **Build**: If the `service:registerNative` (or `service:*`) permission is requested but the merged `native` manifest is empty → **build fails**; missing declared files also fail
+- **Load**: If that permission is requested but the manifest is empty → **loading is refused**
+- **Plugins not requesting the `service:registerNative` permission do not need to declare `native`**
+
+**Runtime behavior**:
+
+- serviceId declared + binary path declared + SHA-256 matches → registration succeeds (log shows verification passed)
+- serviceId undeclared / binary path undeclared / SHA-256 mismatch → **registration refused**, `registerNativeService`'s Promise rejects
+- **Declaration ≠ trusted**: Regardless of declaration, a risk log is printed at registration (treated as untrusted) — declaration only pins content, it does not mean the source is trusted
 
 ### Untrusted Service Switch (Load with Warning by Default)
 

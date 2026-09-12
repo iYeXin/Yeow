@@ -13,10 +13,9 @@
 | [message](message/index.md)             | Message formats for non-dispatcher channels (timer / fs / http / assets / service / debug, etc.) |
 | [task](task/index.md)                   | Dispatcher task type catalog (request/response formats for `player.get`, `world.setBlock`, etc.) |
 | [event](event/index.md)                 | Event subscription mechanism and data fields for each event type                  |
-| [native-service](native-service/index.md) | Native Service subprocess protocol (TCP JSON line)                              |
+| [native-service](native-service/index.md) | Native Service subprocess protocol (TCP framed protocol: header JSON + raw body)                              |
 | [runtime](runtime/index.md)             | Runtime mechanics (JS environment, callback system, global variables, event loop) |
 | [values.md](values.md)                  | **Value Appendix**: format rules (R1–R5) and listings — platform-specific enums maintained directly (gamemode/difficulty/BossBar/scoreboard/ClickType/ItemFlag/InventoryType, etc.) + reference implementations (non-normative: DamageCause/teleport cause/regen cause); version-varying domains (blocks/items/entities/biomes/sounds/particles/enchantments/potions/attributes/damage types/game rules/translation keys/advancements/recipes) with rules and authoritative links |
-| [adapter](adapter/index.md)             | Plugin adapter specification (multi-language / community adapters implement PluginEntity and register) |
 
 ---
 
@@ -56,7 +55,7 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 └── plugin.yml             ← 宿主平台元信息（Paper 系需要；`.yeow.zip` 与纯平台实现可忽略）
 ```
 
-> **`.yeow.zip` and JAR behave identically**: The runtime registers them using the same logic (read `yeow.json` → permissions → code → startup). Placing them in the runtime data directory (official Paper implementation uses `plugins/Yeow/`) triggers automatic scanning and loading. They can also be loaded manually via `/yeow load <path>`. Only one instance per plugin name is allowed; duplicate loads are rejected with a warning.
+> **`.yeow.zip` and JAR behave identically**: The runtime registers them using the same logic (read `yeow.json` → permissions → code → startup). Placing them in the runtime data directory (official Paper implementation uses `plugins/Yeow/`) triggers automatic scanning and loading. They can also be loaded manually via `/yeow load <path|name>` (when the path is not found, match `<name>-<version>.yeow.zip` under `plugins/Yeow/`). Only one instance per plugin name is allowed; duplicate loads are rejected with a warning.
 
 ### `yeow.json` — Plugin Metadata
 
@@ -80,7 +79,7 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 | `api` / `java`        | API/Java version required by the host platform (may be ignored for other platforms)             |
 | `permissions`         | Developer-declared permissions (sensitive nodes, see [Permission Model](#permission-model) below) |
 | `computedPermissions` | Final effective permissions computed at build time (merged + wildcard normalization); read by the runtime (v0 phase is incompatible with legacy package formats) |
-| `native`              | Native service trustworthiness declaration (SHA-256 computed at build time): `[{ "serviceId": "...", "files": [{ "<path-after-packaging>": "<sha256>" }, ...], "source": "..." }]` |
+| `native`              | Native service trustworthiness declaration (**mandatory**; single-file mode only): at build time merges the main project + dependency packages and computes SHA-256 under each namespace, written as `[{ "serviceId": "...", "files": [{ "<path-after-packaging>": "<sha256>" }, ...], "source": "..." }]` |
 
 ### `.yeow/main.js` — Plugin Code
 
@@ -154,7 +153,7 @@ Rules:
 
 - **Node concept**: Permissions are only considered by **message node** (`channel:node`). Segments in the node name (e.g., `plugin` in `fs:plugin.readFile`, `player` in `task:player.get`) are business/access scope names, **not hierarchy**, and do not participate in permission matching
 - **Node matching**: Exact node (`fs:server.readFile`); **group wildcard** `fs:server.*` matches all nodes under that prefix; **channel wildcard** `fs:*` matches all nodes in the fs channel — at build time, `fs:*` is **automatically expanded** in `computedPermissions` to `fs:outer.*, fs:server.*` (semantically equivalent)
-- **Default allowed**: Nodes outside the above default-deny nodes (e.g., `service:request`, `service:register`, `assets:read`, `fs:plugin.readFile`) need no declaration
+- **Default allowed**: Nodes outside the above default-deny nodes (e.g., `service:request`, `service:register`, `service:info`, `service:unregister`, `assets:read`, `fs:plugin.readFile`) need no declaration
 - **Denial behavior**: Undeclared calls return error `Permission denied: <node>`. Synchronous calls return error JSON directly; asynchronous calls (including those with `cb`) deliver `{"err":"Permission denied: <node>"}` via callback, manifesting as a Promise reject on the JS side
 - **Other channels** (`task`/`timer`/`log`/`env`/`debug`/`lifecycle`) are not constrained by the permission model
 - Permissions are read and **fixed** at plugin load time (cannot be changed at runtime); the load message prints the declared content — when printing, `fs:*` is **expanded to `fs:outer.*, fs:server.*`** (display only, to help server administrators understand the scope; permission checks still use the original value `fs:*`)
@@ -265,9 +264,10 @@ The **complete contracts** for the three major execution components (request/res
 
 Plugins can include native programs (Go/Rust/C++, etc.) and invoke them via the `service` channel. See [Native Service Specification](native-service/index.md) for details. Key points:
 
-- Binaries are placed in `assets/` (namespace injected via `getAssetsPath()`)
+- Binaries are placed in `assets/` (namespace injected via `getAssetsPath()`), **single file only** (directory mode has been removed; binaries must be self-contained)
+- **The `native` field must be declared in `yeow.config.json`** (serviceId + files): at build time SHA-256 is computed per namespace and stored as plugin metadata at load; undeclared / hash mismatch → refused
 - `registerNativeService` extracts and spawns a subprocess based on platform (os + arch)
-- The subprocess communicates with the runtime via TCP JSON line (ready / request / response / publish)
+- The subprocess communicates with the runtime via a TCP framed protocol (header JSON + raw body) for ready / request / response / publish
 
 ---
 
@@ -277,7 +277,7 @@ Implementing a Yeow-compatible runtime requires handling:
 
 - [ ] **Package structure parsing**: Read ZIP (yeow.json, .yeow/main.js, assets/; optional dev.json), JAR and `.yeow.zip` are structurally identical
 - [ ] **Unique name enforcement**: Reject load and warn on plugin name conflict (same behavior for auto-scan / commands / host mechanism)
-- [ ] **Permission model**: Parse yeow.json `computedPermissions`; `fs:server.*`, `fs:outer.*`, `http:*`, `service:registerNative` are denied by default (`fs:plugin.*` needs no declaration; `assets` channel has no permission interception, extraction target constrained to plugin data directory); undeclared calls return `Permission denied: <node>`
+- [ ] **Permission model**: Parse yeow.json `computedPermissions`; unify the gate for all message nodes (`task:*` is owned by default; `fs:server.*`, `fs:outer.*`, `http:*`, `service:registerNative` are denied by default; `fs:plugin.*` needs no declaration; `assets` is allowed by default, with the extraction target constrained to the plugin data directory); Workers may layer `allow`/`deny` (deny wins, cannot escalate); undeclared calls return `Permission denied: <node>`
 - [ ] **Load message**: Output load message on successful plugin load (includes plugin name, version, permission declarations)
 - [ ] **JS engine**: ES2025+ (Sec-Uint8Array), supports `Promise`/`WeakRef`/`FinalizationRegistry`/`Uint8Array`
 - [ ] **Native injections**: `__plugin`, `$dev` (underlying bridge like `$_send` is internal, not part of the spec)

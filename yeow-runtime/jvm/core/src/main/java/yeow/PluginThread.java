@@ -1,7 +1,7 @@
 package yeow;
 
 import com.google.gson.*;
-import com.whl.quickjs.wrapper.*;
+import wiki.yexin.quickjs.*;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +32,7 @@ public class PluginThread implements Runnable, PluginEntity {
     /** 依附于本插件的 Worker（虚拟插件）：key = worker 名；主插件卸载时连带卸载。 */
     private final ConcurrentHashMap<String, WorkerThread> workers = new ConcurrentHashMap<>();
     private volatile Set<String> permissions;
-    private final Map<String, String> nativeHashes; // 打包后路径(assets/<id>/...) → SHA-256（yeow.json native 声明）
+    private final NativeManifest nativeManifest; // yeow.json native 声明（serviceId + 打包后路径 → SHA-256）
     private volatile QuickJSContext ctx;
     private volatile boolean running = false;
     /** 强杀标记：waitForExit 超时且 interrupt 无法退出时置位，调用方必须重建全新实体。 */
@@ -70,7 +70,7 @@ public class PluginThread implements Runnable, PluginEntity {
     @Override public String type() { return "js"; }
     @Override public boolean isVirtual() { return false; }
     @Override public void postMessage(Object message) {
-        // JS 适配器需要 JSON 字符串：POJO 由运行时序列化，String 原样投递
+        // JS 实体需要 JSON 字符串：POJO 由运行时序列化，String 原样投递
         queue.sendJs(message instanceof String s ? s : gson.toJson(message));
     }
 
@@ -99,7 +99,7 @@ public class PluginThread implements Runnable, PluginEntity {
     }
     // ──────────────────────────────────────────────────────────
 
-    public PluginThread(String name, String version, String author, String jarPath, PluginPackage pkg, String initCode, String userCode, RuntimeCore core, Set<String> permissions, Map<String, String> nativeHashes) {
+    public PluginThread(String name, String version, String author, String jarPath, PluginPackage pkg, String initCode, String userCode, RuntimeCore core, Set<String> permissions, NativeManifest nativeManifest) {
         this.name = name;
         this.version = version != null ? version : "";
         this.author = author != null ? author : "";
@@ -108,12 +108,12 @@ public class PluginThread implements Runnable, PluginEntity {
         this.core = core;
         this.log = core.host().logger();
         this.permissions = permissions != null ? Set.copyOf(permissions) : Set.of();
-        this.nativeHashes = nativeHashes != null ? Map.copyOf(nativeHashes) : Map.of();
+        this.nativeManifest = nativeManifest != null ? nativeManifest : NativeManifest.EMPTY;
     }
 
     /** 兼容旧构造（version/author 置空；仅测试用，生产路径必须传 yeow.json 解析值）。 */
-    public PluginThread(String name, String jarPath, String initCode, String userCode, RuntimeCore core, Set<String> permissions, Map<String, String> nativeHashes) {
-        this(name, "", "", jarPath, null, initCode, userCode, core, permissions, nativeHashes);
+    public PluginThread(String name, String jarPath, String initCode, String userCode, RuntimeCore core, Set<String> permissions, NativeManifest nativeManifest) {
+        this(name, "", "", jarPath, null, initCode, userCode, core, permissions, nativeManifest);
     }
 
     public RuntimeCore core() { return core; }
@@ -135,8 +135,8 @@ public class PluginThread implements Runnable, PluginEntity {
         this.permissions = perms != null ? Set.copyOf(perms) : Set.of();
     }
 
-    /** 原生服务 SHA-256 声明（重建实体用，不可变）。 */
-    Map<String, String> nativeHashes() { return nativeHashes; }
+    /** 原生服务声明元数据（重建实体用，不可变）。 */
+    NativeManifest nativeManifest() { return nativeManifest; }
 
     public void start() { running = true; thread = new Thread(this, "yeow-" + name); thread.setDaemon(true); thread.start(); }
     public boolean isRunning() { return running; }
@@ -157,7 +157,7 @@ public class PluginThread implements Runnable, PluginEntity {
     }
 
     /**
-     * 重载（适配器契约实现）。内部强杀场景的实体重建由 RuntimeCore 处理，
+     * 重载（PluginEntity 契约实现）。内部强杀场景的实体重建由 RuntimeCore 处理，
      * 本方法忽略重建结果。
      */
     @Override public void reload(String newCode) { reloadInternal(newCode); }
@@ -266,11 +266,9 @@ public class PluginThread implements Runnable, PluginEntity {
             if (userCode == null) { log.warning("[" + name + "] userCode is null"); return; }
             ctx.evaluate(userCode, "main.js");
 
-            var hmObj = ctx.getGlobalObject().getProperty("$hm");
-            var hmFunc = hmObj instanceof JSFunction ? (JSFunction)hmObj : null;
-            if (hmFunc == null) log.warning("[" + name + "] $hm not found");
-
-            if (hmFunc != null) hmFunc.call(gson.toJson(Map.of("t","INIT")));
+            long hmHandle = ctx.bindGlobal("$hm");
+            if (hmHandle == 0) log.warning("[" + name + "] $hm not found");
+            if (hmHandle != 0) ctx.callHandle(hmHandle, gson.toJson(Map.of("t", "INIT")));
 
             var prof = core.profiler();
             if (prof != null) prof.registerPlugin(PluginThread.this);
@@ -284,15 +282,15 @@ public class PluginThread implements Runnable, PluginEntity {
                 while (running) {
                     if (raw == null) break;
                     try {
-                        if (hmFunc != null) {
-                            hmFunc.call(raw);
+                        if (hmHandle != 0) {
+                            ctx.callHandle(hmHandle, raw);
                         } else {
                             var escaped = raw.replace("\\","\\\\").replace("'","\\'");
                             ctx.evaluate("$hm('" + escaped + "')");
                         }
                     } catch (QuickJSException ex) { handleJSError(ex); } catch (Exception ignored) {}
                     try {
-                        while (ctx.isJobPending()) ctx.executePendingJob();
+                        ctx.drainJobs();
                     } catch (QuickJSException ex) {
                         // A pending job threw (e.g. an async error surfaced by the native wrapper).
                         // Report it but keep the message loop alive - the plugin must not die here.
@@ -317,12 +315,11 @@ public class PluginThread implements Runnable, PluginEntity {
     }
 
     private void inject() {
-        var g = ctx.getGlobalObject();
         // __plugin 元信息来自 yeow.json（加载时解析，经构造传入；Worker 见 WorkerThread.inject，继承主插件版本/作者）
         ctx.evaluate("globalThis.__plugin = {name:'" + esc(name) + "',version:'" + esc(version) + "',author:'" + esc(author) + "'};");
         ctx.evaluate("globalThis.$dev = " + devMode + ";");
 
-        g.setProperty("$_send", (JSCallFunction) args -> {
+        ctx.setGlobalFunction("$_send", args -> {
             try {
                 var channel = String.valueOf(args[0]); var pld = String.valueOf(args.length > 1 ? args[1] : "{}");
                 var rt = core;
@@ -330,10 +327,16 @@ public class PluginThread implements Runnable, PluginEntity {
                     // Worker 通道（内部控制，不受权限模型约束）：创建/卸载/投递/重载主插件的 Worker
                     return handleWorker(pld);
                 } else if ("task".equals(channel)) {
-                    // task 通道为共有接口（适配器同一入口：YeowRuntime.submitTask）
-                    return rt != null ? rt.submitTask(PluginThread.this, pld) : gson.toJson(Map.of("err", "runtime unavailable"));
+                    // task 通道为共有接口（与 YeowRuntime.submitTask 同一实现）；
+                    // 经统一门控（task:* 默认拥有，仅 Worker 的 allow/deny 会收紧）
+                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
+                    var denied = checkTaskPermission(obj);
+                    if (denied != null) return permissionDenied(obj, denied);
+                    return rt != null ? rt.submitTask(PluginThread.this, obj) : gson.toJson(Map.of("err", "runtime unavailable"));
                 } else if ("timer".equals(channel)) {
                     var obj = gson.fromJson(pld, JsonObject.class); var type = obj.get("type").getAsString();
+                    var denied = checkChannelPermission("timer", type);
+                    if (denied != null) return gson.toJson(Map.of("err", denied));
                     if ("clear".equals(type)) {
                         // clear 协议：JS 侧 clearTimeout/clearInterval 取消 Java 定时任务
                         // （此前只做本地注销——interval 的 scheduleAtFixedRate 会永久空转）
@@ -365,7 +368,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
-                        ioExecutor.submit(() -> { var result = handleFs(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(result))); });
+                        ioExecutor.submit(() -> { var result = handleFs(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
                         return null;
                     }
                     return handleFs(pld);
@@ -378,22 +381,27 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     return handleHttp(pld);
                 } else if ("assets".equals(channel)) {
-                    // assets 通道不再做权限拦截（只读打包资源 / 解压被限定在本插件数据目录内，见 handleAssets）
+                    // assets 资源只读 / 解压被限定在本插件数据目录内（见 handleAssets）；
+                    // 统一门控下默认允许，仅 Worker 的 allow/deny 可收紧
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
+                    var denied = checkChannelPermission("assets", obj.has("t") ? obj.get("t").getAsString() : "");
+                    if (denied != null) return permissionDenied(obj, denied);
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
-                        ioExecutor.submit(() -> { var result = handleAssets(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(result))); });
+                        ioExecutor.submit(() -> { var result = handleAssets(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
                         return null;
                     }
                     return handleAssets(pld);
                 } else if ("util".equals(channel)) {
-                    // util 通道（纯计算，无权限检查）：gzip 压缩/解压 + UTF-8 ↔ 字节转换。
+                    // util 通道（纯计算）：gzip 压缩/解压 + UTF-8 ↔ 字节转换。
                     // 字节数据以 base64 字符串承载（JS 侧引擎原生 Uint8Array.toBase64/fromBase64）；
                     // encode/decode 语义 = buffer ↔ 字符串，base64 只是承载形式。
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
+                    var denied = checkChannelPermission("util", obj.has("t") ? obj.get("t").getAsString() : "");
+                    if (denied != null) return permissionDenied(obj, denied);
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
-                        ioExecutor.submit(() -> { var result = handleUtil(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(result))); });
+                        ioExecutor.submit(() -> { var result = handleUtil(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
                         return null;
                     }
                     return handleUtil(pld);
@@ -408,7 +416,7 @@ public class PluginThread implements Runnable, PluginEntity {
                         var echo = obj.has("p") ? gson.toJson(obj.get("p")) : "null";
                         if (obj.has("cb")) {
                             var cbId = obj.get("cb").getAsString();
-                            queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, toJsonValue(echo)));
+                            queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, echo));
                             return null;
                         }
                         return echo;
@@ -436,13 +444,19 @@ public class PluginThread implements Runnable, PluginEntity {
                     var o = gson.fromJson(pld, JsonObject.class);
                     var msg = o.has("message") ? o.get("message").getAsString() : pld;
                     var level = o.has("level") ? o.get("level").getAsString() : "INFO";
+                    // 被门控拒绝时静默丢弃（避免错误日志再触发日志通道形成回环）
+                    if (checkChannelPermission("log", level) != null) return null;
                     switch (level) {
                         case "WARN" -> log.warning(msg);
                         case "ERROR" -> log.severe(msg);
                         default -> log.info(msg);
                     }
                     return null;
-                } else if ("env".equals(channel)) { return handleEnv(); }
+                } else if ("env".equals(channel)) {
+                    var denied = checkChannelPermission("env", "");
+                    if (denied != null) return gson.toJson(Map.of("err", denied));
+                    return handleEnv();
+                }
                 else if ("service".equals(channel)) {
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var denied = checkChannelPermission("service", obj.has("t") ? obj.get("t").getAsString() : "");
@@ -456,10 +470,8 @@ public class PluginThread implements Runnable, PluginEntity {
             }
         });
 
-        var consoleObj = ctx.getGlobalObject().getProperty("console");
-        if (consoleObj instanceof JSObject jsConsole) {
-            jsConsole.setProperty("log", (JSCallFunction) a -> null);
-        }
+        // init.js 已定义 console；这里静默插件直接 console.log（日志统一走 $_send → log 通道）
+        ctx.evaluate("if (globalThis.console) { globalThis.console.log = function() {}; }");
     }
 
     /** JS 单引号字符串转义（__plugin 注入用）。 */
@@ -469,29 +481,39 @@ public class PluginThread implements Runnable, PluginEntity {
     }
 
     /**
-     * Sensitive-permission check for message channels（JS 插件特有的权限模型）。
-     * 权限只按消息节点（channel:node）考虑；节点名中的段是业务/访问范围命名，非层级。
-     * 策略：声明命中（精确节点 / channel:* / channel:段.*）→ 允许；否则命中默认拒绝
-     * 前缀 → 拒绝；否则默认允许。
+     * 统一消息节点权限门控（主插件视角：仅声明权限集 + 默认策略，无 allow/deny 覆盖）。
+     * 匹配与判定细节见 {@link PermissionGate}。
      */
-    private static final String[] DEFAULT_DENIED_NODES = {
-        "fs:server.", "fs:outer.", "http:", "service:registerNative",
-        // assets 通道不设权限拦截（解压目标被强制限定在插件数据目录内，见 assetsTarget）
-    };
-
-    /** 运行时配置目录（plugins/Yeow/runtime/）：fs 写操作一律禁止修改（读取不受限）。 */
-    private static final Path RUNTIME_DIR = Path.of("plugins", "Yeow", "runtime").toAbsolutePath().normalize();
-
     private String checkChannelPermission(String channel, String op) {
-        var node = channel + ":" + op;
-        if (permissions.contains(node) || permissions.contains(channel + ":*")) return null;
-        var dot = op.indexOf('.');
-        if (dot > 0 && permissions.contains(channel + ":" + op.substring(0, dot) + ".*")) return null;
-        for (var denied : DEFAULT_DENIED_NODES) {
-            if (node.startsWith(denied)) return "Permission denied: " + node;
+        return PermissionGate.check(permissions, null, null, channel + ":" + op);
+    }
+
+    /** task 通道门控：校验全部任务节点（单任务 `type` 或批量 `tasks[].type`）。 */
+    private String checkTaskPermission(JsonObject obj) {
+        var nodes = PermissionGate.taskNodes(obj);
+        if (nodes == null) return null;
+        for (var node : nodes) {
+            var denied = PermissionGate.check(permissions, null, null, node);
+            if (denied != null) return denied;
         }
         return null;
     }
+
+    /**
+     * 权限拒绝的统一响应：含非空 `cb` 时经回调异步回投 `{"err":...}`（返回 null），
+     * 否则同步返回 `{"err":...}`。
+     */
+    private Object permissionDenied(JsonObject obj, String denied) {
+        if (obj != null && obj.has("cb") && !obj.get("cb").getAsString().isEmpty()) {
+            var cbId = obj.get("cb").getAsString();
+            queue.sendJs(gson.toJson(Map.of("t", "cb", "p", cbId, "r", Map.of("err", denied))));
+            return null;
+        }
+        return gson.toJson(Map.of("err", denied));
+    }
+
+    /** 运行时配置目录（plugins/Yeow/runtime/）：fs 写操作一律禁止修改（读取不受限）。 */
+    private static final Path RUNTIME_DIR = Path.of("plugins", "Yeow", "runtime").toAbsolutePath().normalize();
 
     // ── Worker 通道（内部控制）与公共包装（WorkerThread 委托）─────────────
 
@@ -518,7 +540,9 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     var code = workerCode(p);
                     if (code == null) { respond.accept("{\"err\":\"worker entry not found\"}"); yield null; }
-                    var w = new WorkerThread(wname, wname, PluginThread.this, initCode, code);
+                    var allow = workerPermList(p, "allow");
+                    var deny = workerPermList(p, "deny");
+                    var w = new WorkerThread(wname, wname, PluginThread.this, initCode, code, allow, deny);
                     if (p.has("msgCb") && !p.get("msgCb").isJsonNull()) w.setMainMessageCb(p.get("msgCb").getAsString());
                     workers.put(wname, w);
                     respond.accept("true");
@@ -567,7 +591,7 @@ public class PluginThread implements Runnable, PluginEntity {
                         // 旧线程被强杀：重建全新 WorkerThread（新线程/新队列/新上下文），
                         // 防止卡死的旧线程从共享队列偷取消息（双线程并发执行）。
                         var oldMainCb = w.mainMessageCb();
-                        var nw = new WorkerThread(wname2, wname2, PluginThread.this, initCode, code);
+                        var nw = new WorkerThread(wname2, wname2, PluginThread.this, initCode, code, w.allowPermissions(), w.denyPermissions());
                         if (oldMainCb != null) nw.setMainMessageCb(oldMainCb);
                         workers.put(wname2, nw);
                         w = nw;
@@ -587,11 +611,29 @@ public class PluginThread implements Runnable, PluginEntity {
                     respond.accept("true");
                     yield null;
                 }
+                case "destroy" -> {
+                    // 彻底销毁：卸载（物理销毁 JS 上下文 + 清理事件/命令/服务/任务）并从注册表移除；
+                    // 与 unload 不同，句柄不可再 load——yeow-api 侧同时放行同名重建。
+                    var w = workers.remove(p.get("name").getAsString());
+                    if (w != null) core.unloadPlugin(w.name());
+                    respond.accept("true");
+                    yield null;
+                }
                 default -> gson.toJson(Map.of("err", "Unknown worker op: " + t));
             };
         } catch (Exception e) {
             return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
         }
+    }
+
+    /** 解析 worker 载荷的 permissions.allow / permissions.deny（缺省 → 空列表）。 */
+    private static java.util.List<String> workerPermList(JsonObject p, String key) {
+        if (p == null || !p.has("permissions") || !p.get("permissions").isJsonObject()) return java.util.List.of();
+        var po = p.getAsJsonObject("permissions");
+        if (!po.has(key) || !po.get(key).isJsonArray()) return java.util.List.of();
+        var out = new java.util.ArrayList<String>();
+        for (var el : po.getAsJsonArray(key)) if (el.isJsonPrimitive()) out.add(el.getAsString());
+        return out;
     }
 
     /** 从 code 或 entry（assets 资源路径）读取 worker 代码；失败返回 null。 */
@@ -612,7 +654,6 @@ public class PluginThread implements Runnable, PluginEntity {
     public String handleFsPublic(String pld) { return handleFs(pld); }
     public String handleAssetsPublic(String pld) { return handleAssets(pld); }
     public String handleHttpPublic(String pld) { return handleHttp(pld); }
-    public Object toJsonValuePublic(String json) { return toJsonValue(json); }
     public void handleJSReportPublic(String pld, String origin) { handleJSReport(pld, origin); }
     public void handleJSErrorPublic(QuickJSException e, String origin) { handleJSError(e, origin); }
     public String handleEnvPublic() { return handleEnv(); }
@@ -654,17 +695,6 @@ public class PluginThread implements Runnable, PluginEntity {
         if (path.startsWith(RUNTIME_DIR)) {
             throw new SecurityException("Cannot modify Yeow runtime directory (plugins/Yeow/runtime): " + path);
         }
-    }
-
-    /**
-     * 通道处理返回的 JSON 字符串 → 对象，用于异步回调投递（`r` 字段）：
-     * 同步调用经 `$send` 的 JSON.parse 得到对象；异步回调必须同样得到对象，
-     * 否则 JS 侧收到字符串（如 `{"data":...}`），`r.data` 为 undefined。
-     * "null"（缺失文件等）→ null；解析失败原样返回。
-     */
-    private static Object toJsonValue(String json) {
-        if (json == null) return null;
-        try { return gson.fromJson(json, Object.class); } catch (Exception e) { return json; }
     }
 
     /** 周期清理：JS 侧从未 respond 的请求（超时）→ 503 关闭，防止连接与内存泄漏。 */
@@ -915,7 +945,7 @@ public class PluginThread implements Runnable, PluginEntity {
                     var responseType = p.has("responseType") ? p.get("responseType").getAsString() : "text";
                     var timeout = p.has("timeout") ? p.get("timeout").getAsLong() : 0;
                     var cb = p.get("cb").getAsString();
-                    ioExecutor.submit(() -> { var result = handleHttpRequest(url, method, body, bodyBase64, headers, responseType, timeout); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cb, toJsonValue(result))); });
+                    ioExecutor.submit(() -> { var result = handleHttpRequest(url, method, body, bodyBase64, headers, responseType, timeout); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cb, result)); });
                     yield null;
                 }
                 default -> gson.toJson(Map.of("err", "Unknown http op: " + t));
@@ -1227,11 +1257,33 @@ public class PluginThread implements Runnable, PluginEntity {
             var sm = core.serviceManager();
             return switch (t) {
                 case "register" -> { var refName = obj.get("refName").getAsString(); var onReq = obj.get("onRequest").getAsString(); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerPluginService(refName, name, onReq, isPublic); }
-                case "registerNative" -> { var refName = obj.get("refName").getAsString(); var platforms = obj.getAsJsonObject("platforms"); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerNativeService(refName, name, platforms, isPublic, pkg, jarPath, devAssetsDir, nativeHashes); }
+                case "registerNative" -> { var refName = obj.get("refName").getAsString(); var platforms = obj.getAsJsonObject("platforms"); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerNativeService(refName, name, platforms, isPublic, pkg, jarPath, devAssetsDir, nativeManifest); }
                 case "registerNativeTerminate" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.registerTerminateCb(svcId, cbId, name); yield "true"; }
-                case "request" -> { var svcId = obj.get("serviceId").getAsString(); var path = obj.has("path") ? obj.get("path").getAsString() : "/"; var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); var reqId = obj.get("requestId").getAsString(); sm.trackRequestConsumer(reqId, name, svcId); sm.request(svcId, path, body, reqId, name); yield null; }
+                case "request" -> {
+                    var svcId = obj.get("serviceId").getAsString();
+                    var path = obj.has("path") ? obj.get("path").getAsString() : "/";
+                    var ct = obj.has("contentType") && !obj.get("contentType").isJsonNull() ? obj.get("contentType").getAsString() : null;
+                    var headers = obj.has("headers") && obj.get("headers").isJsonObject() ? obj.getAsJsonObject("headers") : new JsonObject();
+                    var timeout = obj.has("timeout") ? obj.get("timeout").getAsLong() : core.config().serviceRequestTimeoutMs();
+                    var reqId = obj.get("requestId").getAsString();
+                    sm.trackRequestConsumer(reqId, name, svcId, timeout);
+                    sm.request(svcId, path, headers, ct, yeow.service.ServiceManager.bodyBytes(obj), reqId, name);
+                    yield null;
+                }
                 case "awaitReady" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.awaitReady(svcId, cbId, name); yield null; }
-                case "response" -> { var reqId = obj.get("requestId").getAsString(); var result = obj.has("body") ? gson.fromJson(obj.get("body").toString(), Object.class) : null; sm.respond(reqId, name, result); yield null; }
+                case "response" -> {
+                    var reqId = obj.get("requestId").getAsString();
+                    var ct = obj.has("contentType") && !obj.get("contentType").isJsonNull() ? obj.get("contentType").getAsString() : null;
+                    var headers = obj.has("headers") && obj.get("headers").isJsonObject() ? obj.getAsJsonObject("headers") : new JsonObject();
+                    sm.respondBody(reqId, name, headers, ct, yeow.service.ServiceManager.bodyBytes(obj));
+                    yield null;
+                }
+                case "info" -> sm.serviceInfo(obj.get("serviceId").getAsString()).toString();
+                case "unregister" -> {
+                    var svcId = obj.get("serviceId").getAsString();
+                    var token = obj.has("token") && !obj.get("token").isJsonNull() ? obj.get("token").getAsString() : null;
+                    yield sm.unregisterService(svcId, token, name);
+                }
                 case "subscribe" -> { var svcId = obj.get("serviceId").getAsString(); var eventPath = obj.get("eventPath").getAsString(); var cbId = obj.get("cb").getAsString(); sm.subscribe(svcId, eventPath, cbId, name); yield "true"; }
                 case "unsubscribe" -> { var svcId = obj.get("serviceId").getAsString(); var eventPath = obj.get("eventPath").getAsString(); sm.unsubscribe(svcId, eventPath, name); yield "true"; }
                 case "publish" -> { var token = obj.get("token").getAsString(); var eventPath = obj.get("eventPath").getAsString(); var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); sm.publish(token, eventPath, body); yield "true"; }

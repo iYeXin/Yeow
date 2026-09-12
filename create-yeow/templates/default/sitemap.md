@@ -10,10 +10,10 @@
 | 概览                    | `https://cn.yexin.wiki/yeow/v1/overview`              | 项目总览：用 TypeScript 写 Paper 插件（QuickJS 引擎，每插件独立线程）。按角色（初学者/开发者/服主/平台实现者）的文档入口导引 + 关键概念速览         |
 | AI 辅助启动指南         | `https://cn.yexin.wiki/yeow/v1/ai-agent`              | 面向 AI 代理 / Vibe Coding：Yeow 项目简介、启动命令（`--ts`）、下一步、文档查阅策略（站点地图/docs.zip/Harness 用法）                               |
 | 快速开始                | `https://cn.yexin.wiki/yeow/v1/getting-started`       | 从零开始：`npm create yeow` 建项目 → `npm run dev` 开发（热重载）→ `npm run build` 构建 → 部署方式。含插件示例（/back 传送）、异步/同步约定         |
-| 环境能力                | `https://cn.yexin.wiki/yeow/v1/environment`           | 运行时环境速览：全局能力（$send/fetch/TextEncoder/TextDecoder/定时器）、线程与异步模型、与浏览器/Node 环境的差异、性能建议                          |
+| 环境能力                | `https://cn.yexin.wiki/yeow/v1/environment`           | 运行时环境速览：全局能力（$send/fetch/TextEncoder/TextDecoder/performance/定时器）、线程与异步模型、与浏览器/Node 环境的差异、性能建议                          |
 | CLI 参考                | `https://cn.yexin.wiki/yeow/v1/cli`                   | create-yeow 脚手架与 dev-server 的命令行用法：交互式/非交互创建、开发服务器参数（-y/--stop）、构建脚本、调试体验（source-map 错误定位与异步调用链） |
 | 构建与分发              | `https://cn.yexin.wiki/yeow/v1/distribution`          | 两种产物：标准 Paper JAR（plugins/）与平台无关 .yeow.zip（plugins/Yeow/ 自动扫描或 /yeow install）；分发建议与 Modrinth 发布                        |
-| 权限与原生服务可信性    | `https://cn.yexin.wiki/yeow/v1/permissions`           | 敏感权限声明（默认拒绝表/通配规则/computedPermissions）、原生服务 SHA-256 可信性声明与不可信警告开关                                              |
+| 权限与原生服务可信性    | `https://cn.yexin.wiki/yeow/v1/permissions`           | 统一门控的敏感权限声明（默认拒绝表/通配规则/computedPermissions）、原生服务强制 SHA-256 声明（构建/加载/注册三层）与不可信警告开关                                              |
 | 运行时运维              | `https://cn.yexin.wiki/yeow/v1/operations`            | 服主视角：/yeow 管理命令全集、运行时配置（config.yml 含 Folia 节）、部署形态速查                                                                    |
 | 运行时警告              | `https://cn.yexin.wiki/yeow/v1/runtime-warning`       | 预警引擎：heartbeat.timeout / event.slow / plugin.hung / budget.congested 等告警的触发条件、含义与解决方案；配置阈值；动态扩容机制                  |
 | 进阶知识                | `https://cn.yexin.wiki/yeow/v1/advanced`              | 进阶索引：架构/调度器/事件/生命周期/通道/服务/Folia/关于；告警与运维指向根级文档                                                                    |
@@ -55,10 +55,10 @@
 | Event       | `https://cn.yexin.wiki/yeow/v1/api/event`       | 事件订阅：`eventOn`/`eventOff`、自动/手动模式（取消、回写）、全事件字段表、消息（Message 对象）                                                                                  |
 | Command     | `https://cn.yexin.wiki/yeow/v1/api/command`     | 命令注册 + Tab 补全（含 yeow-command 重载式命令 Command.create 与模式化参数）                                                                                                    |
 | ItemStack   | `https://cn.yexin.wiki/yeow/v1/api/item`        | 物品纯数据描述符：type/amount/meta（显示名/附魔/耐久/染色/药水/头颅/属性修饰符）；构造工具（create/clone/equals）；值语义（快照，不绑定真实物品）                                |
-| Service     | `https://cn.yexin.wiki/yeow/v1/api/service`     | 插件间服务（registerService/request/subscribe/publish）与原生服务（registerNativeService，spawn 子进程 + TCP 通信）                                                              |
+| Service     | `https://cn.yexin.wiki/yeow/v1/api/service`     | 插件间服务（OOP Service 对象：registerService/getService/hasService/request/subscribe/publish/unregister）与原生服务（registerNativeService，spawn 子进程 + TCP 通信）                                                              |
 | HTTP        | `https://cn.yexin.wiki/yeow/v1/api/http`        | 底层 HTTP 客户端：`request`（异步，请求/响应体二进制与 fs 同语义、encoding/timeout 可选）、全局 `fetch`（text/json 按需解码 + base64/bytes）                                     |
 | HTTP Server | `https://cn.yexin.wiki/yeow/v1/api/http-server` | 高层 `createServer`（yeow-server）：洋葱中间件、路由、mount/mountAssets 静态挂载、二进制响应（Uint8Array/encoding）、返回对象自动 JSON、资源包下载闭环                           |
-| Worker      | `https://cn.yexin.wiki/yeow/v1/api/worker`      | 虚拟插件（独立线程）：createWorker（仅注册）/load/unload/reload、双向 postMessage、Worker 侧 onMessage/postMessage；共享数据目录/权限、禁嵌套、/yeow 不覆盖                      |
+| Worker      | `https://cn.yexin.wiki/yeow/v1/api/worker`      | 虚拟插件（独立线程）：createWorker（仅注册，可声明 permissions.allow/deny）/load/unload/destroy/reload、双向 postMessage、Worker 侧 onMessage/postMessage；默认继承主插件权限（allow 不可提权）、禁嵌套、/yeow 不覆盖                      |
 | FS          | `https://cn.yexin.wiki/yeow/v1/api/fs`          | 文件系统：plugin/server/outer 三级（路径安全）、读写/追加/二进制、目录操作、systemPaths、path 工具                                                                               |
 | Assets      | `https://cn.yexin.wiki/yeow/v1/api/assets`      | 打包资源：`getAssetsPath`（yeow-dev，构建期注入命名空间）+ 读取/解压（单文件与目录）                                                                                             |
 | PDC         | `https://cn.yexin.wiki/yeow/v1/api/pdc`         | 持久数据容器：JSON 自动序列化、全量读取、插件命名空间（跨插件不冲突）、Player/Block 实例方法                                                                                     |
@@ -72,10 +72,8 @@
 | -------------- | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 规范总览       | `https://cn.yexin.wiki/yeow/v1/specifications/`                | 协议层总纲：包结构（yeow.json/.yeow/main.js/assets）、加载流程、权限模型、运行时架构、任务执行器、事件/命令桥、Native Service、合格运行时检查清单                                                                                                                                |
 | 值域附录       | `https://cn.yexin.wiki/yeow/v1/specifications/values`          | 取值格式规则（R1-R5）与清单：平台枚举直接维护（游戏模式/难度/BossBar/计分板/ClickType/ItemFlag/InventoryType 等）；参考实现（非强制：DamageCause/传送原因/回血原因）；版本变迁域规则+链接（方块/物品/实体/生物群系/音效/粒子/附魔/药水/属性/伤害类型/游戏规则/翻译键/进度/配方） |
-| Java 插件集成  | `https://cn.yexin.wiki/yeow/v1/specifications/java-api`        | 其他 Java 插件调用 Yeow 服务（requestService 请求-响应、subscribeService 订阅事件）、提交游戏任务、约束                                                                                                                                                                          |
-| 适配器规范     | `https://cn.yexin.wiki/yeow/v1/specifications/adapter/`        | 多语言/社区适配器：PluginEntity 接口、消息契约、submitTask、注册 API、检查清单                                                                                                                                                                                                   |
-| 运行时环境标准 | `https://cn.yexin.wiki/yeow/v1/specifications/runtime/`        | JS 环境：语言标准（ES2025+SecU8）、回调系统（cb 语义）、事件循环、通道总览与权限、全局变量（$send/$dev/fetch/timers）                                                                                                                                                            |
-| 原生服务       | `https://cn.yexin.wiki/yeow/v1/specifications/native-service/` | 原生子进程协议：平台选择、提取、TCP JSON line（ready/request/response/publish）                                                                                                                                                                                                  |
+| 运行时环境标准 | `https://cn.yexin.wiki/yeow/v1/specifications/runtime/`        | JS 环境：语言标准（ES2025+SecU8）、回调系统（cb 语义）、事件循环、通道总览与权限、全局变量（$send/$dev/fetch/timers/performance）                                                                                                                                                            |
+| 原生服务       | `https://cn.yexin.wiki/yeow/v1/specifications/native-service/` | 原生子进程协议：平台选择（仅单文件）、强制 SHA-256 声明、提取、TCP 帧协议（header JSON + raw body，ready/request/response/publish）                                                                                                                                                                                                  |
 
 ### 消息通道（/v1/specifications/message/）
 
@@ -87,12 +85,12 @@
 | FS        | `https://cn.yexin.wiki/yeow/v1/specifications/message/fs`        | fs 通道：plugin/server/outer 三级、各操作（读写/删除/列出/base64/systemPaths）请求格式与路径规则                                    |
 | HTTP      | `https://cn.yexin.wiki/yeow/v1/specifications/message/http`      | http 通道：listen/respond（body + encoding 二进制）/close/request/requestAsync 消息格式                                             |
 | Assets    | `https://cn.yexin.wiki/yeow/v1/specifications/message/assets`    | assets 通道：read/readBase64/extract/extractDir 消息格式（命名空间路径）                                                            |
-| Service   | `https://cn.yexin.wiki/yeow/v1/specifications/message/service`   | service 通道：注册（plugin/native）、请求、订阅/发布、原生 terminate 回调                                                           |
+| Service   | `https://cn.yexin.wiki/yeow/v1/specifications/message/service`   | service 通道：注册（plugin/native）、查询/卸载、请求、订阅/发布、原生 terminate 回调                                                           |
 | Log       | `https://cn.yexin.wiki/yeow/v1/specifications/message/log`       | log 通道：日志消息格式                                                                                                              |
 | Lifecycle | `https://cn.yexin.wiki/yeow/v1/specifications/message/lifecycle` | lifecycle 通道：unloadDone 确认、gc-collect 资源回收                                                                                |
 | Debug     | `https://cn.yexin.wiki/yeow/v1/specifications/message/debug`     | debug 通道：reportError 错误上报、ping-pong 心跳                                                                                    |
 | Util      | `https://cn.yexin.wiki/yeow/v1/specifications/message/util`      | util 通道：gzip 压缩/解压（一次性与流式分块）、UTF-8 ↔ 字节转换（encode.utf8/decode.utf8）                                          |
-| Worker    | `https://cn.yexin.wiki/yeow/v1/specifications/message/worker`    | worker 通道：create（仅注册）/load/unload/post/reload/postToMain 消息格式、生命周期、origin 错误字段、约束（禁嵌套/共享数据与权限） |
+| Worker    | `https://cn.yexin.wiki/yeow/v1/specifications/message/worker`    | worker 通道：create（仅注册，可带 permissions）/load/unload/destroy/post/reload/postToMain 消息格式、生命周期、origin 错误字段、约束（禁嵌套/共享数据与资源/权限可收紧） |
 
 ### 任务类型（/v1/specifications/task/）
 
@@ -130,5 +128,5 @@
 进阶（默认折叠）：关于 Yeow · 进阶索引（架构/调度器/事件/生命周期/通道/服务/运维与安全）
 依赖包开发：编写依赖包
 API 参考：索引 → 玩家与服务器(Player/Server/Env) · 世界与方块(World/Chunk/Location/Block/Material) · 实体(Entity/Potion/Particle) · 交互界面(Inventory/BossBar/Scoreboard/Advancement/Recipe) · 事件与命令(Event/Command) · 物品(ItemStack) · 服务与网络(Service/HTTP/HTTP Server) · 多线程(Worker) · 文件与数据(FS/Assets/PDC/Util) · 文本(Text) · 日志(Log)
-平台规范：规范总览 → 消息通道 · 任务类型 · 事件 · 运行时 · 原生服务 · 适配器
+平台规范：规范总览 → 消息通道 · 任务类型 · 事件 · 运行时 · 原生服务
 ```

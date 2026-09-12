@@ -29,7 +29,7 @@ npm run build
 - Deployment methods:
   - Place in `plugins/Yeow/`, **automatically scanned and loaded** on server startup
   - Or admin executes `/yeow install <url>` for one-click installation
-  - Or `/yeow load <url | path>` for temporary/dynamic loading
+  - Or `/yeow load <url | path | name>` for temporary/dynamic loading
 - Suitable for:
   - Distribution targeting Yeow ecosystem (users have Yeow runtime installed)
   - Multi-platform targets (future non-Paper series runtimes)

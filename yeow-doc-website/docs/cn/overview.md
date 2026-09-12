@@ -18,7 +18,6 @@ Yeow 是一个面向 Minecraft 服务端的插件开发框架（**Paper 与 [Fol
 | **依赖包开发者** | 封装可复用的 npm 包                | [编写依赖包](package-author.md) 包结构与资源封装；[封装 Service 的依赖包](package-service.md) 三类 Service 模式 |
 | **插件使用者**   | 服务器管理员：安装与管理插件       | [运行时运维](operations.md) `/yeow` 管理命令与配置；[构建与分发](distribution.md) 部署方式与一键安装            |
 | **平台实现者**   | 实现 Yeow 兼容运行时               | [平台规范](specifications/README.md) 包结构、消息协议、任务/事件/运行时环境标准                                 |
-| **适配器开发者** | 让其他语言/引擎接入 Yeow           | [适配器规范](specifications/adapter/index.md) `PluginEntity` 接口、注册 API 与消息契约                          |
 
 ## 文档地图
 

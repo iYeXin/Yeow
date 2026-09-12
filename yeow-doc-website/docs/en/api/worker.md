@@ -13,6 +13,10 @@ const worker = createWorker({
     name: 'web-worker',                        // required; 'main' not allowed; unique within the same main plugin (repeatable globally)
     entry: getAssetsPath('worker/web-worker.js'),  // asset path (via getAssetsPath); mutually exclusive with code
     // code: '...',                             // code string; mutually exclusive with entry
+    permissions: {                             // optional: tighten the Worker's permissions (defaults to inheriting the main plugin's)
+        deny: ['fs:*', 'http:*'],              // blacklist (highest priority)
+        // allow: ['task:player.*'],           // whitelist (only matched nodes allowed; cannot escalate)
+    },
 });
 // createWorker only registers it in the registry and returns a handle — worker.load() actually starts it
 
@@ -24,7 +28,21 @@ await worker.postMessage({ task: 'compute', data: [...] });   // send to the Wor
 await worker.reload();          // reload code (requires it to be loaded; destroys the old context, reloads)
 await worker.unload();          // unload (physically destroy the JS context and clean up its events/commands/services/tasks)
 await worker.load();            // after unload the handle is kept — it can be reloaded
+await worker.destroy();         // full destroy: remove the registration, invalidate the handle, same name can be recreated
 ```
+
+### Permission Overrides
+
+`createWorker({ permissions: { allow?, deny? } })` — **by default it inherits all of the main plugin's permissions**:
+
+- `deny`: blacklist, **highest priority** (evaluated before `allow` and inheritance). `deny: ['*']` allows only standard ES code; `deny: ['fs:*', 'http:*']` disables just these two categories
+- `allow`: whitelist, only matched nodes are allowed; **cannot escalate** — permissions the main plugin did not declare are ineffective via `allow` (still denied by default)
+- Node format is `channel:op` (e.g., `fs:server.readFile`, `http:*`, `task:player.*`, `*`); `task:*` is owned by default
+- The unified gate applies to all message nodes (including task/fs/http/service/timer/assets/log/env); `worker`/`debug`/`lifecycle` are runtime-internal channels and are unaffected
+
+### Full Destroy
+
+The difference between `worker.destroy()` and `unload()`: `unload()` only unloads (the handle is kept, it can be `load()`ed again); `destroy()` **removes the registration and invalidates the handle** — afterwards `load()` / `postMessage()` / `reload()` all reject, and a Worker with the same name can be re-`createWorker`ed.
 
 Validation: `entry` and `code` cannot both be passed (throws); `name` is required, cannot be `'main'`, and creating a duplicate within the same main plugin throws.
 
@@ -52,9 +70,9 @@ Developing a Worker is similar to developing a normal plugin: the full yeow-api 
 | Independent entity | Events/commands/services are registered as an independent entity (`<mainPlugin>.<worker>`); scheduler tasks are counted/cleaned up independently                                                            |
 | Data directory | **Shares the main plugin's data directory** (fs plugin level = `plugins/<mainPlugin>/`)                                                                         |
 | Assets | **Shares the main plugin's assets** (same namespace on the assets channel)                                                                                           |
-| Permissions | **Shares the main plugin's permissions** (no independent declarations)                                                                                                        |
+| Permissions | By default **inherits the main plugin's permissions**; can be tightened with `permissions.allow` / `permissions.deny` (cannot escalate, `deny` wins)                                                                                                        |
 | Nesting | **Cannot create new Workers** (the worker channel is rejected)                                                                                            |
-| Lifecycle | When the main plugin is unloaded or hot-reloaded, **all its Workers are unloaded along with it**; **once created, a Worker cannot be destroyed, only unloaded** (`unload` physically destroys the JS context, the handle is kept, and it can be `load`ed again) |
+| Lifecycle | When the main plugin is unloaded or hot-reloaded, **all its Workers are unloaded along with it**; `unload()` unloads (handle kept, can be reloaded); `destroy()` fully destroys (removes the registration, invalidates the handle, same name can be recreated) |
 | Admin command | `/yeow` management commands do **not cover** Workers                                                                                                       |
 | Performance monitoring | The profiler counts Workers (marked `(worker of <mainPlugin>)`), and alerts detect them as well                                                                       |
 | Error reporting | Worker JS errors are reported back just like the main plugin's (dev-mode sourcemap localization, showing `JS Error in Worker <name>`)                                         |

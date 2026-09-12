@@ -10,7 +10,7 @@ Runtime provides `/yeow` command with Tab completion support:
 
 | Command                                    | Description                                                                                                                                                                            |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/yeow load <path\|url>`                   | **Temporarily** load plugin package (`.yeow.zip` or JAR). `<path>` is local path; `<url>` is direct download link to `.yeow.zip` (downloads to cache, not saved to `plugins/Yeow/`, not retained after restart) |
+| `/yeow load <path\|url\|name>`             | **Temporarily** load plugin package (`.yeow.zip` or JAR). `<path>` is local path; `<url>` is direct download link to `.yeow.zip` (downloads to cache, not saved to `plugins/Yeow/`, not retained after restart). When the path is not found, falls back in order: ① `plugins/Yeow/<path>`; ② `plugins/Yeow/<name>-<version>.yeow.zip` (case-insensitive, exact-case match preferred) |
 | `/yeow install <url>`                      | Download and **install**: Rename to standard format `<name>-<version>.yeow.zip` and save to `plugins/Yeow/` (auto-scanned and loaded on next startup), and load immediately            |
 | `/yeow update <url>`                       | Download and **force replace** old version: Scan all `.yeow.zip` in `plugins/Yeow/`, match old version by `name` in `yeow.json` → Move old file to `plugins/Yeow/.backup/` → Write new version; if plugin is running, auto-reload |
 | `/yeow unload <plugin\|all>`               | Unload plugin (same unload logic as hot reload, 5s forced termination)                                                                                                                 |
@@ -21,6 +21,8 @@ Runtime provides `/yeow` command with Tab completion support:
 
 ```bash
 /yeow load plugins/Yeow/my-plugin-1.0.0.yeow.zip              # Runtime dynamic loading
+/yeow load my-plugin-1.0.0.yeow.zip                           # Path not found → look under plugins/Yeow/
+/yeow load my-plugin                                          # Match plugins/Yeow/my-plugin-<version>.yeow.zip by name (case-insensitive)
 /yeow load https://example.com/my-plugin.yeow.zip             # Direct download load (temporary, not retained after restart)
 /yeow install https://example.com/my-plugin.yeow.zip          # Download and install to plugins/Yeow/ (standard format)
 /yeow update https://example.com/my-plugin.yeow.zip           # Replace old version (old package backed up to plugins/Yeow/.backup/)
@@ -51,6 +53,7 @@ native-service-allow-untrusted: true  # Allow loading untrusted native services 
 
 assets:
   cache-enabled: true          # In-memory plugin package cache (assets channel / native extraction via memory, enabled by default; false = direct ZipFile read each time).
+  cache-max-bytes: 31457280    # In-memory cache threshold (default 30 MiB); packages larger than this are not cached (falls back to direct ZipFile reads); <=0 = unlimited.
 
 profile:
   enabled: false                 # Full performance analysis (per-task collection), disabled by default

@@ -2,6 +2,8 @@
 
 > 从 [编写依赖包](package-author.md) 拆出的独立主题：如何在 npm 包中封装 Service（插件间通信与原生扩展）。包的基础结构（package.json / 权限 / 资源）见[编写依赖包](package-author.md)。
 
+> 本文对应 [Service API · 三种场景](api/service.md) 中**以依赖包形式出现的场景 2（纯调用方）与场景 3（包内嵌服务并提供外部接口）**；**场景 1（插件自身提供公共服务）**不需要依赖包，见 Service API。
+
 Service 是 Yeow 包最常见的封装对象。根据**包的角色**（调用方 / 服务方）与**服务来源**，分为三类：
 
 | 类型                       | 包的角色         | 是否注册服务  | 服务来源                     | 典型场景                                                   |
@@ -18,109 +20,109 @@ Service 是 Yeow 包最常见的封装对象。根据**包的角色**（调用�
 
 - 不调用 `registerService` / `registerNativeService`
 - 不接触 `token`、不发布事件
-- 对外暴露 `serviceRequest` / `serviceSubscribe` 的封装函数
+- 通过 `getService` 获取**消费者句柄**（无 token），对外暴露 `svc.request` / `svc.subscribe` 的封装函数
 
 ```ts
 // yeow-economy-sdk —— 调用方语法糖
-import { serviceRequest, serviceSubscribe } from 'yeow-api';
+import { getService } from 'yeow-api';
 
 export const ECONOMY_SERVICE = 'iyexin.economy.v1';   // 与提供方约定的 serviceId
 
-export function deposit(player: string, amount: number) {
-    return serviceRequest(ECONOMY_SERVICE, '/deposit', { player, amount });
+export async function deposit(player: string, amount: number) {
+    const svc = await getService(ECONOMY_SERVICE);   // 消费者句柄；不存在时抛错
+    return (await svc.request('/deposit', { body: { player, amount } })).json();
 }
 
-export function onBalanceChange(handler: (p: { player: string; balance: number }) => void) {
-    return serviceSubscribe(ECONOMY_SERVICE, 'balanceChange', handler);
+export async function onBalanceChange(handler: (p: { player: string; balance: number }) => void) {
+    const svc = await getService(ECONOMY_SERVICE);
+    return svc.subscribe('balanceChange', handler);
 }
 ```
 
 要点：
 - `serviceId` 以常量声明，与提供方约定一致
-- 使用者的插件需与提供服务的插件**同时安装**（否则请求失败：服务未找到）
+- `getService` 不存在时抛错；使用者的插件需与提供服务的插件**同时安装**（否则获取失败）
 
 ## 类型 2 —— JS 服务（全局唯一）
 
-包内实现服务方逻辑（纯 JS），入口处尝试注册：**成功 → 本插件成为唯一服务实例；失败（同名 public 服务已存在）→ 降级为调用方**，用 `err.serviceId` 接入既有服务：
+包内实现服务方逻辑（纯 JS），入口处尝试注册：**成功 → 本插件成为唯一服务实例（返回属主 `PluginService` 句柄）；失败（同名 public 服务已存在）→ 降级为调用方**，用 `err.serviceId` 经 `getService` 接入既有服务：
 
-> **封装铁律（服务端与客户端隔离）**：一个 service 的封装包括**服务端逻辑**（`onRequest`、`publish`）与**客户端逻辑**（`subscribe`、`request`）。由于 public 服务同一时刻只能存在一个服务端，包内必须先**尝试注册服务端**，再**以客户端身份封装对外接口**；无论注册是否成功，对外暴露的逻辑一致。**绝对不允许暴露任何直接调用服务端能力的接口（最典型是发布事件）**——注册失败时拿不到 `token`，逻辑缺失；即使拿到 `token`，各插件 JS 上下文不同，外部发布也会造成致命的状态不一致。哪怕需求只是单纯发布事件，也应走 `serviceRequest(svcId, '/publishEvent', event)` 由服务端配合。详见 [Service API 自包含设计](api/service.md#公共服务的自包含设计)。
+> **封装铁律（服务端与客户端隔离）**：一个 service 的封装包括**服务端逻辑**（`onRequest`、`publish`）与**客户端逻辑**（`subscribe`、`request`）。由于 public 服务同一时刻只能存在一个服务端，包内必须先**尝试注册服务端**，再**以客户端身份封装对外接口**；无论注册是否成功，对外暴露的逻辑一致。**绝对不允许暴露任何直接调用服务端能力的接口（最典型是发布事件）**——注册失败时拿不到 `token`，逻辑缺失；即使拿到 `token`，各插件 JS 上下文不同，外部发布也会造成致命的状态不一致。哪怕需求只是单纯发布事件，也应走 `svc.request('/publishEvent', { body: event })` 由服务端配合。详见 [Service API · 场景 3（自包含设计）](api/service.md)。
 
 ```ts
 // yeow-stats —— JS 服务 + 调用方封装
-import { registerService, serviceRequest, servicePublish } from 'yeow-api';
+import { registerService, getService, PluginService } from 'yeow-api';
 
-let _serviceId: string;
-let _svc: { serviceId: string; token: string } | null = null;
+let _svc: PluginService;   // 成功时属主句柄（含 token），降级后为消费者句柄
 
 export async function initStats() {
     try {
         _svc = await registerService('iyexin.stats.v1', async (path, body) => {
             if (path === '/record') {
                 const entry = await store.record(body.kind, body.value);
-                if (_svc) servicePublish(_svc.token, 'record', entry);  // 服务方内部发布
+                _svc.publish('record', entry);  // 服务方内部发布
                 return { ok: true };
             }
             if (path === '/publishEvent') {          // 对外"只发布事件"需求的服务端配合
                 await store.emit(body.event, body.payload);
-                if (_svc) servicePublish(_svc.token, body.event, body.payload);
+                _svc.publish(body.event, body.payload);
                 return { ok: true };
             }
             return { err: 'unknown path' };
         });
-        _serviceId = _svc.serviceId;   // 成为服务方，token 留在包内
     } catch (e) {
-        _serviceId = e.serviceId;      // 已存在：降级为调用方
+        _svc = (await getService(e.serviceId)) as PluginService;   // 已存在：降级为调用方
     }
 }
 
 // 对外只暴露调用封装——服务方与调用方走同一代码路径
-export function record(kind: string, value: number) {
-    return serviceRequest(_serviceId, '/record', { kind, value });
+export async function record(kind: string, value: number) {
+    return (await _svc.request('/record', { body: { kind, value } })).json();
 }
 
 // 哪怕只是"发布事件"，也不暴露 publish——走 request，由服务端内部发布
-export function publishEvent(event: string, payload: unknown) {
-    return serviceRequest(_serviceId, '/publishEvent', { event, payload });
+export async function publishEvent(event: string, payload: unknown) {
+    return (await _svc.request('/publishEvent', { body: { event, payload } })).json();
 }
 ```
 
 要点：
 - **服务唯一**：多个插件引入同一包时，第一个注册的插件成为服务方，其余自动降级为调用方。所有插件的 `record()` 最终都请求到**同一个服务实例**，行为一致
 - **全局唯一状态**：服务方的状态（如 `store`）只存在于服务方插件的 JS 上下文中——上下文不可跨插件共享，这正是"全局唯一"的价值
-- 降级后本包的调用封装依然可用（经 `err.serviceId` 路由到既有服务），调用方无需感知
+- 降级后本包的调用封装依然可用（消费者句柄经 `getService(err.serviceId)` 获取，路由到既有服务），调用方无需感知
 
 ## 类型 3 —— 原生服务
 
-包内携带二进制（`assets/`），用 `registerNativeService` 按平台提取并启动子进程，再封装调用。核心模式：
+包内携带二进制（`assets/`），用 `registerNativeService` 按平台提取并启动子进程，返回 `NativeService` 句柄，再封装调用。核心模式：
 
 ```ts
 // yeow-image —— 原生服务
-import { registerNativeService, serviceRequest } from 'yeow-api';
+import { registerNativeService } from 'yeow-api';
 import { getAssetsPath } from 'yeow-dev';
 
 export const IMAGE_SERVICE = 'iyexin.image-svc.v1';
 
 export async function initRenderer(): Promise<ImageRenderer> {
-    const { serviceId, ready, onTerminate } = await registerNativeService(IMAGE_SERVICE, {
+    const svc = await registerNativeService(IMAGE_SERVICE, {
         'linux-x64':   getAssetsPath('native/linux-x64/image-svc'),
         'windows-x64': getAssetsPath('native/windows-x64/image-svc.exe'),
         'macos-x64':   getAssetsPath('native/macos-x64/image-svc'),
         'macos-arm64': getAssetsPath('native/macos-arm64/image-svc'),
     });
-    await ready();
-    onTerminate((info) => { /* 子进程终止：记录日志 / 切换降级方案 */ });
+    await svc.ready();
+    svc.onTerminate((info) => { /* 子进程终止：记录日志 / 切换降级方案 */ });
 
     return {
-        serviceId,
-        render(width, height, pixels) {
-            return serviceRequest(serviceId, '/imageRender', { width, height, base64: pixels.toBase64() });
+        serviceId: svc.id,
+        async render(width, height, pixels) {
+            return (await svc.request('/imageRender', { body: { width, height, base64: pixels.toBase64() } })).json();
         },
     };
 }
 ```
 
 要点：
-- 注册失败（重复注册 / 平台不支持）同样 reject —— 捕获后按类型 2 的方式降级（`err.serviceId` 接入既有服务），或直接抛错
+- 注册失败（重复注册 / 平台不支持）同样 reject —— 捕获后按类型 2 的方式降级（`err.serviceId` 经 `getService` 接入既有服务），或直接抛错
 - `onTerminate` 只在**服务方**侧有意义（子进程是服务方启动的；降级为调用方后不触发）
 
 ### 原生服务的错误处理与降级
@@ -128,23 +130,24 @@ export async function initRenderer(): Promise<ImageRenderer> {
 `registerNativeService` / `ready()` 的 reject 原因需要区分（服务已存在 / 可执行文件被篡改）。申请 `service:registerNative` 权限只决定加载时警告或拒绝（见上）；注册阶段的错误只剩以下两类：
 
 ```ts
-import { registerNativeService, serviceRequest, log } from 'yeow-api';
+import { registerNativeService, getService, log } from 'yeow-api';
 import { getAssetsPath } from 'yeow-dev';
 
 export async function initRenderer(): Promise<ImageRenderer | null> {
     try {
-        const { serviceId, ready } = await registerNativeService(IMAGE_SERVICE, {
+        const svc = await registerNativeService(IMAGE_SERVICE, {
             'windows-x64': getAssetsPath('native/windows-x64/image-svc.exe'),
             'linux-x64':   getAssetsPath('native/linux-x64/image-svc'),
         });
-        await ready();
-        return { render: (w, h, px) => serviceRequest(serviceId, '/imageRender', { width: w, height: h, base64: px.toBase64() }) };
+        await svc.ready();
+        return { render: async (w, h, px) => (await svc.request('/imageRender', { body: { width: w, height: h, base64: px.toBase64() } })).json() };
     } catch (e) {
         const msg = (e as Error).message;
         if (msg.includes('Service already registered')) {
             // 服务已存在：以调用方身份接入既有服务（正常降级）
             const sid = (e as any).serviceId as string;
-            return { render: (w, h, px) => serviceRequest(sid, '/imageRender', { width: w, height: h, base64: px.toBase64() }) };
+            const svc = await getService(sid);
+            return { render: async (w, h, px) => (await svc.request('/imageRender', { body: { width: w, height: h, base64: px.toBase64() } })).json() };
         }
         if (msg.includes('hash mismatch')) {
             // 可执行文件被篡改（声明与实际 SHA-256 不一致）：拒绝使用
@@ -165,25 +168,23 @@ JS 服务作为门面（对外路径约定、事件发布），原生子进程�
 
 ```ts
 // yeow-image-svc —— 类型 2 + 3 组合
-import { registerService, registerNativeService, serviceRequest, servicePublish } from 'yeow-api';
+import { registerService, registerNativeService, getService, PluginService, NativeService } from 'yeow-api';
 import { getAssetsPath } from 'yeow-dev';
 
-let _serviceId: string;
-let _svc: { serviceId: string; token: string } | null = null;
-let _engine: { render(p: any): Promise<any> } | null = null;
+let _svc: PluginService;
+let _engine: NativeService | null = null;
 
 export async function initImageService() {
     try {
         // ① 先注册 JS 门面（成为服务方的前提）
         _svc = await registerService('iyexin.image-svc.v1', async (path, body) => {
             if (path === '/render') {
-                const result = await _engine!.render(body);          // 引擎：原生子进程
-                if (_svc) servicePublish(_svc.token, 'rendered', result);  // 服务方内部发布
+                const result = await (await _engine!.request('/render', { body })).json();  // 引擎：原生子进程
+                _svc.publish('rendered', result);  // 服务方内部发布
                 return result;
             }
             return { err: 'unknown path' };
         });
-        _serviceId = _svc.serviceId;
 
         // ② 成为服务方后，再启动原生引擎
         const native = await registerNativeService('iyexin.image-engine.v1', {
@@ -191,15 +192,15 @@ export async function initImageService() {
             'windows-x64': getAssetsPath('native/windows-x64/image-svc.exe'),
         });
         await native.ready();
-        _engine = { render: (p) => serviceRequest(native.serviceId, '/render', p) };
+        _engine = native;
     } catch (e) {
         // JS 门面已存在 → 整体降级为调用方
-        _serviceId = e.serviceId;
+        _svc = (await getService(e.serviceId)) as PluginService;
     }
 }
 
-export function render(width: number, height: number, pixels: Uint8Array) {
-    return serviceRequest(_serviceId, '/render', { width, height, base64: pixels.toBase64() });
+export async function render(width: number, height: number, pixels: Uint8Array) {
+    return (await _svc.request('/render', { body: { width, height, base64: pixels.toBase64() } })).json();
 }
 ```
 

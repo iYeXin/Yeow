@@ -8,11 +8,14 @@ Worker (virtual plugin) channel — the main plugin JS side controls Worker crea
 
 ```json
 // Register Worker (only registers in registry and returns handle — does not start; worker.load() triggers startup)
-{ "t": "create", "p": { "name": "<worker name>", "code": "<code>" | "entry": "<resource path>", "msgCb": "<main plugin side callback id>", "cb": "<callback id>" } }
+// permissions optional: { "allow": [...], "deny": [...] }, defaults to inheriting the main plugin's permissions (deny wins)
+{ "t": "create", "p": { "name": "<worker name>", "code": "<code>" | "entry": "<resource path>", "msgCb": "<main plugin side callback id>", "permissions": { "allow": ["<pattern>"], "deny": ["<pattern>"] }, "cb": "<callback id>" } }
 // Load (register entity → init.js → worker-inject.js → Worker code → INIT → LOAD → ready)
 { "t": "load", "p": { "name": "<worker name>", "cb": "<callback id>" } }
 // Unload (physically destroy JS context and clean up events/commands/services/tasks; handle preserved, can re-load)
 { "t": "unload", "p": { "name": "<worker name>", "cb": "<callback id>" } }
+// Full destroy (unload and remove the registration; handle invalidated, same name can be recreated)
+{ "t": "destroy", "p": { "name": "<worker name>", "cb": "<callback id>" } }
 // Send message to Worker (errors if not loaded)
 { "t": "post", "p": { "name": "<worker name>", "msg": <any JSON>, "cb": "<callback id>" } }
 // Reload (must be loaded)
@@ -36,6 +39,7 @@ Runtime delivers to the main plugin JS side that Worker's `onMessage` callback (
 | `create` | Register only (construct handle, no startup); duplicate/illegal names report error |
 | `load` | Register entity (plugins map + profiler) → construct execution unit (independent QuickJS context + thread) → `INIT` → `LOAD` → callback when ready; already loaded is a no-op |
 | `unload` | Send `DISABLE` → wait for exit (5s forced) → clean up events/commands/services/tasks → unregister profiler — **handle preserved, can re-`load`** |
+| `destroy` | Full destroy: performs all of `unload`'s cleanup and **removes it from the registry** — **handle invalidated, same name can be recreated** |
 | `reload` | Send `RELOAD` → old context destroyed → new code reloaded (`INIT` + `LOAD`); must be loaded |
 | Main plugin unload/hot-reload | **Cascade unload** all attached Workers (thorough cleanup, handles destroyed with it) |
 
@@ -52,5 +56,5 @@ dev-server reverse-resolves the corresponding Worker's source-map by `origin` (`
 ## Constraints
 
 - **Workers cannot create new Workers**: `$send('worker', ...)` inside a Worker only accepts `postToMain`; all others return `{"err":"workers cannot create workers"}`
-- Workers **share data directory / permissions / resources** with the main plugin (fs plugin-level base, assets namespace are consistent)
+- Workers **share data directory / resources** with the main plugin (fs plugin-level base, assets namespace are consistent); permissions default to inheriting the main plugin's, and can be tightened with `permissions.allow` / `permissions.deny` (cannot escalate, deny wins)
 - Worker registers as a plugin entity with `<main plugin>.<worker name>` (events/commands/services/scheduler are independent); `/yeow` management commands do not cover virtual plugins

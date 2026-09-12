@@ -131,7 +131,7 @@ dev-server → WebSocket hot-reload → Java 主线程
 - `/yeow reload all` — 全部按原路径重载
 - `/yeow unload <plugin|all>` — 卸载（5s 强制终止）
 - `/yeow uninstall <plugin>` — 卸载并把 `plugins/Yeow/` 下同名 `.yeow.zip` 移入 `plugins/Yeow/.backup/`（数据目录需手动清理）
-- `/yeow load <path|url>` — 临时加载（URL 下载到缓存，重启不保留）
+- `/yeow load <path|url|name>` — 临时加载（URL 下载到缓存，重启不保留）。路径找不到时依次回退 `plugins/Yeow/<path>` 与 `plugins/Yeow/<name>-<version>.yeow.zip`
 - `/yeow install <url>` — 下载安装到 `plugins/Yeow/<name>-<version>.yeow.zip`（标准格式，下次启动自动扫描）
 - `/yeow update <url>` — 扫描 `plugins/Yeow/` 按 `yeow.json` 的 `name` 匹配旧包，旧包移入 `plugins/Yeow/.backup/`，写入新版本；插件运行中则自动重载
 - 同名插件在任何场景下重复加载（自动扫描 / 命令 / 模板 JAR）都会被拒绝并输出警告；**同时部署模板 JAR 与 `.yeow.zip` 会产生该冲突，需手动移除其一**

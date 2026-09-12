@@ -22,7 +22,7 @@
     │                                                  │
     │  ┌──────────────────┐  ┌─────────────────────┐  │
     │  │  PluginEntity 1   │  │  PluginEntity 2     │  │
-    │  │  (PluginThread)   │  │  (Adapter / Worker) │  │
+    │  │  (PluginThread)   │  │  (Worker)           │  │
     │  │  QuickJS + message│  │  Message-driven loop│  │
     │  │  driven loop      │  │  fs/http/assets self│  │
     │  │  fs/http/assets   │  │  handled            │  │
@@ -135,10 +135,10 @@ The Paper-family (Paper/Purpur/Leaf, etc.) yeow-runtime is the official referenc
 
 ## Plugin Entity Abstraction
 
-The runtime treats every plugin as a **`PluginEntity`** interface: it can receive messages (`postMessage`), has lifecycle methods (`start` / `stopAndWait` / `reload`), and behavioral metrics (`ping()` heartbeat round-trip). JS-specific details (QuickJS context, `$hm` message protocol, init.js) exist only within the JS adapter (`PluginThread`); the scheduler / event bridge / command bridge / Service / Profile all depend solely on this interface:
+The runtime treats every plugin as a **`PluginEntity`** interface: it can receive messages (`postMessage`), has lifecycle methods (`start` / `stopAndWait` / `reload`), and behavioral metrics (`ping()` heartbeat round-trip). JS-specific details (QuickJS context, `$hm` message protocol, init.js) exist only within the JS implementation (`PluginThread`); the scheduler / event bridge / command bridge / Service / Profile all depend solely on this interface:
 
 - **Scheduler** only knows plugin names (for submitting tasks and reply callbacks), not the execution engine
-- **Profile** uniformly collects response latency via `ping()`; in-flight management is handled by the adapter
+- **Profile** uniformly collects response latency via `ping()`; in-flight management is handled by the implementation
 - **Virtual plugins**: Worker entities implementing `PluginEntity` ([Worker API](/api/worker)) participate in the full pipeline; the `isVirtual()` flag distinguishes them in performance stats and alerts
 
 ## Worker (Virtual Plugin)

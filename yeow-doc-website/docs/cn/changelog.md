@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-09-12
+
+- quickjs-wrapper 重写为 Yeow 专用桥：原生层 C + **Zig 0.16** 单工具链构建（六平台交叉编译），Java 包名 `wiki.yexin.quickjs`，仅保留 evaluate / 全局函数上下行 / job 泵 / 中断；Maven 组 `io.yeow` → `wiki.yexin`，新构件 `wiki.yexin:yeow-quickjs`
+- 新增**原生 polyfill**（`quickjs-wrapper/native/polyfill/`，C，随上下文创建注入，不改 QuickJS 源码）：`performance.now()`（零点为**上下文创建**时刻）/ `performance.timeOrigin`（单调高精度时间）与原生 UTF-8 版 `TextEncoder` / `TextDecoder`；yeow-api `global.d.ts` 声明 `performance`
+- JS↔Java 链路清理（仅 JSON 路径）：`$hm` 绑定句柄、微任务泵合并为单次 JNI `drainJobs()`、异步回调 `cbMessageRaw` 直接拼装结果 JSON、批量同步结果直接拼接数组、字符串 ASCII/BMP 快路径
+- **原生服务强制声明**：`yeow.config.json` 必须声明 `native`（构建时校验：有 `service:registerNative` 权限但清单为空 / 文件缺失 → 构建失败；加载时为空 → 拒绝加载）；`registerNativeService` 校验 serviceId、二进制路径、SHA-256，缺一即拒绝；**移除目录模式**（仅单文件）；`native-service-allow-untrusted` 保留（声明 ≠ 可信）
+- **统一权限门控 + Worker 权限/销毁**：主插件与 Worker 共用 `PermissionGate`（所有消息节点受控、`task:*` 默认拥有、deny 优先、allow 不可提权）；`createWorker({ permissions: { allow?, deny? } })`；新增 `worker.destroy()`
+- 版本 0.5.3 → 0.6.0（runtime core/paper/folia、yeow-template、create-yeow、quickjs）；模板内置 jar 同步为 `yeow-runtime-0.6.0.jar` / `yeow-runtime-folia-0.6.0.jar` / `yeow-template-0.6.0.jar`；yeow-api 0.5.0 → 0.6.0
+- **原生服务协议 v2（破坏性）**：TCP 由 JSON line 改为帧协议（header JSON + raw/分块 body），支持原始二进制与流式；`serviceRequest` 返回 fetch 风格 `Response`（`json()`/`bytes()` 等）；事件语义不变；顺带修复出站帧并发交错、shutdown 缺帧、无大小上限
+- **service API 改 OOP（破坏性）**：注册返回 `PluginService`/`NativeService` 句柄，新增 `getService`/`hasService`（含非原子性警告）与 `unregister`；`Service` 基类含 `request`/`subscribe`，`PluginService` 含 `token`/`publish`，`NativeService` 含 `ready`/`onTerminate`；运行时 `service` 通道新增 `info`/`unregister`，`request`/`response` 支持 `headers`、请求支持超时；移除函数式 `serviceRequest`/`serviceSubscribe`/`servicePublish`
+- **文档**：service 文档重构为三种场景（插件自身提供 / 依赖包纯调用 / 依赖包内嵌服务），自包含设计移至最复杂场景
+- **移除实验性集成能力**：删除「插件适配器规范」与「Java 插件集成」（`requestService`/`subscribeService`）文档、相关代码（`requestJava`/`subscribeJava`、`registerPluginEntity(PluginEntity)` 重载）与站点导航；未来可能并入主线
+- **插件包缓存阈值**：新增 `assets.cache-max-bytes`（默认 30 MiB），超过不再缓存到内存（回退 ZipFile 直读）；`<=0` 不限制
+- **`/yeow load` 增强**：路径找不到时回退 `plugins/Yeow/<path>` 与 `plugins/Yeow/<name>-<version>.yeow.zip`（忽略大小写、精确优先、多版本取最新）
+- CI 重写：Zig 构建 + 冒烟测试，`v*` 标签自动发布 `yeow-quickjs.jar`
+
 ## 2026-09-06
 
 - yeow-runtime 0.5.2 → 0.5.3：资源内存缓存（加载时预解析，默认启用）+ `__plugin.version/author` 修复 + 移除原生动态审批改配置开关（默认允许并警告）+ 配置缺失字段自动合并写回；yeow-template / create-yeow 同步至 0.5.3

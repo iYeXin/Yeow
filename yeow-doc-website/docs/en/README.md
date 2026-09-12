@@ -42,7 +42,7 @@ npm run build                    # Output standard Paper JAR + platform-independ
 
 ### Native Capability Extension
 
-- **Native Service** — Plugins can embed native programs like Go / Rust / C++ (`assets/` carries binaries, runtime automatically extracts and spawns by platform), called via `serviceRequest`, suitable for heavy computation like image processing, machine learning
+- **Native Service** — Plugins can embed native programs like Go / Rust / C++ (`assets/` carries binaries, runtime automatically extracts and spawns by platform), registered with `registerNativeService` and called via `svc.request`, suitable for heavy computation like image processing, machine learning
 - **Runtime Health Detection** — Automatic alerts for heartbeat timeout, event/completion timeout, plugin hanging; dynamic expansion of tick budget during queue backlog
 
 ## Comparison with Other Solutions

@@ -4,7 +4,7 @@
 
 ## 二进制承载
 
-通道协议上字节数据一律以 **base64 字符串**承载（JSON 安全）。JS 侧引擎原生 `Uint8Array.toBase64()` / `Uint8Array.fromBase64()` 负责转换（ES2023+），适配器层不暴露 base64——encode/decode 的语义是 **buffer ↔ 字符串**，base64 只是承载形式。
+通道协议上字节数据一律以 **base64 字符串**承载（JSON 安全）。JS 侧引擎原生 `Uint8Array.toBase64()` / `Uint8Array.fromBase64()` 负责转换（ES2023+），协议层不暴露 base64——encode/decode 的语义是 **buffer ↔ 字符串**，base64 只是承载形式。
 
 ## 大小限制（config.yml 可配置）
 

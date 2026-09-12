@@ -131,7 +131,7 @@ Hot reload waits synchronously on the main thread (max 5s), without affecting ot
 - `/yeow reload all` — Reloads all at their original paths
 - `/yeow unload <plugin|all>` — Unloads (5s forced termination)
 - `/yeow uninstall <plugin>` — Unloads and moves the corresponding `.yeow.zip` from `plugins/Yeow/` into `plugins/Yeow/.backup/` (data directory needs manual cleanup)
-- `/yeow load <path|url>` — Temporary load (URL downloads to cache, not preserved across restarts)
+- `/yeow load <path|url|name>` — Temporary load (URL downloads to cache, not preserved across restarts). When the path is not found, falls back to `plugins/Yeow/<path>` then `plugins/Yeow/<name>-<version>.yeow.zip`
 - `/yeow install <url>` — Downloads and installs to `plugins/Yeow/<name>-<version>.yeow.zip` (standard format, auto-scanned on next startup)
 - `/yeow update <url>` — Scans `plugins/Yeow/` and matches old packages by `yeow.json` `name`; moves old package to `plugins/Yeow/.backup/`, writes new version; if plugin is running, auto-reloads
 - Duplicate loading of a plugin under the same name (auto-scan / command / template JAR) is rejected with a warning in all scenarios; **deploying both a template JAR and a `.yeow.zip` for the same plugin causes this conflict — manually remove one**

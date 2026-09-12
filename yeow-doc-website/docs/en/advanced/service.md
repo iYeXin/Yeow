@@ -10,29 +10,29 @@ Plugin A registers a service, Plugin B calls it:
 
 ```
 Plugin B                         ServiceManager                 Plugin A
-  serviceRequest(svcId, path, body)
+  svc.request(path, { body })
     → service channel request
       → registry locates the owning plugin of the service
-        → delivers {_svc:"request", path, body} via onRequestCb callback
+        → delivers {_svc:"request", path, headers, body} via onRequestCb callback
           → Plugin A's onRequest(path, body) handles it
-          → $send('service', {t:"response", requestId, body})
+          → $send('service', {t:"response", requestId, headers, body})
       → respond(requestId, consumer)
     → Plugin B's Promise resolves
 ```
 
-**Publish/Subscribe**: The service provider publishes events using `publish(token, eventPath, body)`, and subscribers receive them using `subscribe(serviceId, eventPath, handler)`. `token` is the publish authentication credential (returned upon registration).
+**Publish/Subscribe**: The service provider publishes events using `svc.publish(eventPath, body)`, and subscribers receive them using `svc.subscribe(eventPath, handler)`. `token` is the publish authentication credential (returned upon registration), held only by the owner `PluginService` handle.
 
 ### Native Service — Native Capability Extension
 
-Plugins register via `registerNativeService`, and the runtime extracts the executable and spawns a subprocess:
+Plugins register via `registerNativeService`, and the runtime extracts the executable and spawns a subprocess, returning a `NativeService` handle:
 
 ```
-registerNativeService(refName, platforms)
+const svc = await registerNativeService(refName, platforms)
   → Selects the binary based on the current platform (os + arch, exact match falls back to os)
   → Extracts from JAR assets/ to a temporary directory (namespace path resolved via getAssetsPath)
   → spawn(binary, nativePort, serviceId)
-  → Subprocess connects via TCP → sends {"type":"ready"} → ready() resolves
-  → Requests go through TCP JSON line: request → response
+  → Subprocess connects via TCP → sends {"type":"ready"} → svc.ready() resolves
+  → Requests go through a framed protocol (header JSON + raw body): request → response
 ```
 
 - **Platform granularity**: `windows-x64` / `linux-arm64` etc., exact match takes priority, falls back to `windows` / `linux`

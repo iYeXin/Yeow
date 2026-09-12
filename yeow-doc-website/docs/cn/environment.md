@@ -15,6 +15,7 @@
 | `$send(channel, payload)`                                       | **唯一** JS→运行时通信入口（自动 JSON 序列化）。底层 `$_send` 属内部实现，**已被 init.js 闭包持有并从全局移除**——直接引用报 `ReferenceError`，只能使用 `$send`。 |
 | `fetch(url, init?)`                                             | HTTP 客户端（Promise）。响应为 `Response`，提供 `text()` / `json()` / `base64()` / `arrayBuffer()`。需声明 `http:requestAsync` 权限。                            |
 | `TextEncoder` / `TextDecoder`                                   | **utf-8** 编解码（Web 语义；环境要求存在）。为**同步** API。仅 utf-8，无 gbk 等。                                                                                |
+| `performance.now()` / `performance.timeOrigin`                   | 高精度单调时间（Web Performance API 语义）：`now()` 返回相对上下文起点的毫秒数（Double，亚毫秒精度），`timeOrigin` 为上下文创建时的 epoch 毫秒。                    |
 | `setTimeout` / `clearTimeout` / `setInterval` / `clearInterval` | Web 定时器语义。                                                                                                                                                 |
 | `console.log/warn/error/info`                                   | 日志（自动加 `[插件名]` 前缀）。                                                                                                                                 |
 | `Promise`,`JSON`,`Map`/`Set`/`Symbol`/`Proxy`/`Reflect` 等      | 标准 ECMAScript。                                                                                                                                                |
@@ -22,7 +23,7 @@
 | `__plugin`                                                      | 插件元信息（name/version/author，只读）。                                                                                                                        |
 | `__yeow*`（如 `__yeowInitCbs`、`__yeowGcQueue`）                | 运行时内部生命周期钩子，一般**不需要直接接触**。                                                                                                                 |
 
-> 绝大多数能力建议通过 **yeow-api**（`player`/`world`/`fs`/`http`/`util`/`pdc`/…）使用，而非裸 `$send`。全局仅 `$send` / `fetch` / `TextEncoder` / `TextDecoder` / 定时器 / `console` 是“基础设施”。
+> 绝大多数能力建议通过 **yeow-api**（`player`/`world`/`fs`/`http`/`util`/`pdc`/…）使用，而非裸 `$send`。全局仅 `$send` / `fetch` / `TextEncoder` / `TextDecoder` / `performance` / 定时器 / `console` 是“基础设施”。
 
 ## 与浏览器环境的差异
 

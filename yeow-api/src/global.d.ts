@@ -50,12 +50,21 @@ declare global {
 
   interface TextDecoder {
     readonly encoding: string;
-    decode(input?: Uint8Array): string;
+    decode(input?: ArrayBuffer | ArrayBufferView): string;
   }
   const TextDecoder: {
     new (encoding?: string): TextDecoder;
     prototype: TextDecoder;
   };
+
+  // ── performance（高精度单调时间）──
+  interface Performance {
+    /** 相对上下文起点的毫秒数（单调、亚毫秒精度）。 */
+    now(): number;
+    /** 上下文创建时的 epoch 毫秒。 */
+    readonly timeOrigin: number;
+  }
+  var performance: Performance;
 
   function setTimeout(handler: (...args: any[]) => void, timeout?: number, ...args: any[]): string;
   function clearTimeout(id: string): void;

@@ -7,7 +7,7 @@ import { assets } from 'yeow-api';
 
 Files under `assets/` directory are automatically packaged into JAR during build, read via this API at runtime.
 
-> **In-memory cache**: the whole package is read into memory once at plugin load with the central directory pre-parsed; `read` / `extract` / native binary extraction all serve from memory (zero repeated opens). Disable with `assets.cache-enabled: false` in `config.yml` (falls back to direct `ZipFile` reads).
+> **In-memory cache**: the whole package is read into memory once at plugin load with the central directory pre-parsed; `read` / `extract` / native binary extraction all serve from memory (zero repeated opens). Disable with `assets.cache-enabled: false` in `config.yml` (falls back to direct `ZipFile` reads); packages larger than `assets.cache-max-bytes` (default 30 MiB, `<=0` = unlimited) are also not cached.
 
 > `getAssetsPath` imported from **`yeow-dev`** (build-time virtual module), not `yeow-api`: It injects namespace by caller's belonging dependency, only builder knows which package current code belongs to. `yeow-dev` published as empty package (can be not installed, type declarations provided by `yeow-api`).
 
@@ -31,7 +31,7 @@ getAssetsPath('native/win/svc.exe'): string
 
 ### Relative References (No Limitations)
 
-Because files **not hash-renamed**, any relative references within `assets/` (including cross-directory) — whether from referenced file's content (config, scripts, `../` sibling references) or `{ dir, entry }` native services — are **always valid**. No more "directory should be self-contained" or "cross-top-level directory breaks" limitations:
+Because files **not hash-renamed**, any relative references within `assets/` (including cross-directory) — whether from referenced file's content (config, scripts, `../` sibling references) — are **always valid**. No more "directory should be self-contained" or "cross-top-level directory breaks" limitations:
 
 ```ts
 // Layout: assets/native/win/{start.bat, app.js, modules/moduleA.js}
@@ -49,18 +49,13 @@ Each dependency's assets has independent `<id>` namespace, **same-name files don
 
 Builder scans `node_modules` top-level directory (including `@scope/name`), identifies dependencies with `<name>-<version>` as key:
 
-- **Identification condition**: Package has `assets/` directory, and `peerDependencies` contains `yeow-api` key
+- **Identification condition**: Package has an `assets/` directory and satisfies one of — `peerDependencies` contains the `yeow-api` key, or it ships a `yeow.config.json` with `permissions` / `native` declarations (native-only / resource packages are identified even without a `yeow-api` dependency; their `native` participates in the merge and their `assets` are deployed)
 - **Main project**: Has `assets/` participates (always assigned id)
 - **Compatibility**: npm / pnpm flat layout well supported; yarn hoisting differences may cause dependencies not in expected location, if issues please use npm or pnpm
 
-### Directory Boundary
+### Directory Boundaries
 
-**`{ file }` mode only extracts single file** — that file's relative references to other files in directory will fail. For maintaining internal references use `{ dir, entry }` mode:
-
-```ts
-// ✅ dir points to top-level directory containing all dependencies, entry uses relative sub-path
-{ dir: getAssetsPath('native/'), entry: 'win/start.bat' }
-```
+Native services (`registerNativeService`) support **single file only** (`string` / `{ file }`) — the runtime extracts only that file to a temp directory, other files in the same directory are not extracted. The native binary therefore must be **self-contained** (statically linked, or dependencies packed into a single executable). `assets.extractDir` is still a general-purpose resource directory extraction capability, unrelated to native services.
 
 > During build esbuild intercepts `yeow-dev` virtual module: Scans each dependency's `assets/`, copies as-is to `dist/.assets/<id>/` (or `dist/.dev/.assets/<id>/`), injects namespace id by importer ownership, finally packages into JAR.
 
@@ -123,7 +118,7 @@ const icon = assetsReadSync(getAssetsPath('icon.png'));
 await assets.extract(getAssetsPath('icon.png'));
 
 // Native Service (auto-injected namespace path)
-const { serviceId } = await registerNativeService('renderer', {
+const svc = await registerNativeService('renderer', {
     windows: getAssetsPath('native/renderer.exe'),
     linux: getAssetsPath('native/renderer'),
 });

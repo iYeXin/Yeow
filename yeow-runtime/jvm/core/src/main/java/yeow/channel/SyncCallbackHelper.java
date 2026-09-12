@@ -23,6 +23,16 @@ public class SyncCallbackHelper {
         return gson.toJson(m);
     }
 
+    /**
+     * Same envelope, but the result is already a serialized JSON string —
+     * concatenated directly instead of parsed and re-serialized. `resultJson`
+     * must be valid JSON, or null for a JSON null.
+     */
+    public static String cbMessageRaw(String cbId, String resultJson) {
+        return "{\"t\":\"cb\",\"p\":" + gson.toJson(cbId) + ",\"r\":"
+            + (resultJson == null ? "null" : resultJson) + "}";
+    }
+
     public static class Pending {
         final CountDownLatch latch = new CountDownLatch(1);
         final Runnable onComplete;

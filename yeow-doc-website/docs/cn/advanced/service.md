@@ -10,29 +10,29 @@
 
 ```
 插件 B                         ServiceManager                 插件 A
-  serviceRequest(svcId, path, body)
+  svc.request(path, { body })
     → service 通道 request
       → registry 定位服务归属插件
-        → 通过 onRequestCb 回调投递 {_svc:"request", path, body}
+        → 通过 onRequestCb 回调投递 {_svc:"request", path, headers, body}
           → 插件 A 的 onRequest(path, body) 处理
-          → $send('service', {t:"response", requestId, body})
+          → $send('service', {t:"response", requestId, headers, body})
       → respond(requestId, consumer)
     → 插件 B 的 Promise resolve
 ```
 
-**发布/订阅**：服务方用 `publish(token, eventPath, body)` 发布事件，订阅方用 `subscribe(serviceId, eventPath, handler)` 接收。`token` 是发布鉴权凭证（注册时返回）。
+**发布/订阅**：服务方用 `svc.publish(eventPath, body)` 发布事件，订阅方用 `svc.subscribe(eventPath, handler)` 接收。`token` 是发布鉴权凭证（注册时返回），仅属主 `PluginService` 句柄持有。
 
 ### Native Service — 原生能力扩展
 
-插件通过 `registerNativeService` 注册，运行时提取可执行文件并 spawn 子进程：
+插件通过 `registerNativeService` 注册，运行时提取可执行文件并 spawn 子进程，返回 `NativeService` 句柄：
 
 ```
-registerNativeService(refName, platforms)
+const svc = await registerNativeService(refName, platforms)
   → 按当前平台（os + arch，精确匹配回退 os）选择二进制
   → 从 JAR assets/ 提取到临时目录（命名空间路径经 getAssetsPath 解析）
   → spawn(binary, nativePort, serviceId)
-  → 子进程连接 TCP → 发送 {"type":"ready"} → ready() resolve
-  → 请求走 TCP JSON line：request → response
+  → 子进程连接 TCP → 发送 {"type":"ready"} → svc.ready() resolve
+  → 请求走帧协议（header JSON + raw body）：request → response
 ```
 
 - **平台粒度**：`windows-x64` / `linux-arm64` 等，精确匹配优先，回退到 `windows` / `linux`

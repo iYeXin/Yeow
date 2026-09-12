@@ -13,10 +13,9 @@
 | [message](message/index.md)               | 非调度器通道（timer / fs / http / assets / service / debug 等）的消息格式 |
 | [task](task/index.md)                     | 调度器任务类型清单（`player.get`、`world.setBlock` 等的请求/响应格式）    |
 | [event](event/index.md)                   | 事件订阅机制与各类事件的数据字段                                          |
-| [native-service](native-service/index.md) | Native Service 子进程协议（TCP JSON line）                                |
+| [native-service](native-service/index.md) | Native Service 子进程协议（TCP 帧协议：header JSON + raw body）                                |
 | [runtime](runtime/index.md)               | 运行时机制（JS 环境、回调系统、全局变量、事件循环）                       |
 | [values.md](values.md)                    | **值域附录**：取值格式规则（R1-R5）与清单——平台专有枚举直接维护（游戏模式/难度/BossBar/计分板/ClickType/ItemFlag/InventoryType 等）+ 参考实现（非强制：DamageCause/传送原因/回血原因）；版本变迁域（方块/物品/实体/生物群系/音效/粒子/附魔/药水/属性/伤害类型/游戏规则/翻译键/进度/配方）给规则 + 权威链接 |
-| [adapter](adapter/index.md)               | 插件适配器规范（多语言 / 社区适配器实现 PluginEntity 并注册）             |
 
 ---
 
@@ -56,7 +55,7 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 └── plugin.yml             ← 宿主平台元信息（Paper 系需要；`.yeow.zip` 与纯平台实现可忽略）
 ```
 
-> **`.yeow.zip` 与 JAR 的行为完全一致**：运行时按同一套逻辑注册（读 `yeow.json` → 权限 → 代码 → 启动）。放入运行时数据目录（Paper 系官方实现为 `plugins/Yeow/`）会被自动扫描加载，也可通过 `/yeow load <path>` 手动加载。同一插件名只允许一个实例，重复加载拒绝并警告。
+> **`.yeow.zip` 与 JAR 的行为完全一致**：运行时按同一套逻辑注册（读 `yeow.json` → 权限 → 代码 → 启动）。放入运行时数据目录（Paper 系官方实现为 `plugins/Yeow/`）会被自动扫描加载，也可通过 `/yeow load <path|name>` 手动加载（路径找不到时在 `plugins/Yeow/` 下按名匹配 `<name>-<version>.yeow.zip`）。同一插件名只允许一个实例，重复加载拒绝并警告。
 
 ### `yeow.json` — 插件元信息
 
@@ -80,7 +79,7 @@ my-plugin.jar / my-plugin.yeow.zip (ZIP)
 | `api` / `java`        | 宿主平台要求的 API/Java 版本（其他平台可忽略）                                           |
 | `permissions`  | 开发者声明的权限（敏感节点，见下文[权限模型](#权限模型)）     |
 | `computedPermissions` | 构建时计算的最终生效权限（合并 + 通配归一化）；运行时读取此字段（v0 阶段不兼容旧格式包） |
-| `native` | 原生服务可信性声明（构建时计算 SHA-256）：`[{ "serviceId": "...", "files": [{ "<打包后路径>": "<sha256>" }, ...], "source": "..." }]` |
+| `native` | 原生服务可信性声明（**强制**；仅单文件模式）：构建时合并主项目 + 依赖包并按各自命名空间计算 SHA-256，写入 `[{ "serviceId": "...", "files": [{ "<打包后路径>": "<sha256>" }, ...], "source": "..." }]` |
 
 ### `.yeow/main.js` — 插件代码
 
@@ -154,7 +153,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 - **节点概念**：权限只按**消息节点**（`channel:node`）考虑。节点名中的段（如 `fs:plugin.readFile` 的 `plugin`、`task:player.get` 的 `player`）是业务/访问范围命名，**不是层级**，不参与权限匹配
 - **节点匹配**：精确节点（`fs:server.readFile`）；**整组通配** `fs:server.*` 命中该前缀全部节点；**通道通配** `fs:*` 命中 fs 通道全部节点——构建时 `fs:*` 在 `computedPermissions` 中**自动展开**为 `fs:outer.*, fs:server.*`（语义等价）
-- **默认允许**：上述默认拒绝节点之外的节点（如 `service:request`、`service:register`、`assets:read`、`fs:plugin.readFile`）无需声明
+- **默认允许**：上述默认拒绝节点之外的节点（如 `service:request`、`service:register`、`service:info`、`service:unregister`、`assets:read`、`fs:plugin.readFile`）无需声明
 - **拒绝行为**：未声明调用返回错误 `Permission denied: <node>`。同步调用直接返回错误 JSON；异步调用（含 `cb`）通过回调投递 `{"err":"Permission denied: <node>"}`，JS 侧表现为 Promise reject
 - **其他通道**（`task`/`timer`/`log`/`env`/`debug`/`lifecycle`）不受权限模型约束
 - 权限在插件加载时读取并**固定**（运行时不可变更），加载消息中打印声明内容——打印时 `fs:*` 会**展开为 `fs:outer.*, fs:server.*`**（仅展示，便于服主理解影响范围；权限校验仍按原值 `fs:*`）
@@ -265,9 +264,10 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 插件可携带原生程序（Go/Rust/C++ 等）并通过 `service` 通道调用。详见 [Native Service 规范](native-service/index.md)。要点：
 
-- 二进制放在 `assets/`（经 `getAssetsPath()` 注入命名空间）
+- 二进制放在 `assets/`（经 `getAssetsPath()` 注入命名空间），**仅单文件**（目录模式已移除；二进制需自包含）
+- **强制在 `yeow.config.json` 声明 `native`**（serviceId + 文件）：构建时按命名空间计算 SHA-256，加载时存为插件元数据；未声明/哈希不符 → 拒绝
 - `registerNativeService` 按平台（os + arch）提取并 spawn 子进程
-- 子进程通过 TCP JSON line 与运行时通信（ready / request / response / publish）
+- 子进程通过 TCP 帧协议（header JSON + raw body）与运行时通信（ready / request / response / publish）
 
 ---
 
@@ -277,7 +277,7 @@ JS 侧通过 `getAssetsPath()` 获取带命名空间的路径（如 `"assets/a1b
 
 - [ ] **包结构解析**：读 ZIP（yeow.json、.yeow/main.js、assets/；可选 dev.json），JAR 与 `.yeow.zip` 同构
 - [ ] **同名唯一**：插件名冲突时拒绝加载并警告（自动扫描 / 命令 / 宿主机制途径一致）
-- [ ] **权限模型**：解析 yeow.json `computedPermissions`；`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative` 默认拒绝（`fs:plugin.*` 免声明；`assets` 通道不设权限拦截，解压目标限定在插件数据目录内）；未声明调用返回 `Permission denied: <node>`
+- [ ] **权限模型**：解析 yeow.json `computedPermissions`；统一门控所有消息节点（`task:*` 默认拥有；`fs:server.*`、`fs:outer.*`、`http:*`、`service:registerNative` 默认拒绝；`fs:plugin.*` 免声明；`assets` 默认允许，解压目标限定在插件数据目录内）；Worker 可叠加 `allow`/`deny`（deny 优先、不可提权）；未声明调用返回 `Permission denied: <node>`
 - [ ] **加载消息**：插件加载成功时输出加载消息（含插件名、版本、权限声明）
 - [ ] **JS 引擎**：ES2025+（Sec-Uint8Array），支持 `Promise`/`WeakRef`/`FinalizationRegistry`/`Uint8Array`
 - [ ] **原生注入**：`__plugin`、`$dev`（底层桥接如 `$_send` 为内部实现，不属规范约束）

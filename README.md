@@ -18,7 +18,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 
 ---
 
-## 组件总览（10 个目录）
+## 组件总览（9 个目录）
 
 | 目录                                    | 语言       | 作用                                                                                                              |
 | --------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
@@ -26,10 +26,11 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 | [`yeow-api`](yeow-api/)                 | TypeScript | 插件开发期 npm 依赖：OOP 封装全部底层协议（Player/World/Event/Command/Service…），构建时随插件 bundle             |
 | [`create-yeow`](create-yeow/)           | Node.js    | `npm create yeow` 脚手架：交互式项目模板、dev-server（Paper + 热重载 + source-map 错误定位）、构建脚本            |
 | [`yeow-template`](yeow-template/)       | Java 21    | 空 JAR 骨架（`Bootstrap` 类），构建时注入 JS 代码生成标准 Paper 插件 JAR                                          |
-| [`quickjs-wrapper`](quickjs-wrapper/) | Java + C++ | QuickJS 2026-06-04 的 JVM 封装（fork），含四平台预编译原生库。**本仓库中的副本仅为镜像**——主维护仓库：[github.com/iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper)（版本标签、多平台 CI 构建、Release 发布均在那里进行）。`native/quickjs`（QuickJS 本体 C 源码）为 **git submodule**（[iyexin/quickjs](https://github.com/iyexin/quickjs)，上游 bellard/quickjs 的 fork，锁定 2026-06-04 快照） |
+| [`quickjs-wrapper`](quickjs-wrapper/) | C + Java（Zig 构建） | Yeow 专用 QuickJS JNI 桥：原生 C 实现 + `wiki.yexin.quickjs` Java API，用 **Zig 0.16** 单工具链交叉编译 linux/macos/windows × x86_64/arm64 六平台原生库（`zig build jar`）。`native/quickjs`（QuickJS 本体 C 源码）为 **git submodule**（[iyexin/quickjs](https://github.com/iyexin/quickjs)，上游 bellard/quickjs 的 fork，锁定 2026-06-04 快照） |
 | [`yeow-dev`](yeow-dev/)                 | Node.js    | 构建期虚拟模块（空 npm 包）：`getAssetsPath` 的引入来源，构建时被 esbuild 拦截并按依赖项注入命名空间            |
 | [`yeow-tools`](yeow-tools/)             | Java 21    | 开发辅助工具：调度器/队列基准（Bench）、Base64 编解码诊断                                                         |
 | [`yeow-doc-website`](yeow-doc-website/) | Markdown + VitePress | 仓库内文档目录 + 文档站点工程：`docs/` 为多语言文档根（中文在 `docs/cn/`，**直接提交**），`npm run build` 产出 `/v1/` 站点 |
+| [`packages`](packages/)                 | TypeScript | 独立发布的关联 npm 包：`yeow-command`（命令框架）、`yeow-server`（HTTP 静态服务）、`yeow-fflate`（ZIP/压缩）、`yeow-docs`（离线文档压缩包） |
 
 ### 运行链路
 
@@ -56,7 +57,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 完整文档见 [yeow-doc-website/docs/cn/getting-started.md](yeow-doc-website/docs/cn/getting-started.md)。
 
-1. **安装运行时**：将 `yeow-runtime-0.5.3.jar` 放入服务器 `plugins/`
+1. **安装运行时**：将 `yeow-runtime-0.6.0.jar` 放入服务器 `plugins/`
 2. **创建插件**：`npm create yeow@latest -- -y && cd my-plugin && npm install`
 3. **开发**：`npm run dev`（自动下载 Paper、启动热重载）
 4. **构建**：`npm run build` → `dist/<name>-<version>.jar` + `.yeow.zip`

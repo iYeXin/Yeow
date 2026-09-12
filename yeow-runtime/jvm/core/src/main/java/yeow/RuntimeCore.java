@@ -96,7 +96,7 @@ public class RuntimeCore {
         host.purgePlatformResources(name);
         if (serviceManager != null) serviceManager.purgePluginServices(name);
         if (profiler != null) profiler.unregisterPlugin(name);
-        var fresh = new PluginThread(name, pt.version(), pt.author(), pt.source(), pt.pluginPackage(), initCode, newCode, this, pt.permissions(), pt.nativeHashes());
+        var fresh = new PluginThread(name, pt.version(), pt.author(), pt.source(), pt.pluginPackage(), initCode, newCode, this, pt.permissions(), pt.nativeManifest());
         fresh.setDevAssetsDir(pt.getDevAssetsDir());
         fresh.setDevMode(pt.isDevMode());
         return registerPluginEntity(fresh, false);
@@ -198,9 +198,17 @@ public class RuntimeCore {
     public boolean registerPlugin(String jarPath, boolean sendLoad) {
         // 插件包内存镜像：加载时一步到位——yeow.json / main.js 解析与后续
         // assets 通道、原生二进制解压共用同一份内存（零重复 open/解析）。
-        // 缓存关闭（assets.cache-enabled=false）或加载失败（ZIP64/非 zip）时回退 ZipFile 直读。
+        // 缓存关闭（assets.cache-enabled=false）、包超过阈值（assets.cache-max-bytes）
+        // 或加载失败（ZIP64/非 zip）时回退 ZipFile 直读。
         PluginPackage pkg = null;
-        if (config.assetsCacheEnabled()) {
+        long cacheMax = config.assetsCacheMaxBytes();
+        long pkgSize = new File(jarPath).length();
+        boolean withinLimit = cacheMax <= 0 || pkgSize <= cacheMax;
+        if (config.assetsCacheEnabled() && !withinLimit) {
+            LOG.info("Asset cache skipped for " + jarPath + " (" + (pkgSize / (1024 * 1024)) + " MB > "
+                + (cacheMax / (1024 * 1024)) + " MB) - falling back to direct read");
+        }
+        if (config.assetsCacheEnabled() && withinLimit) {
             try {
                 pkg = PluginPackage.load(Path.of(jarPath));
             } catch (Exception e) {
@@ -224,7 +232,7 @@ public class RuntimeCore {
             var version = "";
             var author = "";
             var perms = new LinkedHashSet<String>();
-            var nativeHashes = new java.util.HashMap<String, String>(); // 打包后路径 → SHA-256
+            var natives = NativeManifest.EMPTY; // yeow.json native 声明（serviceId + 打包后路径 → SHA-256）
             if (meta != null) {
                 var obj = new Gson().fromJson(meta, JsonObject.class);
                 if (obj.has("name")) name = obj.get("name").getAsString();
@@ -235,20 +243,8 @@ public class RuntimeCore {
                 if (obj.has("computedPermissions") && obj.get("computedPermissions").isJsonArray()) {
                     for (var el : obj.getAsJsonArray("computedPermissions")) perms.add(el.getAsString());
                 }
-                // 原生服务可信性声明（构建时计算 SHA-256 写入）：打包后路径 → hash
-                if (obj.has("native") && obj.get("native").isJsonArray() && obj.getAsJsonArray("native").size() > 0) {
-                    for (var el : obj.getAsJsonArray("native")) {
-                        if (!el.isJsonObject()) continue;
-                        var e = el.getAsJsonObject();
-                        if (e.has("files") && e.get("files").isJsonArray()) {
-                            for (var f : e.getAsJsonArray("files")) {
-                                if (!f.isJsonObject()) continue;
-                                var fo = f.getAsJsonObject();
-                                for (var entry2 : fo.entrySet()) nativeHashes.put(entry2.getKey(), entry2.getValue().getAsString());
-                            }
-                        }
-                    }
-                }
+                // 原生服务可信性声明（构建时由 yeow.config.json 的 native 计算）：作为插件元数据保存
+                natives = NativeManifest.parse(obj.get("native"));
             }
 
             if (plugins.containsKey(name)) {
@@ -261,6 +257,17 @@ public class RuntimeCore {
             // 为 true 时正常加载并打印醒目警告。yeow.config.json 的 `native` 声明与
             // SHA-256 校验不受此开关影响（注册原生服务时始终校验）。
             boolean wantsNative = perms.contains("service:registerNative") || perms.contains("service:*");
+            // 强制声明（加载层）：申请了原生服务权限的插件，其 yeow.json native 清单不得为空
+            // （yeow.config.json 必须声明 native，构建时写入）。声明 ≠ 可信——见下方 untrusted 开关。
+            if (wantsNative && natives.isEmpty()) {
+                LOG.severe("\n" + "=".repeat(60)
+                    + "\n  [Yeow] " + name + " requests NATIVE SERVICES but declares NO `native` manifest"
+                    + "\n  and was REFUSED to load."
+                    + "\n  Declare `native` in yeow.config.json (serviceId + binary files) so every"
+                    + "\n  binary is pinned by SHA-256, then rebuild."
+                    + "\n" + "=".repeat(60));
+                return false;
+            }
             if (wantsNative && !config.nativeServiceAllowUntrusted()) {
                 LOG.severe("\n" + "=".repeat(60)
                     + "\n  [Yeow] " + name + " requests NATIVE SERVICES and was REFUSED to load"
@@ -290,7 +297,7 @@ public class RuntimeCore {
                 userCode = code;
             }
 
-            var pt = new PluginThread(name, version, author, jarPath, P, initCode, userCode, this, perms, nativeHashes);
+            var pt = new PluginThread(name, version, author, jarPath, P, initCode, userCode, this, perms, natives);
             if (devAssetsDir != null) pt.setDevAssetsDir(devAssetsDir);
             if (devMode) pt.setDevMode(true);
             if (!registerPluginEntity(pt, sendLoad)) return false;
@@ -299,9 +306,9 @@ public class RuntimeCore {
                 + (author.isEmpty() ? "" : " by " + author)
                 + " - permissions: " + displayPermissions(perms));
             if (wantsNative && config.nativeServiceAllowUntrusted()) {
-                var trust = nativeHashes.isEmpty()
+                var trust = natives.files().isEmpty()
                     ? "NO SHA-256 pinned (no `native` declaration in yeow.config.json)"
-                    : nativeHashes.size() + " file(s) SHA-256 pinned (verified when the service registers)";
+                    : natives.files().size() + " file(s) SHA-256 pinned (verified when the service registers)";
                 LOG.warning("\n" + "!".repeat(60)
                     + "\n  [Yeow] " + name + " runs UNTRUSTED NATIVE binaries as child processes"
                     + "\n  " + trust
@@ -341,11 +348,11 @@ public class RuntimeCore {
     }
 
     /**
-     * 公开的插件实体注册接口--第三方适配器（Yeow-Python、Worker、TCP 适配器等）
-     * 构造好自己的 {@link PluginEntity} 后调用，接入与普通插件一致的运行时链路：
-     * 同名唯一检查、Profile 指标、生命周期（start + LOAD）。
+     * 插件实体注册（运行时内部：JS 插件 {@link PluginThread} 与 Worker 虚拟插件
+     * {@link WorkerThread} 共用），接入统一运行时链路：同名唯一检查、Profile 指标、
+     * 生命周期（start + LOAD）。
      *
-     * 适配器负责：包结构解析、引擎封装（postMessage 消化消息契约）、ping 实现；
+     * 实体负责：包结构/引擎封装（postMessage 消化消息契约）、ping 实现；
      * 运行时负责：注册、去重、启动、卸载清理（/yeow unload、服务/事件清理）、指标采集。
      *
      * @param entity    已构造的插件实体（未启动；name() 必须非空且全局唯一）
@@ -372,16 +379,12 @@ public class RuntimeCore {
         return true;
     }
 
-    /** 注册插件实体并立即发送 LOAD 生命周期消息。 */
-    public boolean registerPluginEntity(PluginEntity entity) {
-        return registerPluginEntity(entity, true);
-    }
-
     /**
-     * 运行时级游戏任务提交--适配器提交游戏任务的统一入口（等价于 JS 的 `$_send('task', ...)`）。
+     * 运行时级游戏任务提交--插件实体（JS 插件 / Worker）提交游戏任务的统一入口
+     * （等价于 JS 的 `$_send('task', ...)`）。
      * 回调约定：payload 含 `cb` 字段时异步执行（立即返回 null），结果经
      * {@link PluginEntity#postMessage} 回投 `{"t":"cb","p":"<cbId>","r":<data>}`；
-     * 无 `cb` 时同步阻塞返回结果 JSON。`cbId` 由适配器自行生成与管理。
+     * 无 `cb` 时同步阻塞返回结果 JSON。`cbId` 由调用方自行生成与管理。
      *
      * **批量扩展**：payload 含 `tasks` 数组（`[{type, params, priority?}, ...]`）时执行批处理——
      * 按顺序向调度器提交全部任务、收集结果数组一次返回（同步阻塞 / 异步回调
@@ -448,9 +451,12 @@ public class RuntimeCore {
             submitTasksAsync(entity, tasks, cbId);
             return null;
         }
-        var out = new java.util.ArrayList<Object>();
+        var sb = new StringBuilder();
+        sb.append('[');
+        boolean first = true;
         for (var el : tasks) {
             String taskType = null;
+            String item;
             try {
                 var t = el.getAsJsonObject();
                 taskType = t.get("type").getAsString();
@@ -461,15 +467,19 @@ public class RuntimeCore {
                 scheduler.submitGameSync(taskType, params, future, priority, entity.name());
                 try {
                     var r = future.get(config.taskSyncTimeoutMs(), TimeUnit.MILLISECONDS);
-                    out.add(gson.fromJson(r.isEmpty() ? "null" : r, Object.class));
+                    item = r.isEmpty() ? "null" : r;
                 } catch (Exception e) {
-                    out.add(batchErr(e, taskType));
+                    item = gson.toJson(batchErr(e, taskType));
                 }
             } catch (Exception e) {
-                out.add(batchErr(e, taskType));
+                item = gson.toJson(batchErr(e, taskType));
             }
+            if (!first) sb.append(',');
+            sb.append(item);
+            first = false;
         }
-        return gson.toJson(out);
+        sb.append(']');
+        return sb.toString();
     }
 
     /** 批量异步：全部任务完成后一次回调结果数组（按提交顺序）。 */
@@ -571,6 +581,67 @@ public class RuntimeCore {
     private static String resolveServerPath(String p) {
         var path = Path.of(p);
         return (path.isAbsolute() ? path : Path.of(System.getProperty("user.dir"), p)).normalize().toString();
+    }
+
+    /**
+     * Resolve a `/yeow load` target:
+     * <ol>
+     *   <li>as a server-relative / absolute path;</li>
+     *   <li>else the same relative path under the runtime data dir (<code>plugins/Yeow</code>);</li>
+     *   <li>else an installed <code>&lt;name&gt;-&lt;version&gt;.yeow.zip</code> in the data dir.</li>
+     * </ol>
+     * Name matching is **case-insensitive but prefers an exact-case match**; when several
+     * versions match, the most recently modified file wins. Returns a readable file or null.
+     */
+    public static File resolveLoadTarget(String arg, File dataFolder) {
+        if (arg == null || arg.isEmpty()) return null;
+
+        var f = new File(resolveServerPath(arg));
+        if (f.isFile()) return f;
+
+        // Same relative path under plugins/Yeow (exact first, then case-insensitive basename)
+        var exact = new File(dataFolder, arg);
+        if (exact.isFile()) return exact;
+        if (arg.indexOf('/') < 0 && arg.indexOf('\\') < 0) {
+            var ci = findChildIgnoringCase(dataFolder, arg);
+            if (ci != null && ci.isFile()) return ci;
+        }
+
+        // Installed `<name>-<version>.yeow.zip` (exact-case prefix preferred, newest wins)
+        return findPackageIgnoringCase(dataFolder, arg);
+    }
+
+    /** Direct child of {@code dir} named {@code name}: exact case first, else {@code equalsIgnoreCase}. */
+    private static File findChildIgnoringCase(File dir, String name) {
+        if (dir == null || !dir.isDirectory()) return null;
+        var children = dir.listFiles();
+        if (children == null) return null;
+        File ci = null;
+        for (var c : children) {
+            if (c.getName().equals(name)) return c;
+            if (ci == null && c.getName().equalsIgnoreCase(name)) ci = c;
+        }
+        return ci;
+    }
+
+    /** `<name>-<version>.yeow.zip` in {@code dir}: case-insensitive prefix, exact case preferred, newest wins. */
+    private static File findPackageIgnoringCase(File dir, String name) {
+        if (dir == null || !dir.isDirectory()) return null;
+        var files = dir.listFiles();
+        if (files == null) return null;
+        File exact = null, ci = null;
+        for (var f : files) {
+            var n = f.getName();
+            if (!n.endsWith(".yeow.zip") || n.length() <= name.length() + 1) continue;
+            if (n.charAt(name.length()) != '-') continue;
+            var prefix = n.substring(0, name.length());
+            if (prefix.equals(name)) {
+                if (exact == null || f.lastModified() > exact.lastModified()) exact = f;
+            } else if (prefix.equalsIgnoreCase(name)) {
+                if (ci == null || f.lastModified() > ci.lastModified()) ci = f;
+            }
+        }
+        return exact != null ? exact : ci;
     }
 
     private static boolean isHttpUrl(String s) {

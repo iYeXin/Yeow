@@ -27,6 +27,7 @@ class YeowConfigTest {
         assertEquals(2000, cfg.schedulerIdleWaitUs());
         // 0.5.3：资源内存缓存默认启用；不可信原生服务默认允许加载（仅警告）
         assertTrue(cfg.assetsCacheEnabled());
+        assertEquals(30L * 1024 * 1024, cfg.assetsCacheMaxBytes());
         assertTrue(cfg.nativeServiceAllowUntrusted());
     }
 
@@ -97,6 +98,17 @@ class YeowConfigTest {
     }
 
     @Test
+    void assetsCacheMaxBytesConfigurable() throws Exception {
+        var dir = tmp.resolve("assets-max").toFile();
+        var runtime = new File(dir, "runtime");
+        runtime.mkdirs();
+        Files.writeString(new File(runtime, "config.yml").toPath(),
+            "assets:\n  cache-enabled: true\n  cache-max-bytes: 1048576\n");
+        var cfg = new YeowConfig(dir, false);
+        assertEquals(1024 * 1024, cfg.assetsCacheMaxBytes());
+    }
+
+    @Test
     void missingKeysAreWrittenBack() throws Exception {
         // 平滑升级：旧配置文件缺失新字段 → 加载时合并默认并写回，用户值保留
         var dir = tmp.resolve("upgrade").toFile();
@@ -110,6 +122,7 @@ class YeowConfigTest {
         assertTrue(after.contains("tick-budget-ms: 5"), "用户值必须保留");
         assertTrue(after.contains("native-service-allow-untrusted: true"), "新字段必须补上并写回");
         assertTrue(after.contains("cache-enabled: true"), "新增 assets 段必须补上并写回");
+        assertTrue(after.contains("cache-max-bytes: 31457280"), "新增 assets 阈值必须补上并写回");
     }
 
     @Test

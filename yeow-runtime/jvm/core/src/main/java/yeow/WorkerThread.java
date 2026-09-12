@@ -1,7 +1,7 @@
 package yeow;
 
 import com.google.gson.*;
-import com.whl.quickjs.wrapper.*;
+import wiki.yexin.quickjs.*;
 
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -54,12 +54,17 @@ public class WorkerThread implements PluginEntity, Runnable {
     private volatile String messageCbId;
     /** 主插件 JS 侧该 worker 的 onMessage 回调 id（create 时传入；worker → main 投递用）。 */
     private volatile String mainMessageCb;
+    /** 权限覆盖：allow 白名单（空 = 继承主插件全部权限）；deny 黑名单（优先级最高）。 */
+    private final java.util.List<String> allowPermissions;
+    private final java.util.List<String> denyPermissions;
 
     public String messageCbId() { return messageCbId; }
     public String mainMessageCb() { return mainMessageCb; }
     public void setMainMessageCb(String id) { this.mainMessageCb = id; }
+    public java.util.List<String> allowPermissions() { return allowPermissions; }
+    public java.util.List<String> denyPermissions() { return denyPermissions; }
 
-    public WorkerThread(String name, String workerId, PluginThread main, String initCode, String userCode) {
+    public WorkerThread(String name, String workerId, PluginThread main, String initCode, String userCode, java.util.List<String> allowPermissions, java.util.List<String> denyPermissions) {
         this.name = name;
         this.workerId = workerId;
         this.main = main;
@@ -68,6 +73,8 @@ public class WorkerThread implements PluginEntity, Runnable {
         this.userCode = userCode;
         this.scheduler = main.getSchedulerRef();
         this.log = main.core().host().logger();
+        this.allowPermissions = allowPermissions != null ? java.util.List.copyOf(allowPermissions) : java.util.List.of();
+        this.denyPermissions = denyPermissions != null ? java.util.List.copyOf(denyPermissions) : java.util.List.of();
         try (var is = WorkerThread.class.getResourceAsStream("/js/worker-inject.js")) {
             injectCode = new String(is.readAllBytes(), StandardCharsets.UTF_8)
                 .replace("__WORKER_ID__", workerId).replace("__MAIN__", main.name);
@@ -117,7 +124,7 @@ public class WorkerThread implements PluginEntity, Runnable {
         cleanupResources();
     }
 
-    /** 适配器契约实现：忽略重建结果（内部强杀场景由主插件 handleWorker 处理）。 */
+    /** PluginEntity 契约实现：忽略重建结果（内部强杀场景由主插件 handleWorker 处理）。 */
     @Override public void reload(String newCode) { reloadInternal(newCode); }
 
     /**
@@ -208,10 +215,11 @@ public class WorkerThread implements PluginEntity, Runnable {
             messageCbId = String.valueOf(ctx.evaluate("globalThis.__workerMessageCbId"));
             if (userCode != null) ctx.evaluate(userCode, "main.js");
 
-            var hmObj = ctx.getGlobalObject().getProperty("$hm");
-            var hmFunc = hmObj instanceof JSFunction ? (JSFunction) hmObj : null;
-            if (hmFunc != null) hmFunc.call(gson.toJson(Map.of("t","INIT")));
-            if (hmFunc != null) hmFunc.call(gson.toJson(Map.of("t","LOAD")));
+            long hmHandle = ctx.bindGlobal("$hm");
+            if (hmHandle != 0) {
+                ctx.callHandle(hmHandle, gson.toJson(Map.of("t", "INIT")));
+                ctx.callHandle(hmHandle, gson.toJson(Map.of("t", "LOAD")));
+            }
             // 实体注册（plugins map + profiler）由 load 通道的 registerPluginEntity 完成
 
             while (running) {
@@ -219,14 +227,14 @@ public class WorkerThread implements PluginEntity, Runnable {
                 while (running) {
                     if (raw == null) break;
                     try {
-                        if (hmFunc != null) hmFunc.call(raw);
+                        if (hmHandle != 0) ctx.callHandle(hmHandle, raw);
                         else {
                             var escaped = raw.replace("\\","\\\\").replace("'","\\'");
                             ctx.evaluate("$hm('" + escaped + "')");
                         }
                     } catch (QuickJSException ex) { main.handleJSErrorPublic(ex, name); } catch (Exception ignored) {}
                     try {
-                        while (ctx.isJobPending()) ctx.executePendingJob();
+                        ctx.drainJobs();
                     } catch (QuickJSException ex) {
                         main.handleJSErrorPublic(ex, name);
                     } catch (Exception e) {
@@ -247,12 +255,11 @@ public class WorkerThread implements PluginEntity, Runnable {
     }
 
     private void inject() {
-        var g = ctx.getGlobalObject();
         // Worker 的 __plugin.name 为注册名（<主插件>.<worker>），version/author 继承主插件（yeow.json）
         ctx.evaluate("globalThis.__plugin = {name:'" + PluginThread.esc(entityName) + "',version:'" + PluginThread.esc(main.version()) + "',author:'" + PluginThread.esc(main.author()) + "'};");
         ctx.evaluate("globalThis.$dev = " + main.isDevMode() + ";");
 
-        g.setProperty("$_send", (JSCallFunction) args -> {
+        ctx.setGlobalFunction("$_send", args -> {
             try {
                 var channel = String.valueOf(args[0]); var pld = String.valueOf(args.length > 1 ? args[1] : "{}");
                 var rt = main.core();
@@ -267,10 +274,15 @@ public class WorkerThread implements PluginEntity, Runnable {
                     return gson.toJson(Map.of("err", "workers cannot create workers"));
                 }
                 if ("task".equals(channel)) {
-                    return rt != null ? rt.submitTask(WorkerThread.this, pld) : gson.toJson(Map.of("err", "runtime unavailable"));
+                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
+                    var denied = checkTaskPermission(obj);
+                    if (denied != null) return denyResult(obj, denied);
+                    return rt != null ? rt.submitTask(WorkerThread.this, obj) : gson.toJson(Map.of("err", "runtime unavailable"));
                 }
                 if ("timer".equals(channel)) {
                     var obj = gson.fromJson(pld, JsonObject.class); var type = obj.get("type").getAsString();
+                    var denied = checkPermission("timer", type);
+                    if (denied != null) return gson.toJson(Map.of("err", denied));
                     if ("clear".equals(type)) {
                         // clear 协议：JS 侧 clearTimeout/clearInterval 取消 Java 定时任务
                         var cbId = obj.get("cb").getAsString();
@@ -292,17 +304,11 @@ public class WorkerThread implements PluginEntity, Runnable {
                     }
                     return null;
                 }
-                // fs / http：委托主插件（共享数据目录、权限、资源），权限检查随主插件
-                // assets：委托主插件但**不做权限拦截**（与主插件一致——解压限定在共享数据目录内）
+                // fs / http / assets：委托主插件（共享数据目录、资源）；权限按 Worker 覆盖判定
                 if ("fs".equals(channel) || "assets".equals(channel) || "http".equals(channel)) {
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
-                    if (!"assets".equals(channel)) {
-                        var denied = main.checkChannelPermissionPublic(channel, obj.has("t") ? obj.get("t").getAsString() : "");
-                        if (denied != null) {
-                            if (obj.has("cb")) { var cbId = obj.get("cb").getAsString(); queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",Map.of("err", denied)))); return null; }
-                            return gson.toJson(Map.of("err", denied));
-                        }
-                    }
+                    var denied = checkPermission(channel, obj.has("t") ? obj.get("t").getAsString() : "");
+                    if (denied != null) return denyResult(obj, denied);
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
                         ioExecutor.submit(() -> {
@@ -311,7 +317,7 @@ public class WorkerThread implements PluginEntity, Runnable {
                                 case "assets" -> main.handleAssetsPublic(pld);
                                 default -> main.handleHttpPublic(pld);
                             };
-                            queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessage(cbId, main.toJsonValuePublic(result)));
+                            queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result));
                         });
                         return null;
                     }
@@ -323,7 +329,7 @@ public class WorkerThread implements PluginEntity, Runnable {
                 }
                 if ("service".equals(channel)) {
                     var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
-                    var denied = main.checkChannelPermissionPublic("service", obj.has("t") ? obj.get("t").getAsString() : "");
+                    var denied = checkPermission("service", obj.has("t") ? obj.get("t").getAsString() : "");
                     if (denied != null) return gson.toJson(Map.of("err", denied));
                     return handleService(pld);
                 }
@@ -337,7 +343,7 @@ public class WorkerThread implements PluginEntity, Runnable {
                         var echo = obj.has("p") ? gson.toJson(obj.get("p")) : "null";
                         if (obj.has("cb")) {
                             var cbId = obj.get("cb").getAsString();
-                            queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r", main.toJsonValuePublic(echo))));
+                            queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, echo));
                             return null;
                         }
                         return echo;
@@ -353,6 +359,7 @@ public class WorkerThread implements PluginEntity, Runnable {
                     var o = gson.fromJson(pld, JsonObject.class);
                     var msg = o.has("message") ? o.get("message").getAsString() : pld;
                     var level = o.has("level") ? o.get("level").getAsString() : "INFO";
+                    if (checkPermission("log", level) != null) return null;
                     switch (level) {
                         case "WARN" -> log.warning(msg);
                         case "ERROR" -> log.severe(msg);
@@ -360,7 +367,11 @@ public class WorkerThread implements PluginEntity, Runnable {
                     }
                     return null;
                 }
-                if ("env".equals(channel)) { return main.handleEnvPublic(); }
+                if ("env".equals(channel)) {
+                    var denied = checkPermission("env", "");
+                    if (denied != null) return gson.toJson(Map.of("err", denied));
+                    return main.handleEnvPublic();
+                }
                 return null;
             } catch (Exception ex) {
                 log.warning("[" + entityName + "] $_send err: " + ex.getMessage());
@@ -368,10 +379,34 @@ public class WorkerThread implements PluginEntity, Runnable {
             }
         });
 
-        var consoleObj = ctx.getGlobalObject().getProperty("console");
-        if (consoleObj instanceof JSObject jsConsole) {
-            jsConsole.setProperty("log", (JSCallFunction) a -> null);
+        // init.js 已定义 console；这里静默插件直接 console.log（日志统一走 $_send → log 通道）
+        ctx.evaluate("if (globalThis.console) { globalThis.console.log = function() {}; }");
+    }
+
+    // ── 统一权限门控（Worker 覆盖：deny 优先，allow 白名单，基集 = 继承主插件权限）──
+
+    private String checkPermission(String channel, String op) {
+        return PermissionGate.check(main.permissions(), allowPermissions, denyPermissions, channel + ":" + op);
+    }
+
+    /** task 通道门控：校验全部任务节点（单任务 `type` 或批量 `tasks[].type`）。 */
+    private String checkTaskPermission(JsonObject obj) {
+        var nodes = PermissionGate.taskNodes(obj);
+        if (nodes == null) return null;
+        for (var node : nodes) {
+            var denied = PermissionGate.check(main.permissions(), allowPermissions, denyPermissions, node);
+            if (denied != null) return denied;
         }
+        return null;
+    }
+
+    private Object denyResult(JsonObject obj, String denied) {
+        if (obj != null && obj.has("cb") && !obj.get("cb").getAsString().isEmpty()) {
+            var cbId = obj.get("cb").getAsString();
+            queue.sendJs(gson.toJson(Map.of("t", "cb", "p", cbId, "r", Map.of("err", denied))));
+            return null;
+        }
+        return gson.toJson(Map.of("err", denied));
     }
 
     /** service 通道（ownerPlugin = 本 worker 注册名，独立实体语义）。 */
@@ -382,9 +417,31 @@ public class WorkerThread implements PluginEntity, Runnable {
             var sm = main.core().serviceManager();
             return switch (t) {
                 case "register" -> { var refName = obj.get("refName").getAsString(); var onReq = obj.get("onRequest").getAsString(); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerPluginService(refName, entityName, onReq, isPublic); }
-                case "request" -> { var svcId = obj.get("serviceId").getAsString(); var path = obj.has("path") ? obj.get("path").getAsString() : "/"; var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); var reqId = obj.get("requestId").getAsString(); sm.trackRequestConsumer(reqId, entityName, svcId); sm.request(svcId, path, body, reqId, entityName); yield null; }
+                case "request" -> {
+                    var svcId = obj.get("serviceId").getAsString();
+                    var path = obj.has("path") ? obj.get("path").getAsString() : "/";
+                    var ct = obj.has("contentType") && !obj.get("contentType").isJsonNull() ? obj.get("contentType").getAsString() : null;
+                    var headers = obj.has("headers") && obj.get("headers").isJsonObject() ? obj.getAsJsonObject("headers") : new JsonObject();
+                    var timeout = obj.has("timeout") ? obj.get("timeout").getAsLong() : main.core().config().serviceRequestTimeoutMs();
+                    var reqId = obj.get("requestId").getAsString();
+                    sm.trackRequestConsumer(reqId, entityName, svcId, timeout);
+                    sm.request(svcId, path, headers, ct, yeow.service.ServiceManager.bodyBytes(obj), reqId, entityName);
+                    yield null;
+                }
                 case "awaitReady" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.awaitReady(svcId, cbId, entityName); yield null; }
-                case "response" -> { var reqId = obj.get("requestId").getAsString(); var result = obj.has("body") ? gson.fromJson(obj.get("body").toString(), Object.class) : null; sm.respond(reqId, entityName, result); yield null; }
+                case "response" -> {
+                    var reqId = obj.get("requestId").getAsString();
+                    var ct = obj.has("contentType") && !obj.get("contentType").isJsonNull() ? obj.get("contentType").getAsString() : null;
+                    var headers = obj.has("headers") && obj.get("headers").isJsonObject() ? obj.getAsJsonObject("headers") : new JsonObject();
+                    sm.respondBody(reqId, entityName, headers, ct, yeow.service.ServiceManager.bodyBytes(obj));
+                    yield null;
+                }
+                case "info" -> sm.serviceInfo(obj.get("serviceId").getAsString()).toString();
+                case "unregister" -> {
+                    var svcId = obj.get("serviceId").getAsString();
+                    var token = obj.has("token") && !obj.get("token").isJsonNull() ? obj.get("token").getAsString() : null;
+                    yield sm.unregisterService(svcId, token, entityName);
+                }
                 case "subscribe" -> { var svcId = obj.get("serviceId").getAsString(); var eventPath = obj.get("eventPath").getAsString(); var cbId = obj.get("cb").getAsString(); sm.subscribe(svcId, eventPath, cbId, entityName); yield "true"; }
                 case "unsubscribe" -> { var svcId = obj.get("serviceId").getAsString(); var eventPath = obj.get("eventPath").getAsString(); sm.unsubscribe(svcId, eventPath, entityName); yield "true"; }
                 case "publish" -> { var token = obj.get("token").getAsString(); var eventPath = obj.get("eventPath").getAsString(); var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); sm.publish(token, eventPath, body); yield "true"; }

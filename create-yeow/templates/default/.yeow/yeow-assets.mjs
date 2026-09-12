@@ -29,9 +29,10 @@ function readNatives(configPath) {
 // ── 依赖项收集（node_modules 扫描）─────────────────────────────
 // 规则：
 //   - 主项目无条件参与（始终分配 id，保证 getAssetsPath 恒可用；有 assets/ 才复制）
-//   - 依赖包：node_modules 顶层目录（含 @scope/name 两级），要求
-//     assets/ 目录存在 且 peerDependencies 含 yeow-api 键
-//   - 每个候选同时读取其 yeow.config.json 的 permissions（依赖包可自行声明权限）
+//   - 依赖包：node_modules 顶层目录（含 @scope/name 两级），要求 assets/ 目录存在，
+//     且满足以下之一：peerDependencies 含 yeow-api 键，或自带 yeow.config.json 的
+//     permissions/native 声明（纯原生/资源包可无 peer 依赖）
+//   - 每个候选同时读取其 yeow.config.json 的 permissions 与 native
 // 键：<name>-<version>。npm/pnpm 扁平布局支持良好；yarn 的 hoisting
 // 差异可能导致依赖不在预期位置（见文档说明）。
 function collectCandidates(root, pkgJson) {
@@ -67,16 +68,23 @@ function collectCandidates(root, pkgJson) {
             const pkgDir = resolve(nm, ...name.split('/'));
             let meta;
             try { meta = JSON.parse(readFileSync(resolve(pkgDir, 'package.json'), 'utf-8')); } catch { continue; }
-            if (!meta.peerDependencies || !meta.peerDependencies['yeow-api']) continue;
             const pkgAssets = resolve(pkgDir, 'assets');
             if (!existsSync(pkgAssets)) continue;
+            const perms = readPerms(resolve(pkgDir, 'yeow.config.json'));
+            const natives = readNatives(resolve(pkgDir, 'yeow.config.json'));
+            // 识别条件：assets/ 目录 +（peerDependencies 含 yeow-api，或自带 yeow.config.json 的
+            // permissions/native 声明）——后者让「纯原生 / 资源包」即使未声明 yeow-api peer 也能被
+            // 识别，保证其 native 声明参与合并、其 assets 被部署。
+            const yeowAware = (meta.peerDependencies && meta.peerDependencies['yeow-api'])
+                || perms.length > 0 || natives.length > 0;
+            if (!yeowAware) continue;
             candidates.push({
                 key: meta.name + '-' + (meta.version || '0.0.0'),
                 pkgDir,
                 absSrc: pkgAssets,
                 hasAssets: true,
-                perms: readPerms(resolve(pkgDir, 'yeow.config.json')),
-                natives: readNatives(resolve(pkgDir, 'yeow.config.json')),
+                perms,
+                natives,
             });
         }
     }
@@ -192,19 +200,21 @@ export function prepareAssets(root, pkgJson, outDir) {
 }
 
 // ── 原生服务可信性声明（native manifest）───────────────────────
-// 依赖包 / 主项目在 yeow.config.json 声明 native：[{serviceId, files[], source}]；
-// 构建时把 files 映射为打包后路径（assets/<id>/...）并计算 SHA-256，
-// 相同 serviceId 合并（files 归并到一项）。产物写入 yeow.json 的 native 字段：
+// 依赖包 / 主项目在各自 yeow.config.json 声明 native：[{serviceId, files[], source}]；
+// 构建时遍历 **全部候选**（主项目 + 每个依赖包），把各包 files 按该包命名空间映射为
+// 打包后路径（assets/<id>/...）并计算 SHA-256，相同 serviceId 合并（files 归并）。
+// 产物写入 yeow.json 的 native 字段：
 //   [{ "serviceId": "...", "files": [{ "<打包后路径>": "<sha256>" }, ...], "source": "..." }]
 export function computeNativeManifest(prepared) {
-    const merged = new Map(); // serviceId → { files: Map<path, {abs, packaged}>, source }
+    const merged = new Map(); // serviceId → { files: Map<path, abs>, source, packages: Set<key> }
     for (const c of prepared.candidates) {
         for (const n of c.natives || []) {
             const sid = n.serviceId;
             if (!sid) continue;
             let e = merged.get(sid);
-            if (!e) { e = { files: new Map(), source: n.source || '' }; merged.set(sid, e); }
+            if (!e) { e = { files: new Map(), source: n.source || '', packages: new Set() }; merged.set(sid, e); }
             else if (!e.source && n.source) e.source = n.source;
+            e.packages.add(c.key);
             for (const f of n.files || []) {
                 const raw = String(f).replace(/\\/g, '/').replace(/^\/+/, '');
                 const packaged = 'assets/' + c.id + '/' + raw;
@@ -218,10 +228,13 @@ export function computeNativeManifest(prepared) {
     for (const [sid, e] of merged) {
         const files = [];
         for (const [packaged, abs] of e.files) {
-            let hash = null;
+            let hash;
             try { hash = createHash('sha256').update(readFileSync(abs)).digest('hex'); }
-            catch (err) { console.warn('  ! native file not found (skipped from manifest): ' + packaged); }
-            if (hash) files.push({ [packaged]: hash });
+            catch (err) {
+                throw new Error('native file not found: ' + packaged
+                    + ' (service "' + sid + '", declared in yeow.config.json of ' + [...e.packages].join(', ') + ')');
+            }
+            files.push({ [packaged]: hash });
         }
         if (files.length === 0) continue;
         out.push({ serviceId: sid, files, ...(e.source ? { source: e.source } : {}) });

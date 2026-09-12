@@ -277,15 +277,27 @@ interface Response {
 
 ```ts
 new TextEncoder().encode(str: string): Uint8Array
-new TextDecoder('utf-8').decode(bytes: Uint8Array): string
+new TextDecoder('utf-8').decode(input?: ArrayBuffer | ArrayBufferView): string
 ```
 
 - 当前仅支持 `utf-8`；传入其他编码抛 `RangeError`。
 - `TextDecoder` 非法 UTF-8 序列替换为 `U+FFFD`。
-- **内部实现不作要求**：具体是否用底层通道、阈值等由实现自决（当前实现 ≤100 字节且 ≤50 字符纯 JS 直转，超阈值经 `util` 通道 `encode.utf8` / `decode.utf8`——此策略不构成规范约束）。
+- **内部实现不作要求**。
 
 > [!WARNING]
 > **`fetch` 依赖 `http:requestAsync` 权限**：`fetch` 的实现基于 http 通道的 `requestAsync`（`$send('http', {t:'requestAsync', ...})`）。插件未声明 `http:*`（或 `http:requestAsync`）权限时，运行时必须返回 `Permission denied: http:requestAsync`（经回调投递），`fetch` 的 Promise reject。见[通道权限](#通道权限敏感节点默认拒绝)。
+
+### `performance.now()` / `performance.timeOrigin`
+
+**实现要求存在**（Web Performance API 语义，高精度时间）：
+
+```ts
+performance.now(): number          // 相对上下文起点的毫秒数（单调、亚毫秒精度）
+performance.timeOrigin: number     // 上下文创建时的 epoch 毫秒
+```
+
+- `now()` 必须基于**单调时钟**，不受系统时间调整影响，同一上下文内非递减。
+- 时钟源与分辨率不作约束。
 
 ### `setTimeout(fn, ms)` / `clearTimeout(id)` / `setInterval(fn, ms)` / `clearInterval(id)`
 

@@ -22,7 +22,7 @@ Yeow **will not** provide an API to call Java methods directly from JS. Reasons:
 1. **Technical Difficulty**: JS runs in an isolated QuickJS thread/context. Directly calling Java methods requires a cross-thread synchronous bridge, object reference and lifecycle management, and type system mapping — high complexity and difficult to guarantee safety (main thread blocking, reference leaks, thread safety).
 2. **Breaking Cross-Platform Compatibility**: Allowing Java method calls means plugin code depends on specific implementations (Paper classes, versioned CraftBukkit packages). The same plugin cannot run on other runtimes (other platforms / future implementations), directly violating the core principle of platform agnosticism.
 
-Scenarios requiring Java-side capabilities are resolved through the **protocol layer**: game operations go through the task/event/command bridge; inter-plugin communication goes through Service; native computation goes through Native Service; other Java plugins can call services registered by Yeow plugins through the [Java Integration Interface](../specifications/java-api.md).
+Scenarios requiring Java-side capabilities are resolved through the **protocol layer**: game operations go through the task/event/command bridge; inter-plugin communication goes through Service; native computation goes through Native Service.
 
 ## Future Roadmap
 

@@ -5,9 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.yeow</groupId>
+        <groupId>wiki.yexin</groupId>
         <artifactId>yeow-runtime-parent</artifactId>
-        <version>0.5.3</version>
+        <version>0.6.0</version>
     </parent>
 
     <artifactId>yeow-runtime-folia</artifactId>
@@ -24,7 +24,7 @@
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>io.yeow</groupId>
+            <groupId>wiki.yexin</groupId>
             <artifactId>yeow-runtime-core</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -33,8 +33,8 @@
             <artifactId>gson</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.whl.quickjs</groupId>
-            <artifactId>quickjs-java-wrapper</artifactId>
+            <groupId>wiki.yexin</groupId>
+            <artifactId>yeow-quickjs</artifactId>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -58,10 +58,10 @@
                         <configuration>
                             <artifactSet>
                                 <includes>
-                                    <include>io.yeow:yeow-runtime-core</include>
+                                    <include>wiki.yexin:yeow-runtime-core</include>
                                     <include>com.google.code.gson:gson</include>
                                     <include>org.yaml:snakeyaml</include>
-                                    <include>com.whl.quickjs:quickjs-java-wrapper</include>
+                                    <include>wiki.yexin:yeow-quickjs</include>
                                 </includes>
                             </artifactSet>
                             <relocations>

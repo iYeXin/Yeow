@@ -15,6 +15,7 @@
 | `$send(channel, payload)`                                       | **Only** JS→runtime communication entry (auto JSON serialization). Underlying `$_send` is internal implementation, **held by init.js closure and removed from global** — direct reference throws `ReferenceError`, can only use `$send`. |
 | `fetch(url, init?)`                                             | HTTP client (Promise). Response is `Response`, providing `text()` / `json()` / `base64()` / `arrayBuffer()`. Requires `http:requestAsync` permission declaration.    |
 | `TextEncoder` / `TextDecoder`                                   | **utf-8** encoding/decoding (Web semantics; environment requires existence). **Synchronous** API. utf-8 only, no gbk etc.                                           |
+| `performance.now()` / `performance.timeOrigin`                   | High-resolution monotonic time (Web Performance API semantics): `now()` returns milliseconds since the context origin (Double, sub-millisecond precision), `timeOrigin` is the epoch milliseconds at context creation. |
 | `setTimeout` / `clearTimeout` / `setInterval` / `clearInterval` | Web timer semantics.                                                                                                                                               |
 | `console.log/warn/error/info`                                   | Logging (auto-adds `[pluginName]` prefix).                                                                                                                         |
 | `Promise`,`JSON`,`Map`/`Set`/`Symbol`/`Proxy`/`Reflect` etc.    | Standard ECMAScript.                                                                                                                                                |
@@ -22,7 +23,7 @@
 | `__plugin`                                                      | Plugin metadata (name/version/author, read-only).                                                                                                                  |
 | `__yeow*` (e.g., `__yeowInitCbs`, `__yeowGcQueue`)             | Runtime internal lifecycle hooks, generally **don't need direct contact**.                                                                                          |
 
-> Most capabilities recommended to use via **yeow-api** (`player`/`world`/`fs`/`http`/`util`/`pdc`/…), not bare `$send`. Only globally `$send` / `fetch` / `TextEncoder` / `TextDecoder` / timers / `console` are "infrastructure".
+> Most capabilities recommended to use via **yeow-api** (`player`/`world`/`fs`/`http`/`util`/`pdc`/…), not bare `$send`. Only globally `$send` / `fetch` / `TextEncoder` / `TextDecoder` / `performance` / timers / `console` are "infrastructure".
 
 ## Differences from Browser Environment
 

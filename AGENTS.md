@@ -2,10 +2,17 @@
 
 ## 发布模式（运行时 / yeow-api 变更后）
 
-修改 `yeow-runtime/jvm/paper`（Java，Paper 平台实现）后，将编译产物复制到模板：
+修改 `yeow-runtime/jvm/paper`（Paper 平台实现）或 `yeow-runtime/jvm/folia`（Folia 平台实现）后，将编译产物复制到模板：
 
 ```
-create-yeow\templates\default\.yeow\assets\yeow-runtime-0.5.3.jar   ← yeow-runtime\jvm\paper\target\yeow-runtime-0.5.3.jar
+create-yeow\templates\default\.yeow\assets\yeow-runtime-0.6.0.jar         ← yeow-runtime\jvm\paper\target\yeow-runtime-0.6.0.jar
+create-yeow\templates\default\.yeow\assets\yeow-runtime-folia-0.6.0.jar   ← yeow-runtime\jvm\folia\target\yeow-runtime-folia-0.6.0.jar
+```
+
+修改 `yeow-template` 后同样需要复制：
+
+```
+create-yeow\templates\default\.yeow\assets\yeow-template-0.6.0.jar   ← yeow-template\target\yeow-template-0.6.0.jar
 ```
 
 若变更涉及 `yeow-api`（TypeScript），依次执行：

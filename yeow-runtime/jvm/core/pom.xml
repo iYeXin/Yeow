@@ -5,9 +5,9 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>io.yeow</groupId>
+        <groupId>wiki.yexin</groupId>
         <artifactId>yeow-runtime-parent</artifactId>
-        <version>0.5.3</version>
+        <version>0.6.0</version>
     </parent>
 
     <artifactId>yeow-runtime-core</artifactId>
@@ -18,8 +18,8 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.whl.quickjs</groupId>
-            <artifactId>quickjs-java-wrapper</artifactId>
+            <groupId>wiki.yexin</groupId>
+            <artifactId>yeow-quickjs</artifactId>
         </dependency>
         <dependency>
             <groupId>com.google.code.gson</groupId>

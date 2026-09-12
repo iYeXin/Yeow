@@ -4,7 +4,7 @@ Pure computation channel (gzip compress/decompress — one-shot + streaming chun
 
 ## Binary Transport
 
-Channel protocol carries byte data as **base64 strings** (JSON-safe). JS side uses engine-native `Uint8Array.toBase64()` / `Uint8Array.fromBase64()` for conversion (ES2023+); the adapter layer does not expose base64 — encode/decode semantics are **buffer ↔ string**, base64 is just the transport format.
+Channel protocol carries byte data as **base64 strings** (JSON-safe). JS side uses engine-native `Uint8Array.toBase64()` / `Uint8Array.fromBase64()` for conversion (ES2023+); the protocol layer does not expose base64 — encode/decode semantics are **buffer ↔ string**, base64 is just the transport format.
 
 ## Size Limits (config.yml configurable)
 

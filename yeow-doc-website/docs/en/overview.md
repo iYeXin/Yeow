@@ -18,7 +18,6 @@ The documentation is extensive, not sure where to start? Find your entry point b
 | **Dependency Package Developer** | Encapsulate reusable npm packages | [Writing Dependency Packages](package-author.md) Package structure and resource encapsulation; [Encapsulating Service Packages](package-service.md) Three Service patterns |
 | **Plugin User**    | Server admin: install and manage plugins | [Runtime Operations](operations.md) `/yeow` management commands and configuration; [Build & Distribution](distribution.md) Deployment methods and one-click install |
 | **Platform Implementer** | Implement Yeow-compatible runtime | [Platform Specification](specifications/README.md) Package structure, message protocol, task/event/runtime environment standards |
-| **Adapter Developer** | Enable other languages/engines to access Yeow | [Adapter Specification](specifications/adapter/index.md) `PluginEntity` interface, registration API and message contracts |
 
 ## Documentation Map
 

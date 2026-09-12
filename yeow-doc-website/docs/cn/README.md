@@ -42,7 +42,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 
 ### 原生能力扩展
 
-- **Native Service** — 插件可嵌入 Go / Rust / C++ 等原生程序（`assets/` 携带二进制，运行时自动按平台提取 spawn），用 `serviceRequest` 调用，适合图像处理、机器学习等重计算
+- **Native Service** — 插件可嵌入 Go / Rust / C++ 等原生程序（`assets/` 携带二进制，运行时自动按平台提取 spawn），用 `registerNativeService` 注册、`svc.request` 调用，适合图像处理、机器学习等重计算
 - **运行时健康检测** — 心跳超时、事件/补全超时、插件挂起自动告警；队列积压时动态扩容 tick 预算
 
 ## 与其他方案对比

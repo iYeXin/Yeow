@@ -178,7 +178,6 @@ export default defineConfig({
                 items: [
                     { text: 'Specifications Overview', link: '/specifications/' },
                     { text: 'Value Domain Appendix', link: '/specifications/values' },
-                    { text: 'Java Plugin Integration', link: '/specifications/java-api' },
                     {
                         text: 'Message Channels',
                         collapsed: true,
@@ -233,7 +232,6 @@ export default defineConfig({
                         items: [
                             { text: 'Runtime Environment Standard', link: '/specifications/runtime/' },
                             { text: 'Native Service Protocol', link: '/specifications/native-service/' },
-                            { text: 'Adapter Specification', link: '/specifications/adapter/' },
                         ],
                     },
                 ],

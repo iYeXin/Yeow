@@ -7,7 +7,7 @@ import { assets } from 'yeow-api';
 
 `assets/` 目录下的文件在构建时自动打包进 JAR，运行时通过此 API 读取。
 
-> **内存缓存**：插件加载时整个包一次性读入内存并预解析中央目录，`read` / `extract` / 原生二进制解压全部走内存（零重复 open）。可用 `config.yml` 的 `assets.cache-enabled: false` 关闭（回退每次 `ZipFile` 直读）。
+> **内存缓存**：插件加载时整个包一次性读入内存并预解析中央目录，`read` / `extract` / 原生二进制解压全部走内存（零重复 open）。可用 `config.yml` 的 `assets.cache-enabled: false` 关闭（回退每次 `ZipFile` 直读）；包大小超过 `assets.cache-max-bytes`（默认 30 MiB，`<=0` 不限制）时也不再缓存到内存。
 
 > `getAssetsPath` 从 **`yeow-dev`**（构建期虚拟模块）引入，而非 `yeow-api`：它按调用方所属依赖项注入命名空间，只有构建器知道当前代码属于哪个包。`yeow-dev` 已发布为空包（可不安装，类型声明由 `yeow-api` 提供）。
 
@@ -31,7 +31,7 @@ getAssetsPath('native/win/svc.exe'): string
 
 ### 相对引用（无限制）
 
-因为文件**不哈希改名**，`assets/` 内部（含跨目录）的任何相对引用——无论来自被引用文件的内容（配置、脚本、`../` 兄弟引用）还是 `{ dir, entry }` 的原生服务——都**永远有效**。不再有「目录应自包含」「跨顶层目录断裂」的限制：
+因为文件**不哈希改名**，`assets/` 内部（含跨目录）的任何相对引用——无论来自被引用文件的内容（配置、脚本、`../` 兄弟引用）——都**永远有效**。不再有「目录应自包含」「跨顶层目录断裂」的限制：
 
 ```ts
 // 布局: assets/native/win/{start.bat, app.js, modules/moduleA.js}
@@ -49,18 +49,13 @@ getAssetsPath('native/win/modules/moduleA.js') // → "assets/<id>/native/win/mo
 
 构建器扫描 `node_modules` 顶层目录（含 `@scope/name`），以 `<name>-<version>` 为键识别依赖项：
 
-- **识别条件**：包存在 `assets/` 目录，且 `peerDependencies` 含 `yeow-api` 键
+- **识别条件**：包存在 `assets/` 目录，且满足以下之一——`peerDependencies` 含 `yeow-api` 键，或自带 `yeow.config.json` 的 `permissions` / `native` 声明（纯原生 / 资源包即使不依赖 `yeow-api` 也能被识别，其 `native` 参与合并、`assets` 被部署）
 - **主项目**：有 `assets/` 即参与（始终分配 id）
 - **兼容性**：npm / pnpm 的扁平布局支持良好；yarn 的 hoisting 差异可能导致依赖不在预期位置，如遇问题请使用 npm 或 pnpm
 
 ### 目录边界
 
-**`{ file }` 模式只提取单文件**——该文件对目录内其他文件的相对引用会失效。需要保持内部引用的请用 `{ dir, entry }` 模式：
-
-```ts
-// ✅ dir 指向包含全部依赖的最顶层目录，entry 用相对子路径
-{ dir: getAssetsPath('native/'), entry: 'win/start.bat' }
-```
+原生服务（`registerNativeService`）仅支持**单文件**（`string` / `{ file }`）——运行时只把该文件提取到临时目录，同目录其他文件不会被提取。因此原生二进制需**自包含**（静态链接，或把依赖打进单一可执行文件）。`assets.extractDir` 仍是通用的资源目录提取能力，与原生服务无关。
 
 > 构建时 esbuild 拦截 `yeow-dev` 虚拟模块：扫描各依赖项的 `assets/`，原样复制到 `dist/.assets/<id>/`（或 `dist/.dev/.assets/<id>/`），按 importer 归属注入命名空间 id，最后打包进 JAR。
 
@@ -123,7 +118,7 @@ const icon = assetsReadSync(getAssetsPath('icon.png'));
 await assets.extract(getAssetsPath('icon.png'));
 
 // Native Service（自动注入命名空间路径）
-const { serviceId } = await registerNativeService('renderer', {
+const svc = await registerNativeService('renderer', {
     windows: getAssetsPath('native/renderer.exe'),
     linux: getAssetsPath('native/renderer'),
 });

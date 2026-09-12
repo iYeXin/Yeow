@@ -21,7 +21,7 @@
     │                                                  │
     │  ┌──────────────────┐  ┌─────────────────────┐  │
     │  │  PluginEntity 1   │  │  PluginEntity 2     │  │
-    │  │  (PluginThread)   │  │  (适配器 / Worker)  │  │
+    │  │  (PluginThread)   │  │  (Worker)         │  │
     │  │  QuickJS + 消息    │  │  消息驱动循环        │  │
     │  │  驱动循环          │  │  fs/http/assets 自处 │  │
     │  │  fs/http/assets   │  │  理                 │  │
@@ -132,10 +132,10 @@ Paper 系（Paper/Purpur/Leaf 等）的 yeow-runtime 是官方实现的运行时
 
 ## 插件实体抽象
 
-运行时以 **`PluginEntity`** 接口看待每个插件：可接收消息（`postMessage`）、有生命周期（`start` / `stopAndWait` / `reload`）与行为指标（`ping()` 心跳往返）。JS 的特殊性（QuickJS 上下文、`$hm` 消息协议、init.js）只存在于 JS 适配器（`PluginThread`）内；调度器 / 事件桥 / 命令桥 / Service / Profile 均只依赖该接口：
+运行时以 **`PluginEntity`** 接口看待每个插件：可接收消息（`postMessage`）、有生命周期（`start` / `stopAndWait` / `reload`）与行为指标（`ping()` 心跳往返）。JS 的特殊性（QuickJS 上下文、`$hm` 消息协议、init.js）只存在于 JS 实体（`PluginThread`）内；调度器 / 事件桥 / 命令桥 / Service / Profile 均只依赖该接口：
 
 - **调度器**只认插件名（提交任务、回复回调），不感知执行引擎
-- **Profile** 通过 `ping()` 统一采集响应延迟，in-flight 管理由适配器负责
+- **Profile** 通过 `ping()` 统一采集响应延迟，in-flight 管理由实体实现负责
 - **虚拟插件**：实现 `PluginEntity` 的 Worker 实体（[Worker API](/api/worker)）接入全链路；`isVirtual()` 标记用于性能统计与告警的区分
 
 ## Worker（虚拟插件）

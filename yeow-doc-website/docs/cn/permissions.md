@@ -47,6 +47,8 @@ Yeow 对**敏感消息节点**实施声明式权限：插件在 `yeow.config.jso
 
 > 修改 `permissions` 后需重新构建——开发模式热重载会**一并重新加载权限**（构建时 `computedPermissions` 随热重载消息刷新）；生产环境需完整重载插件（`/yeow reload` 或重启服务器）。
 
+> **统一门控**：所有消息节点（`channel:op`）统一过权限门控；`task:*` 默认拥有（无需声明）。Worker 可在 `createWorker` 时用 `permissions.allow` / `permissions.deny` 收紧（详见 [Worker API · 权限覆盖](api/worker.md)）：默认继承主插件权限，`deny` 优先级最高，`allow` 为白名单且**不可提权**（主插件未声明的权限，`allow` 无效）。
+
 ### 最终权限（computedPermissions）
 
 构建时自动合并主项目与依赖包的声明（去重 + 通配归一化：`fs:*` 覆盖 `fs:server.*`、`fs:server.readFile` 等；`fs:server.*` 覆盖 `fs:server.readFile`），结果回写到 `yeow.config.json` 的 `computedPermissions` 字段并打包进 `yeow.json`。声明 `fs:*` 会被**自动展开**为 `fs:outer.*, fs:server.*`（语义等价，让服主对影响范围有明确感知）。
@@ -65,9 +67,9 @@ Yeow 对**敏感消息节点**实施声明式权限：插件在 `yeow.config.jso
 
 **控制台核对**：运行时加载插件时会把权限清单打印到服务器控制台（`Loaded plugin: <name> ... — permissions: ...`）。
 
-## 二、原生服务可信性声明
+## 二、原生服务可信性声明（强制）
 
-插件（或依赖包）可在 `yeow.config.json` 声明 `native` 字段，**固定原生服务二进制的 SHA-256**——构建时自动计算打包后的哈希并写入 `yeow.json`；运行时注册原生服务时校验，哈希不匹配则**拒绝加载**（Promise reject）。
+插件（或依赖包）**必须**在 `yeow.config.json` 声明 `native` 字段，固定原生服务二进制的 SHA-256——构建时遍历主项目与全部依赖包，按各自命名空间计算打包后的哈希并合并写入 `yeow.json`；运行时把它作为插件元数据保存，注册原生服务时强制校验。
 
 ```json
 {
@@ -81,16 +83,22 @@ Yeow 对**敏感消息节点**实施声明式权限：插件在 `yeow.config.jso
 }
 ```
 
-- `serviceId`：注册 `registerNativeService` 时的服务名；`files`：本包 `assets/` 下的二进制原始路径；`source`：来源链接（可选）
-- 主项目与依赖包均可声明；**相同 `serviceId` 在构建时合并**到一项（files 归并）
+- `serviceId`：注册 `registerNativeService` 时的服务名；`files`：**本包** `assets/` 下的二进制原始路径；`source`：来源链接（可选）
+- 主项目与依赖包各自声明自己的 `native`；**相同 `serviceId` 在构建时合并**（files 归并，保留各自命名空间路径）
 - 构建产物 `yeow.json` 的 `native` 格式：`[{ "serviceId": "...", "files": [{ "<打包后路径>": "<sha256>" }, ...], "source": "..." }]`
+- **仅支持单文件模式**（`string` / `{file}`）；目录模式（`{dir, entry}`）已移除
+
+**强制声明（构建 + 加载）**：
+
+- **构建**：申请了 `service:registerNative`（或 `service:*`）权限、但合并后的 `native` 清单为空 → **构建失败**；声明的文件缺失也失败
+- **加载**：申请了该权限但清单为空 → **拒绝加载**
+- **不申请 `service:registerNative` 权限的插件无需声明 `native`**
 
 **运行时行为**：
 
-- 有声明且匹配 → 正常加载（日志显示校验通过）
-- 有声明但不匹配（文件被替换/篡改）→ **拒绝加载服务**，`registerNativeService` 的 Promise reject
-- **无论是否声明**，加载原生服务时都会打印风险日志：未声明 → 警告"无可信 SHA-256 声明，视为不可信"；已声明 → 提示校验结果
-- **可信性声明只对单文件模式有效**（`string` / `{file}`）；目录模式（`{dir, entry}`）暂不支持声明与校验
+- serviceId 已声明 + 二进制路径已声明 + SHA-256 匹配 → 注册成功（日志显示校验通过）
+- serviceId 未声明 / 二进制路径未声明 / SHA-256 不匹配 → **拒绝注册**，`registerNativeService` 的 Promise reject
+- **声明 ≠ 可信**：无论是否声明，注册时都打印风险日志（视为不可信）——声明只固定内容，不代表来源可信
 
 ### 不可信服务开关（默认允许加载并警告）
 

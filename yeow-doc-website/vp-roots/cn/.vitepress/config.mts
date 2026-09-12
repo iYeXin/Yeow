@@ -179,7 +179,6 @@ export default defineConfig({
                 items: [
                     { text: '规范总览', link: '/specifications/' },
                     { text: '值域附录', link: '/specifications/values' },
-                    { text: 'Java 插件集成', link: '/specifications/java-api' },
                     {
                         text: '消息通道',
                         collapsed: true,
@@ -234,7 +233,6 @@ export default defineConfig({
                         items: [
                             { text: '运行时环境标准', link: '/specifications/runtime/' },
                             { text: 'Native Service 协议', link: '/specifications/native-service/' },
-                            { text: '适配器规范', link: '/specifications/adapter/' },
                         ],
                     },
                 ],

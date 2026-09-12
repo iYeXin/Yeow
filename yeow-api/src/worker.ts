@@ -5,6 +5,19 @@ export interface WorkerOptions {
   entry?: string;
   /** 代码字符串；与 `entry` 互斥。 */
   code?: string;
+  /**
+   * 权限覆盖（可选）。默认继承主插件全部权限。
+   * - `allow`：白名单——只有命中的节点允许（未声明时继承主插件权限）
+   * - `deny`：黑名单——优先级最高（先于 allow 与继承）
+   *
+   * 节点格式 `channel:op`（如 `fs:server.readFile`、`http:*`、`task:player.*`、`*`）。
+   * **不能提权**：主插件未声明的权限，`allow` 无效（仍按默认拒绝）。
+   * 例：`deny: ['*']` 只允许标准 ES 代码；`deny: ['fs:*', 'http:*']` 仅禁用这两类。
+   */
+  permissions?: {
+    allow?: string[];
+    deny?: string[];
+  };
 }
 
 let _seq = 0;
@@ -35,9 +48,10 @@ function _sendWorkerAsync(t: string, p: Record<string, unknown>): Promise<void> 
  * Worker —— 虚拟插件（独立 QuickJS 上下文 + 线程）。
  *
  * - 事件/命令/服务以独立实体注册；调度器任务独立统计
- * - 共享主插件的**数据目录**与**权限**
+ * - 共享主插件的**数据目录**；权限默认继承主插件，可按需用 `allow`/`deny` 收紧（不可提权）
  * - 不能创建新的 Worker（嵌套被拒绝）
- * - **创建后无法销毁，只能卸载**（卸载物理销毁 JS 上下文，句柄保留——可重新 load）
+ * - `unload()` 卸载（物理销毁 JS 上下文，句柄保留——可重新 load）；
+ *   `destroy()` **彻底销毁**（移除注册，句柄作废，同名可重建）
  * - 主插件卸载时连带卸载；/yeow 管理命令不覆盖 Worker；profiler 会统计（标记 created by 主插件）
  * - Worker 的 JS 错误与主插件同样回传（dev 模式经 source-map 定位）
  */
@@ -46,15 +60,18 @@ export class Worker {
   private readonly entry?: string;
   private readonly code?: string;
   private readonly key: string;
+  private readonly permissions?: { allow?: string[]; deny?: string[] };
   private _loaded = false;
+  private _destroyed = false;
   private _onMessage: ((msg: any) => void) | null = null;
   /** 内部 workerId（主插件 JS 侧分配；跨主插件可重复）。 */
   readonly id: string;
 
-  constructor(name: string, entry: string | undefined, code: string | undefined) {
+  constructor(name: string, entry: string | undefined, code: string | undefined, permissions?: { allow?: string[]; deny?: string[] }) {
     this.name = name;
     this.entry = entry;
     this.code = code;
+    this.permissions = permissions;
     this.id = 'worker_' + (++_seq);
     this.key = (__plugin?.name || 'unknown') + ':' + name;
     // 主插件侧 onMessage 回调（worker → main 时 Java 投递到这里）
@@ -71,6 +88,7 @@ export class Worker {
 
   /** 启动 Worker：执行 init.js → worker-inject.js → Worker 代码 → INIT → LOAD（已加载为 no-op）。 */
   load(): Promise<void> {
+    if (this._destroyed) return Promise.reject(new Error('worker has been destroyed'));
     if (this._loaded) return Promise.resolve();
     this._loaded = true;
     return _sendWorkerAsync('load', { name: this.name });
@@ -78,21 +96,39 @@ export class Worker {
 
   /** 卸载 Worker（物理销毁 JS 上下文并清理其事件/命令/服务/任务；句柄保留，可重新 load）。 */
   unload(): Promise<void> {
+    if (this._destroyed) return Promise.reject(new Error('worker has been destroyed'));
     this._loaded = false;
     return _sendWorkerAsync('unload', { name: this.name });
   }
 
   /** 向 Worker 发送消息（其 onMessage 回调接收；未 load 时抛错）。 */
   postMessage(msg: Record<string, unknown>): Promise<void> {
+    if (this._destroyed) return Promise.reject(new Error('worker has been destroyed'));
     return _sendWorkerAsync('post', { name: this.name, msg });
   }
 
   /** 重载 Worker 代码（需已 load；旧上下文销毁、新代码重新加载）。 */
   reload(): Promise<void> {
+    if (this._destroyed) return Promise.reject(new Error('worker has been destroyed'));
     const p: Record<string, unknown> = { name: this.name };
     if (this.entry) p.entry = this.entry;
     else p.code = this.code;
     return _sendWorkerAsync('reload', p);
+  }
+
+  /**
+   * **彻底销毁** Worker：卸载并移除注册（清理事件/命令/服务/任务），句柄作废——
+   * 之后 load/post/reload 均 reject；同名 Worker 可重新 `createWorker`。
+   */
+  destroy(): Promise<void> {
+    if (this._destroyed) return Promise.resolve();
+    return _sendWorkerAsync('destroy', { name: this.name }).then(() => {
+      this._destroyed = true;
+      this._loaded = false;
+      const cb = _msgCbs[this.id];
+      if (cb) { _unregisterCallback(cb); delete _msgCbs[this.id]; }
+      delete _created[this.key];
+    });
   }
 }
 
@@ -122,11 +158,12 @@ export function createWorker(options: WorkerOptions): Worker {
     throw new Error('createWorker: duplicate worker name "' + name + '" in plugin ' + (__plugin?.name || 'unknown'));
   }
   _created[key] = true;
-  const w = new Worker(name, options.entry, options.code);
+  const w = new Worker(name, options.entry, options.code, options.permissions);
   // 注册到运行时注册表（同步；重复/非法名抛错）
   const p: Record<string, unknown> = { name, msgCb: _msgCbs[w.id] };
   if (options.entry) p.entry = options.entry;
   else p.code = options.code;
+  if (options.permissions) p.permissions = options.permissions;
   _sendWorker({ t: 'create', p });
   return w;
 }

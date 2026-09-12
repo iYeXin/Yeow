@@ -101,11 +101,11 @@ import { getAssetsPath } from 'yeow-dev';   // 构建期虚拟模块
 export const IMAGE_SERVICE = 'iyexin.image-svc.v1';
 
 export async function registerImageService(): Promise<string> {
-    const { serviceId, ready } = await registerNativeService(IMAGE_SERVICE, {
+    const svc = await registerNativeService(IMAGE_SERVICE, {
         windows: getAssetsPath('image-svc.exe'),
     });
-    await ready();
-    return serviceId;
+    await svc.ready();
+    return svc.id;
 }
 ```
 
@@ -117,28 +117,17 @@ export async function registerImageService(): Promise<string> {
 - `getAssetsPath('image-svc.exe')` 在构建后返回 `"assets/<id>/image-svc.exe"`（真实路径）
 - **无需任何额外配置** — 构建插件自动扫描所有依赖包（见下文「依赖项识别」）
 
-### 目录资源
+### 单文件与自包含
 
-如果入口脚本需要引用同目录的兄弟文件（脚本内相对引用），用目录级路径：
+原生服务仅支持**单文件**（`string` / `{ file }`）：
 
 ```ts
 const svc = await registerNativeService('my-svc', {
-    windows: { dir: getAssetsPath('native/'), entry: 'win/start.ps1' },
+    windows: getAssetsPath('native/win/my-svc.exe'),
 });
 ```
 
-**无哈希**：所有文件**保持原名**（含嵌套子目录）——`assets/` 内部（含跨目录）的任何相对引用（`./`、`../`）都**永远有效**，不再有「目录应自包含」「跨顶层目录断裂」的限制。
-
-### 目录边界
-
-**`dir` 指向包含全部依赖的最顶层目录**，`entry` 用相对子路径：
-
-```ts
-// ✅ 提取整个 native/，内部引用完整
-{ dir: getAssetsPath('native/'), entry: 'win/start.bat' }
-```
-
-**`{ file }` 只提取单文件** — 该文件对目录内其他文件的引用会失效（不被提取）。需要自包含请用 `{ dir, entry }`。
+运行时只把该文件提取到临时目录（同目录其他文件不会被提取），因此原生二进制需**自包含**（静态链接，或把依赖打进单一可执行文件）。目录模式（`{ dir, entry }`）已移除。
 
 ---
 
@@ -160,7 +149,7 @@ const svc = await registerNativeService('my-svc', {
 
 构建器扫描 `node_modules` 顶层目录（含 `@scope/name` 两级），以 `<name>-<version>` 为键识别依赖项：
 
-- **识别条件**：包存在 `assets/` 目录，且 `peerDependencies` 含 `yeow-api` 键
+- **识别条件**：包存在 `assets/` 目录，且满足以下之一——`peerDependencies` 含 `yeow-api` 键，或自带 `yeow.config.json` 的 `permissions` / `native` 声明（纯原生 / 资源包即使不依赖 `yeow-api` 也能被识别，其 `native` 参与合并、`assets` 被部署）
 - **主项目**：有 `assets/` 即参与（始终分配 id）
 - **同名冲突**：各依赖项有独立命名空间，同名文件互不覆盖
 - **兼容性**：npm / pnpm 的扁平布局支持良好；yarn 的 hoisting 差异可能导致依赖不在预期位置，如遇问题请使用 npm 或 pnpm
@@ -209,7 +198,7 @@ npm run permissions
 
 ### 原生服务可信性声明（native）
 
-依赖包携带原生服务二进制时，建议在 `yeow.config.json` 声明 `native` 字段固定 SHA-256：
+依赖包携带原生服务二进制时，**必须**在自身 `yeow.config.json` 声明 `native` 字段（serviceId + 二进制文件），构建时固定 SHA-256：
 
 ```json
 {
@@ -224,8 +213,8 @@ npm run permissions
 ```
 
 - `files` 为**本包** `assets/` 下的二进制原始路径（与 `getAssetsPath` 使用的路径一致）
-- 构建时自动映射为打包后路径（`assets/<id>/...`）并计算 SHA-256，写入 `yeow.json` 的 `native` 字段；主项目与依赖包声明相同 `serviceId` 时合并（files 归并）
-- 运行时注册该原生服务时校验哈希：不匹配 → 拒绝加载（Promise reject）；无论是否声明都会打印风险日志。详见[权限与原生服务可信性](permissions.md#二原生服务可信性声明)
+- 构建时遍历**主项目 + 每个依赖包**的 native 声明，按各自命名空间映射为打包后路径（`assets/<id>/...`）并计算 SHA-256，合并写入 `yeow.json` 的 `native` 字段；相同 `serviceId` 合并（files 归并）
+- 运行时注册该原生服务时校验：serviceId 未声明 / 二进制路径未声明 / SHA-256 不匹配 → **拒绝注册**（Promise reject）。**声明 ≠ 可信**，仍打印风险日志。详见[权限与原生服务可信性](permissions.md#二原生服务可信性声明)
 
 ---
 
@@ -243,7 +232,7 @@ npm run permissions
 
 ```ts
 // src/index.ts
-import { registerNativeService, serviceRequest } from 'yeow-api';
+import { registerNativeService } from 'yeow-api';
 import { getAssetsPath } from 'yeow-dev';
 
 export const IMAGE_SERVICE = 'iyexin.image-svc.v1';
@@ -262,24 +251,22 @@ export interface ImageRenderer {
 }
 
 export async function initRenderer(): Promise<ImageRenderer> {
-    const { serviceId, ready } = await registerNativeService(IMAGE_SERVICE, {
+    const svc = await registerNativeService(IMAGE_SERVICE, {
         'linux-x64':   getAssetsPath('native/linux-x64/image-svc'),
         'linux-arm64': getAssetsPath('native/linux-arm64/image-svc'),
         'windows-x64': getAssetsPath('native/windows-x64/image-svc.exe'),
         'macos-x64':   getAssetsPath('native/macos-x64/image-svc'),
         'macos-arm64': getAssetsPath('native/macos-arm64/image-svc'),
     });
-    await ready();
+    await svc.ready();
 
     return {
-        serviceId,
+        serviceId: svc.id,
         async render(width, height, pixels) {
             const base64 = pixels.toBase64(); // ES2026 原生
-            return serviceRequest(serviceId, '/imageRender', {
-                width,
-                height,
-                base64,
-            }) as Promise<RenderResult>;
+            return (await svc.request('/imageRender', {
+                body: { width, height, base64 },
+            })).json() as Promise<RenderResult>;
         },
     };
 }

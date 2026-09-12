@@ -10,7 +10,7 @@
 
 | 命令                                     | 说明                                                                                                                                                                                 |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/yeow load <path\|url>`                 | **临时**加载插件包（`.yeow.zip` 或 JAR）。`<path>` 为本地路径；`<url>` 为直接指向 `.yeow.zip` 的下载地址（下载到缓存，不落盘到 `plugins/Yeow/`，重启后不保留）                       |
+| `/yeow load <path\|url\|name>`           | **临时**加载插件包（`.yeow.zip` 或 JAR）。`<path>` 为本地路径；`<url>` 为直接指向 `.yeow.zip` 的下载地址（下载到缓存，不落盘到 `plugins/Yeow/`，重启后不保留）。路径找不到时依次回退：① `plugins/Yeow/<path>`；② `plugins/Yeow/<name>-<version>.yeow.zip`（忽略大小写，精确匹配优先） |
 | `/yeow install <url>`                    | 下载并**安装**：重命名为标准格式 `<name>-<version>.yeow.zip` 保存到 `plugins/Yeow/`（下次启动自动扫描加载），并立即加载                                                              |
 | `/yeow update <url>`                     | 下载并**强制替换**旧版本：扫描 `plugins/Yeow/` 内所有 `.yeow.zip`，按 `yeow.json` 中的 `name` 匹配旧版本 → 旧文件移入 `plugins/Yeow/.backup/` → 写入新版本；若插件正在运行则自动重载 |
 | `/yeow unload <plugin\|all>`             | 卸载插件（与热重载相同的卸载逻辑，5s 强制终止）                                                                                                                                      |
@@ -21,6 +21,8 @@
 
 ```bash
 /yeow load plugins/Yeow/my-plugin-1.0.0.yeow.zip              # 服务器运行时动态加载
+/yeow load my-plugin-1.0.0.yeow.zip                           # 未找到路径时在 plugins/Yeow/ 下再找
+/yeow load my-plugin                                          # 按名匹配 plugins/Yeow/my-plugin-<version>.yeow.zip（忽略大小写）
 /yeow load https://example.com/my-plugin.yeow.zip             # 直接下载加载（临时，重启不保留）
 /yeow install https://example.com/my-plugin.yeow.zip          # 下载并安装到 plugins/Yeow/（标准格式）
 /yeow update https://example.com/my-plugin.yeow.zip           # 替换旧版本（旧包备份到 plugins/Yeow/.backup/）
@@ -51,6 +53,7 @@ native-service-allow-untrusted: true  # 允许加载不可信原生服务（默�
 
 assets:
   cache-enabled: true          # 插件包内存缓存（assets 通道/原生解压走内存，默认启用；false = 每次 ZipFile 直读）。
+  cache-max-bytes: 31457280    # 内存缓存阈值（默认 30 MiB）；超过此大小不再缓存到内存（回退 ZipFile 直读）；<=0 = 不限制。
 
 profile:
   enabled: false                 # 全量性能分析（逐任务采集），默认关闭

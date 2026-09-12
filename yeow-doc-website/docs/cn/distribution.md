@@ -29,7 +29,7 @@ npm run build
 - 部署方式：
   - 放入 `plugins/Yeow/`，服务器启动时**自动扫描加载**
   - 或管理员执行 `/yeow install <url>` 一键安装
-  - 或 `/yeow load <url | path>` 临时/动态加载
+  - 或 `/yeow load <url | path | name>` 临时/动态加载
 - 适合：
   - 面向 Yeow 生态的分发（用户已装 Yeow 运行时）
   - 多平台目标（未来非 Paper 系运行时）

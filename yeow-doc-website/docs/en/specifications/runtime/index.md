@@ -277,15 +277,27 @@ interface Response {
 
 ```ts
 new TextEncoder().encode(str: string): Uint8Array
-new TextDecoder('utf-8').decode(bytes: Uint8Array): string
+new TextDecoder('utf-8').decode(input?: ArrayBuffer | ArrayBufferView): string
 ```
 
 - Currently only `utf-8` is supported; other encodings throw `RangeError`.
 - `TextDecoder` replaces invalid UTF-8 sequences with `U+FFFD`.
-- **Internal implementation is not specified**: Whether to use underlying channels, thresholds, etc., is at the implementer's discretion (current implementation: ≤100 bytes and ≤50 characters uses pure JS conversion, above threshold goes through `util` channel `encode.utf8` / `decode.utf8` — this strategy is not a specification constraint).
+- **Internal implementation is not specified.**
 
 > [!WARNING]
 > **`fetch` depends on `http:requestAsync` permission**: The `fetch` implementation is based on the http channel's `requestAsync` (`$send('http', {t:'requestAsync', ...})`). When a plugin does not declare `http:*` (or `http:requestAsync`) permission, the runtime must return `Permission denied: http:requestAsync` (via callback delivery), and `fetch`'s Promise rejects. See [Channel Permissions](#channel-permissions-sensitive-nodes-default-deny).
+
+### `performance.now()` / `performance.timeOrigin`
+
+**Required to exist** (Web Performance API semantics, high-resolution time):
+
+```ts
+performance.now(): number          // milliseconds since the context origin (monotonic, sub-millisecond)
+performance.timeOrigin: number     // epoch milliseconds at context creation
+```
+
+- `now()` must be backed by a **monotonic clock**, unaffected by wall-clock adjustments and non-decreasing within a context.
+- The clock source and resolution are unconstrained.
 
 ### `setTimeout(fn, ms)` / `clearTimeout(id)` / `setInterval(fn, ms)` / `clearInterval(id)`
 

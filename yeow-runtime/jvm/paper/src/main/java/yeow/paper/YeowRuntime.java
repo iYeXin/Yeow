@@ -124,7 +124,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                 return switch (a[0]) {
                     case "load" -> {
                         if (!s.hasPermission("yeow.admin")) { s.sendMessage("No permission."); yield true; }
-                        if (a.length < 2) { s.sendMessage("Usage: /yeow load <path|url>"); yield true; }
+                        if (a.length < 2) { s.sendMessage("Usage: /yeow load <path|url|name>"); yield true; }
                         // Always temporary: URL downloads go to the cache and are never persisted.
                         if (a[1].startsWith("http://") || a[1].startsWith("https://")) {
                             var cache = core.downloadPluginZip(a[1]);
@@ -133,9 +133,13 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                             else { s.sendMessage("Load failed (duplicate or invalid package): " + a[1]); cache.delete(); }
                             yield true;
                         }
-                        var path = resolveServerPath(a[1]);
-                        var f = new File(path);
-                        if (!f.isFile()) { s.sendMessage("File not found: " + path); yield true; }
+                        // Path → plugins/Yeow relative path → plugins/Yeow/<name>-<version>.yeow.zip (case-insensitive)
+                        var f = RuntimeCore.resolveLoadTarget(a[1], getDataFolder());
+                        if (f == null) {
+                            s.sendMessage("File not found: " + a[1] + " (also searched plugins/Yeow/" + a[1]
+                                + " and plugins/Yeow/" + a[1] + "-<version>.yeow.zip)");
+                            yield true;
+                        }
                         if (core.registerPlugin(f.getAbsolutePath(), true)) s.sendMessage("Loaded: " + f.getAbsolutePath());
                         else s.sendMessage("Load failed (duplicate or invalid package): " + f.getAbsolutePath());
                         yield true;
@@ -283,7 +287,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
             }
 
             private void usage(CommandSender s) {
-                s.sendMessage("Usage: /yeow load <path|url> | /yeow install <url> | /yeow update <url> | /yeow unload <plugin|all> | /yeow uninstall <plugin> | /yeow reload <plugin|all> [path|url] | /yeow profile | /yeow track <plugin> <seconds>");
+                s.sendMessage("Usage: /yeow load <path|url|name> | /yeow install <url> | /yeow update <url> | /yeow unload <plugin|all> | /yeow uninstall <plugin> | /yeow reload <plugin|all> [path|url] | /yeow profile | /yeow track <plugin> <seconds>");
             }
 
             @Override
@@ -401,10 +405,5 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
             "count", done,
             "elapsedMs", elapsedNs / 1_000_000,
             "blocksPerSec", (long) (done / secs));
-    }
-
-    private static String resolveServerPath(String p) {
-        var path = java.nio.file.Path.of(p);
-        return (path.isAbsolute() ? path : java.nio.file.Path.of(System.getProperty("user.dir"), p)).normalize().toString();
     }
 }

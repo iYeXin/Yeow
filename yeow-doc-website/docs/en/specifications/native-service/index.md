@@ -26,16 +26,16 @@ The executable receives two command-line arguments at startup:
 4. Begins processing requests
 ```
 
-The JS side can wait for readiness via the `ready()` method returned by `registerNativeService`:
+The JS side can wait for readiness via the `ready()` method on the `NativeService` returned by `registerNativeService`:
 
 ```js
 import { registerNativeService } from 'yeow-api';
 import { getAssetsPath } from 'yeow-dev';
 
-const { serviceId, ready } = await registerNativeService('image-svc', {
+const svc = await registerNativeService('image-svc', {
     windows: getAssetsPath('image-svc.exe'),
 });
-await ready(); // Promise resolve means TCP connection established and ready message received
+await svc.ready(); // Promise resolve means TCP connection established and ready message received
 ```
 
 > **Paths must be resolved via `getAssetsPath()`**: At build time, resources receive a namespace prefix (e.g., `image-svc.exe` → `assets/a1b2c3d4/image-svc.exe`); hardcoding the original path will fail to find the file at runtime.
@@ -50,7 +50,7 @@ If the process exits abnormally before sending the ready message, `ready()` will
 
 ```js
 try {
-    await ready();
+    await svc.ready();
 } catch (e) {
     console.error(e.message);   // "Native service image-svc exited with code 1"
     console.error(e.exitCode);  // 1
@@ -60,13 +60,21 @@ try {
 
 ## Communication Protocol
 
-The TCP connection uses the **JSON line** protocol (one complete JSON object per line, separated by `\n`). Yeow-Runtime acts as the server (passive listener), and the subprocess acts as the client (active connector). Implementations should ensure the read buffer is large enough to accommodate the maximum expected line size (e.g., Go's `bufio.Scanner` defaults to 64KB, which must be expanded to support large payloads like base64-encoded data).
+The TCP connection uses a **framed protocol** (a breaking replacement for the old JSON line):
 
-In received JSON objects, values that should be `int` are not guaranteed to be `int`; it is recommended to receive them as **floating-point** and convert manually.
+```
+[u32 headerLen][header JSON (UTF-8)] [u32 chunkLen][chunk bytes] ... [u32 0]
+```
+
+- **header**: JSON carrying the type and metadata (`type` / `id` / `path` / `headers` / `contentType` / `eventPath` / `reason`, ...)
+- **body**: a zero-terminated sequence of chunks carrying **raw bytes** (no base64); it supports streaming (the sender need not know the total length up front); an empty body is a single zero-length chunk
+- All lengths are **big-endian u32**; header ≤ 64 KiB, body ≤ 256 MiB (oversized messages are rejected and the connection dropped)
+
+Yeow-Runtime is the server (passive listener) and the subprocess is the client (active connector). JSON `number` values are not guaranteed to be `int`; receive them as floating-point and convert manually.
 
 ### 1. Ready Message (child → runtime)
 
-The subprocess must send this immediately upon readiness:
+The subprocess must send this immediately upon readiness (header JSON + empty body):
 
 ```json
 {"type":"ready","serviceId":"mySvc_a1b2","servicePort":12345}
@@ -79,43 +87,53 @@ The subprocess must send this immediately upon readiness:
 
 ### 2. Request (runtime → child)
 
-When a Yeow plugin calls a service request:
+When a Yeow plugin calls a service request (header JSON, immediately followed by the body chunks):
 
 ```json
-{"type":"request","requestId":"svcreq_1","path":"/api/process","body":{"key":"value"}}
+{"type":"request","id":"svcreq_1","path":"/api/process","headers":{"content-type":"application/json"},"contentType":"application/json"}
 ```
 
-| Field       | Description                                     |
-| ----------- | ----------------------------------------------- |
-| `requestId` | Unique request ID, must be echoed in the response |
-| `path`      | Request path                                     |
-| `body`      | Request body (JSON object)                       |
+| Field         | Description                                                       |
+| ------------- | ----------------------------------------------------------------- |
+| `id`          | Unique request ID, must be echoed in the response                 |
+| `path`        | Request path                                                      |
+| `headers`     | App-level request header key/value pairs (`content-type` is the typical entry) |
+| `contentType` | `application/json` (default) or `application/octet-stream` (raw binary); a convenience alias for `headers['content-type']` |
+
+The body is raw bytes: for JSON requests it is the UTF-8 text of the serialized object; for binary requests the JS side carries it as base64, the runtime decodes it and **forwards the raw bytes** (the subprocess always receives raw bytes).
 
 ### 3. Response (child → runtime)
 
 ```json
-{"type":"response","requestId":"svcreq_1","body":{"result":"ok"}}
+{"type":"response","id":"svcreq_1","headers":{"content-type":"application/json"},"contentType":"application/json"}
 ```
+(immediately followed by the body chunks)
 
-| Field       | Description                    |
-| ----------- | ------------------------------ |
-| `requestId` | ID matching the request exactly |
-| `body`      | Response body (JSON object)    |
+| Field         | Description                                                        |
+| ------------- | ------------------------------------------------------------------ |
+| `id`          | ID matching the request exactly                                    |
+| `headers`     | App-level response header key/value pairs (`content-type` is the typical entry) |
+| `contentType` | Body type; JS uses `resp.json()` for JSON and `resp.bytes()` for binary; a convenience alias for `headers['content-type']` |
+
+The runtime hands the response body (raw bytes + headers + contentType) to the consumer, which reads it via a fetch-style `ServiceResponse` on the JS side.
 
 ### 4. Publish Event (child → runtime)
 
 ```json
-{"type":"publish","eventPath":"status","body":{"health":0.95}}
+{"type":"publish","eventPath":"status"}
 ```
+(immediately followed by the JSON body chunks)
 
-| Field       | Description                 |
-| ----------- | --------------------------- |
-| `eventPath` | Event path                   |
-| `body`      | Event body (JSON object)    |
+| Field       | Description                     |
+| ----------- | ------------------------------- |
+| `eventPath` | Event path                      |
+| body        | Event body (JSON object, UTF-8) |
+
+Event delivery semantics are unchanged: the runtime parses the JSON body and delivers it to subscribers matching `eventPath`.
 
 ### 5. Shutdown (runtime → child)
 
-When the runtime stops a service (plugin uninstall / hot-reload / runtime shutdown), it pushes:
+When the runtime stops a service (plugin uninstall / hot-reload / runtime shutdown), it pushes (header JSON + empty body):
 
 ```json
 {"type":"shutdown","reason":"unregistered"}
@@ -148,31 +166,27 @@ Yeow-Runtime is a multiplexed relay: plugins interact with Native Services throu
 
 ## Packaging and Deployment
 
-Executables are placed in the plugin's `assets/` directory. At registration, platform-specific configurations are specified via the `platforms` parameter:
+Executables are placed in the plugin's `assets/` directory. At registration, platform-specific configurations are specified via the `platforms` parameter, **single file mode only**:
 
-**Single file mode (file/string):**
 ```json
 { "windows": "native/win/my-svc.exe" }
 ```
 
-**Directory + entry mode (dir+entry):**
-```json
-{ "windows": { "dir": "native/win/", "entry": "start.ps1" } }
-```
-In this mode, all files in the directory specified by `dir` are extracted to a temporary directory, then the `entry` file is executed.
-Suitable for complex native services with multi-file dependencies (e.g., Python scripts, Node.js projects).
+Or the equivalent object form `{ "windows": { "file": "native/win/my-svc.exe" } }`. Directory mode (`{dir, entry}`) has been removed — native binaries must be **self-contained** (statically linked, or dependencies packed into a single executable).
 
 **Extraction directory: `<TEMP>/yeow-native-services/<serviceId>/`**
 - Automatically cleaned up on each Runtime startup
 - Automatically cleaned up and re-extracted on plugin hot-reload
 
-## Trust Statement and Untrusted Switch (SHA-256)
+## Mandatory Declaration & Verification (SHA-256)
 
-Plugins or dependency packages can declare a `native` field in `yeow.config.json` to fix binary hashes (the SHA-256 of the packaged path is computed at build time and written to the `native` field in `yeow.json`). **Declarations only apply to single file mode** (`string` / `{file}`); directory mode (`{dir, entry}`) is not yet supported.
+Plugins or dependency packages **must** declare a `native` field in `yeow.config.json` to fix binary hashes (at build time the builder walks the main project + dependency packages, computes the SHA-256 of the packaged path and merges it into the `native` field of `yeow.json`; at plugin load it is stored as metadata). **Single file mode only** (`string` / `{file}`).
 
-**Untrusted switch (plugin loading layer)**: By default (`native-service-allow-untrusted: true`), all native services are considered untrusted but loading is not blocked. Plugins requesting the `service:registerNative` permission load normally, with a prominent untrusted warning on the console (stating whether SHA-256 is pinned); with `false`, plugins requesting that permission are **rejected at load time** (console points back to `true`).
+**Mandatory declaration (build + load layer)**: For a plugin requesting the `service:registerNative` permission, its merged `native` manifest must not be empty — if empty at build time, the **build fails** (missing declared files also fail); if empty at load time, **loading is refused**. Plugins not requesting that permission do not need to declare it.
 
-**Hash verification (runtime)**: After the plugin is loaded, when registering a native service, the SHA-256 of the selected binary (single file mode) is verified: if it doesn't match the declaration → **rejected** (`ready()` rejects, with an error containing the declared/actual hash — the executable may have been tampered with). This verification always runs, regardless of the switch above.
+**Registration checks (runtime, always executed)**: When registering a native service, three things are verified — serviceId declared, binary path declared, SHA-256 matches; if any is missing, **registration is refused** (`ready()` rejects, with an error pointing to undeclared or hash mismatch — the executable may have been tampered with).
+
+**Untrusted switch (plugin loading layer)**: **Declaration ≠ trusted**. By default (`native-service-allow-untrusted: true`) plugins that declared native services load normally, but the console prints a prominent untrusted warning; with `false`, plugins requesting that permission are **rejected at load time** (console points back to `true`).
 
 **Configuration persistence**:
 

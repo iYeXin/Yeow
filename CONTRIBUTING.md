@@ -9,10 +9,10 @@
 | 工具 | 版本 | 用途 |
 |------|------|------|
 | Node.js | 18+ | `yeow-api` / `create-yeow` / 文档站点 |
-| JDK | 21+ | `yeow-runtime/jvm` / `yeow-template` / `yeow-tools` / `quickjs-wrapper` |
+| JDK | 21+ | `yeow-runtime/jvm` / `yeow-template` / `yeow-tools`；打包 `quickjs-wrapper` 的 JAR |
 | Maven | 3.9+ | 运行时与模板构建 |
-| Gradle | 8.x（仓库自带 wrapper） | quickjs-wrapper 构建 |
-| Git | 任意 | 版本控制（本仓库与 quickjs-wrapper 均使用） |
+| Zig | 0.16.0 | `quickjs-wrapper` 原生构建与交叉编译 |
+| Git | 任意 | 版本控制 |
 
 **克隆时必须带 submodule**（`quickjs-wrapper/native/quickjs` 是 QuickJS 本体的 submodule）：
 
@@ -31,59 +31,50 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 | `yeow-runtime/jvm` | Maven 父工程（多模块） | 根目录 `mvn install -DskipTests`（详见下文） |
 | `yeow-runtime/jvm/core` | 平台无关引擎（artifact `yeow-runtime-core`，零 Bukkit 依赖） | 随父工程构建；单独构建 `mvn -pl core install` |
 | `yeow-runtime/jvm/paper` | Paper/Bukkit 平台实现（artifact `yeow-runtime`，产出运行 jar） | 随父工程构建；单独构建 `mvn -pl paper install`（需先装 core） |
+| `yeow-runtime/jvm/folia` | Folia 平台实现（artifact `yeow-runtime-folia`，实验性） | 随父工程构建；单独构建 `mvn -pl folia install`（需先装 core） |
 | `yeow-template` | 空 JAR 骨架 | `mvn package`（依赖 yeow-runtime，需先安装到本地 Maven 仓库） |
 | `yeow-api` | TS 库 | 无构建步骤（源码直接随插件 bundle）；类型检查 `tsc --noEmit` |
 | `create-yeow` | CLI 脚手架 | 无构建步骤；模板改动直接生效 |
-| `quickjs-wrapper` | QuickJS JVM 封装 | Gradle + CMake（详见下文） |
+| `quickjs-wrapper` | QuickJS 专用 JNI 桥（原生 C + Java `wiki.yexin.quickjs`） | Zig 0.16（`zig build jar`，详见下文） |
 | `yeow-tools` | 开发基准/诊断工具 | `mvn package`（独立，不依赖运行时） |
 | `yeow-dev` | 构建期虚拟模块（空 npm 包） | 无构建；发布 `npm publish`（构建时被 esbuild 拦截，不实际加载） |
 | `yeow-doc-website` | 文档源 + 文档站点 | 文档目录 `docs/cn/`（仓库内直接提交）；`npm run build` 产出 `/v1/` 站点 |
+| `packages` | 独立发布的关联 npm 包（`yeow-command` / `yeow-server` / `yeow-fflate` / `yeow-docs`） | 各自 TypeScript 类型检查 `tsc --noEmit`；发布 `npm publish` |
 
 ---
 
 ## 本地安装流程（Maven）
 
-### 1. quickjs-java-wrapper（关键依赖）
+### 1. yeow-quickjs（原生桥，关键依赖）
 
-`yeow-runtime/jvm` 依赖 `com.whl.quickjs:quickjs-java-wrapper`（本地 Maven 仓库）。该组件由主仓库 [iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper) 维护，本仓库仅镜像。两种获取方式：
-
-**方式 A：使用 CI 发布产物（推荐）**
-
-1. 在 `quickjs-wrapper` 目录修改代码 → 更新 `CHANGELOG.md` → `git commit` → 打版本标签并推送（`git tag vX.Y.Z` + `git push origin main vX.Y.Z`）
-2. 标签推送触发 GitHub Actions 多平台构建，完成后从 [Releases](https://github.com/iYeXin/quickjs-wrapper/releases) 下载 `quickjs-java-wrapper.jar`
-3. 放入 `yeow-runtime/jvm/paper/lib/`，执行：
-
-```bash
-cd yeow-runtime/jvm/paper
-mvn install:install-file \
-  -Dfile=lib/quickjs-java-wrapper-<version>.jar \
-  -DgroupId=com.whl.quickjs -DartifactId=quickjs-java-wrapper \
-  -Dversion=<version> -Dpackaging=jar
-```
-
-4. 确认 `yeow-runtime/jvm/paper/pom.xml` 中的 `<version>` 与安装版本一致
-
-**方式 B：本地构建（仅 Java 层改动，原生库不变）**
+`yeow-runtime/jvm` 依赖 `wiki.yexin:yeow-quickjs`（本地 Maven 仓库）。该桥位于本仓库 `quickjs-wrapper/`，用 **Zig 0.16** 编译——原生 C 源码 + 内置 JNI 头，构建原生库不需要 JDK：
 
 ```bash
 cd quickjs-wrapper
-./gradlew :wrapper-java:jar
-./gradlew :wrapper-java:publishToMavenLocal   # 或手动 install:install-file
+zig build jar          # 产出 zig-out/yeow-quickjs.jar（Java 类 + 全部平台原生库）
+mvn install:install-file \
+  -Dfile=zig-out/yeow-quickjs.jar \
+  -DgroupId=wiki.yexin -DartifactId=yeow-quickjs -Dversion=0.6.0 -Dpackaging=jar
 ```
 
-> 注意：C++ 层（`native/cpp/*`）改动必须走方式 A 的 CI 流程——本地原生库不会自动重建，发布标签后把产物下载到 `yeow-runtime/jvm/paper/lib/` 再重装。
+- 只构建本机原生库：`zig build`
+- 只构建各平台原生库：`zig build all` → `zig-out/native/<platform>/`
+- 交叉编译：`zig build -Dtarget=aarch64-linux-gnu` 等（单工具链产出 linux/macos/windows × x86_64/arm64）
+- 冒烟测试与 API 说明：见 `quickjs-wrapper/README.md`
 
-### 2. yeow-runtime（core + paper 多模块）
+> 修改原生 C（`quickjs-wrapper/native/src/*`）或 Java API 后，重新执行 `zig build jar` 并重装该依赖，再重建 yeow-runtime。
+
+### 2. yeow-runtime（core + paper + folia 多模块）
 
 ```bash
 cd yeow-runtime/jvm
-mvn clean install -DskipTests    # 一次构建 core + paper 并安装到本地 Maven 仓库
+mvn clean install -DskipTests    # 一次构建 core + paper + folia 并安装到本地 Maven 仓库
 ```
 
-构建产物 `paper/target/yeow-runtime-0.5.3.jar`（shaded，含 core + 引擎 + 配置解析）需要**复制到脚手架模板**，供 `create-yeow` 生成的插件项目使用：
+构建产物 `paper/target/yeow-runtime-0.6.0.jar` 与 `folia/target/yeow-runtime-folia-0.6.0.jar`（均 shaded，含 core + 引擎 + 配置解析）需要**复制到脚手架模板**，供 `create-yeow` 生成的插件项目使用：
 
 ```bash
-cp paper/target/yeow-runtime-0.5.3.jar ../create-yeow/templates/default/.yeow/assets/
+cp paper/target/yeow-runtime-0.6.0.jar folia/target/yeow-runtime-folia-0.6.0.jar ../create-yeow/templates/default/.yeow/assets/
 ```
 
 ### 3. yeow-template
@@ -96,25 +87,31 @@ mvn clean package -DskipTests
 编译时解析 `yeow-runtime/jvm` 来自本地 Maven 仓库（第 2 步已安装）。产物同样复制到模板：
 
 ```bash
-cp target/yeow-template-0.5.3.jar ../create-yeow/templates/default/.yeow/assets/
+cp target/yeow-template-0.6.0.jar ../create-yeow/templates/default/.yeow/assets/
 ```
 
-> **为什么必须同步复制？** `create-yeow` 生成的项目在 `npm run dev` / `npm run build` 时从 `.yeow/assets/` 读取这两个 jar。不同步会导致旧签名（如 `registerPlugin` 返回类型变化）引发 `NoSuchMethodError`。
+> **为什么必须同步复制？** `create-yeow` 生成的项目在 `npm run dev` / `npm run build` 时从 `.yeow/assets/` 读取这三个 jar。不同步会导致旧签名（如 `registerPlugin` 返回类型变化）引发 `NoSuchMethodError`。
 
 ---
 
-## quickjs-wrapper 版本发布流程
+## yeow-quickjs 版本
 
-> **镜像说明**：本仓库中的 `quickjs-wrapper` 目录仅为**镜像副本**，主维护仓库在 [github.com/iYeXin/quickjs-wrapper](https://github.com/iYeXin/quickjs-wrapper)。版本标签、多平台 CI 构建与 Release 发布均在该仓库进行，镜像副本不运行任何 CI。
+`quickjs-wrapper/` 现在是 **Yeow 专用实现**（不再是外部镜像），接口、包名与构件坐标见 `quickjs-wrapper/README.md`。升版步骤：
 
-1. 在主仓库（`iYeXin/quickjs-wrapper`）修改 C++ / Java 代码
-2. `CHANGELOG.md` 顶部新增版本条目（`## X.Y.Z *(YYYY-MM-DD)*`）
-3. `git add` + `git commit`（提交信息使用 conventional 风格，如 `fix: ...` / `feat: ...`）
-4. `git tag vX.Y.Z && git push origin main vX.Y.Z` —— 标签触发多平台 CI 构建
-5. 从 Releases 下载 `quickjs-java-wrapper.jar` → 同步到本仓库 `yeow-runtime/jvm/core/lib/` → 执行上面方式 A 的安装
-6. 重新构建并安装 yeow-runtime（第 2 步）
+1. 修改 C / Java 代码，`quickjs-wrapper/CHANGELOG.md` 顶部新增版本条目（`## X.Y.Z *(YYYY-MM-DD)*`）
+2. `cd quickjs-wrapper && zig build jar`
+3. 安装到本地 Maven 仓库：
 
-> 镜像同步：主仓库的代码与 Release 更新后，将 `quickjs-wrapper/` 内容同步到本仓库（不含 `.git`）；`native/quickjs` 的 submodule commit 与主仓库保持一致（`git submodule update`）。提交镜像更新时需同时提交 `.gitmodules` 与 submodule gitlink。
+```bash
+mvn install:install-file \
+  -Dfile=zig-out/yeow-quickjs.jar \
+  -DgroupId=wiki.yexin -DartifactId=yeow-quickjs \
+  -Dversion=<X.Y.Z> -Dpackaging=jar
+```
+
+4. 更新 `yeow-runtime/jvm/pom.xml` 的 `<quickjs.version>`（子模块经父 POM 的 dependencyManagement 继承），重建运行时（第 2 步）
+
+> `native/quickjs`（QuickJS 引擎）仍是 git submodule，版本锁定在其自身仓库；本目录只维护桥接层。
 
 ---
 

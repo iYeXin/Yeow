@@ -4,6 +4,22 @@
 
 ---
 
+## 2026-09-12
+
+- quickjs-wrapper rewritten as a Yeow-specific bridge: native C + **Zig 0.16** single-toolchain build (six-platform cross-compilation), Java package `wiki.yexin.quickjs` keeping only evaluate / global function up- and down-calls / job pump / interrupt; Maven group `io.yeow` → `wiki.yexin`, new artifact `wiki.yexin:yeow-quickjs`
+- New **native polyfills** (`quickjs-wrapper/native/polyfill/`, C, injected at context creation without touching QuickJS sources): `performance.now()` (origin captured per context) / `performance.timeOrigin` (monotonic high-resolution time) and native UTF-8 `TextEncoder` / `TextDecoder`; yeow-api `global.d.ts` declares `performance`
+- JS↔Java link cleanup (JSON path only): bound `$hm` handle, single-JNI `drainJobs()` microtask pump, `cbMessageRaw` envelope from pre-serialized result JSON, raw batch result concatenation, ASCII/BMP string fast path
+- **Mandatory native declaration**: `yeow.config.json` must declare `native` (build-time check: `service:registerNative` permission but empty manifest / missing file → build fails; empty manifest at load → refuse to load); `registerNativeService` verifies serviceId, binary path and SHA-256, refusing when any is missing; **directory mode removed** (single file only); `native-service-allow-untrusted` retained (declaration ≠ trusted)
+- **Unified permission gate + Worker permissions/destroy**: main plugin and Workers share `PermissionGate` (all message nodes gated, `task:*` default-owned, deny wins, allow cannot escalate); `createWorker({ permissions: { allow?, deny? } })`; new `worker.destroy()`
+- Version 0.5.3 → 0.6.0 (runtime core/paper/folia, yeow-template, create-yeow, quickjs); bundled template jars synced to `yeow-runtime-0.6.0.jar` / `yeow-runtime-folia-0.6.0.jar` / `yeow-template-0.6.0.jar`; yeow-api 0.5.0 → 0.6.0
+- **Native Service protocol v2 (breaking)**: TCP switched from JSON line to a framed protocol (header JSON + raw/chunked body), supporting raw binary and streaming; `serviceRequest` now returns a fetch-style `Response` (`json()`/`bytes()`/...); event semantics unchanged; also fixes concurrent write interleaving, the missing shutdown frame, and missing size limits
+- **Service API now OOP (breaking)**: registration returns `PluginService`/`NativeService` handles; new `getService`/`hasService` (with the non-atomicity warning) and `unregister`; `Service` base has `request`/`subscribe`, `PluginService` has `token`/`publish`, `NativeService` has `ready`/`onTerminate`; runtime `service` channel gained `info`/`unregister`, `request`/`response` support `headers` and requests support a timeout; functional `serviceRequest`/`serviceSubscribe`/`servicePublish` removed
+- **Docs**: service docs restructured into three scenarios (plugin provides its own / dependency package wraps calls / dependency package embeds a service), with the self-containment design moved to the most complex scenario
+- **Removed experimental integration features**: deleted the Adapter Specification and Java Plugin Integration (`requestService`/`subscribeService`) docs, their code (`requestJava`/`subscribeJava`, the `registerPluginEntity(PluginEntity)` overload) and site navigation; may be merged back into the mainline later
+- **Plugin package cache threshold**: new `assets.cache-max-bytes` (default 30 MiB); packages larger than this are not cached in memory (falls back to direct ZipFile reads); `<=0` = unlimited
+- **`/yeow load` enhancement**: when the path is not found, fall back to `plugins/Yeow/<path>` then `plugins/Yeow/<name>-<version>.yeow.zip` (case-insensitive, exact-case preferred, newest version wins)
+- CI rewritten: Zig build + smoke test, `v*` tags auto-publish `yeow-quickjs.jar`
+
 ## 2026-09-06
 
 - yeow-runtime 0.5.2 → 0.5.3: in-memory asset cache (pre-parsed at load, enabled by default) + `__plugin.version/author` fix + native dynamic approval replaced by config switch (allow with warning by default) + auto merge-and-write-back of missing config fields; yeow-template / create-yeow synced to 0.5.3
