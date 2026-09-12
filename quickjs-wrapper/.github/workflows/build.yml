@@ -1,0 +1,44 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Zig build + smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      # Compiles QuickJS + the bridge, cross-compiles every platform and
+      # assembles the JAR (Java classes + all native libraries).
+      - name: Build JAR
+        run: zig build jar
+
+      - name: Smoke test
+        run: |
+          javac -d out/classes \
+            java/src/main/java/wiki/yexin/quickjs/*.java \
+            java/src/test/java/wiki/yexin/quickjs/SmokeTest.java
+          java -cp "zig-out/yeow-quickjs.jar:out/classes" wiki.yexin.quickjs.SmokeTest
+
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: yeow-quickjs-jar
+          path: zig-out/yeow-quickjs.jar
+          if-no-files-found: error

@@ -1,0 +1,148 @@
+package wiki.yexin.quickjs;
+
+import java.io.Closeable;
+import java.util.HashMap;
+
+/**
+ * A single-threaded QuickJS context.
+ *
+ * <p>This is the Yeow-specific bridge: the Java &lt;-&gt; JS boundary is limited to
+ * context lifecycle, {@link #evaluate}, global function registration
+ * ({@link #setGlobalFunction}, a JS -&gt; Java upcall) and global function
+ * invocation ({@link #callGlobal}, a Java -&gt; JS downcall), plus the promise
+ * microtask pump and the interrupt hook. JS objects never cross the boundary;
+ * values are converted to/from plain Java types.
+ *
+ * <p>All methods must be called from the thread that created the context.
+ */
+public final class QuickJSContext implements Closeable {
+
+    /** A Java function callable from JS. Arguments are converted from JS values. */
+    @FunctionalInterface
+    public interface Callback {
+        Object call(Object... args);
+    }
+
+    private long handle;
+    private final HashMap<Integer, Callback> callbacks = new HashMap<>();
+    private int callbackSeq = 0;
+
+    private QuickJSContext() {}
+
+    public static QuickJSContext create() {
+        QuickJSNativeLoader.load();
+        QuickJSContext ctx = new QuickJSContext();
+        long h = ctx.nativeCreate();
+        if (h == 0) {
+            throw new QuickJSException("Failed to create QuickJS context");
+        }
+        ctx.handle = h;
+        return ctx;
+    }
+
+    public Object evaluate(String code) {
+        return evaluate(code, "unknown.js");
+    }
+
+    public Object evaluate(String code, String fileName) {
+        checkAlive();
+        if (code == null) throw new NullPointerException("code");
+        return nativeEvaluate(handle, code, fileName == null ? "unknown.js" : fileName);
+    }
+
+    /** Registers {@code name} on the JS global object, dispatching to {@code fn}. */
+    public void setGlobalFunction(String name, Callback fn) {
+        checkAlive();
+        if (name == null || fn == null) throw new NullPointerException("name/callback");
+        int id = ++callbackSeq;
+        callbacks.put(id, fn);
+        nativeSetGlobalFunction(handle, name, id);
+    }
+
+    /** Calls the global function {@code name} with a single string argument. */
+    public Object callGlobal(String name, String arg) {
+        checkAlive();
+        if (name == null) throw new NullPointerException("name");
+        return nativeCallGlobal(handle, name, arg);
+    }
+
+    /** Whether a callable global function with this name exists. */
+    public boolean hasGlobalFunction(String name) {
+        checkAlive();
+        if (name == null) throw new NullPointerException("name");
+        return nativeHasGlobalFunction(handle, name);
+    }
+
+    /** Binds a global function and returns a handle for repeated calls (0 if absent). */
+    public long bindGlobal(String name) {
+        checkAlive();
+        if (name == null) throw new NullPointerException("name");
+        return nativeBindGlobal(handle, name);
+    }
+
+    /** Calls a handle returned by {@link #bindGlobal} with a single string argument. */
+    public Object callHandle(long fnHandle, String arg) {
+        checkAlive();
+        return nativeCallHandle(handle, fnHandle, arg);
+    }
+
+    /** Runs all pending microtasks in one native transition. */
+    public void drainJobs() {
+        checkAlive();
+        nativeDrainJobs(handle);
+    }
+
+    /**
+     * Requests that the currently executing JS code be aborted. Thread-safe;
+     * one-shot. Aborts the current (or next) evaluate/call with an error.
+     */
+    public void interrupt() {
+        if (handle != 0) nativeInterrupt(handle);
+    }
+
+    public void destroy() {
+        if (handle == 0) return;
+        long h = handle;
+        handle = 0;
+        callbacks.clear();
+        nativeDestroy(h);
+    }
+
+    @Override
+    public void close() {
+        destroy();
+    }
+
+    /** Invoked from native code only. */
+    Object invokeCallback(int id, Object[] args) {
+        Callback cb = callbacks.get(id);
+        if (cb == null) return null;
+        return cb.call(args);
+    }
+
+    private void checkAlive() {
+        if (handle == 0) {
+            throw new QuickJSException("QuickJS context has been destroyed");
+        }
+    }
+
+    private native long nativeCreate();
+
+    private native void nativeDestroy(long handle);
+
+    private native Object nativeEvaluate(long handle, String code, String fileName);
+
+    private native void nativeSetGlobalFunction(long handle, String name, int callbackId);
+
+    private native Object nativeCallGlobal(long handle, String name, String arg);
+
+    private native boolean nativeHasGlobalFunction(long handle, String name);
+
+    private native long nativeBindGlobal(long handle, String name);
+
+    private native Object nativeCallHandle(long handle, long fnHandle, String arg);
+
+    private native void nativeDrainJobs(long handle);
+
+    private native void nativeInterrupt(long handle);
+}

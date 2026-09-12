@@ -1,5 +1,41 @@
 # Change Log
 
+## 0.6.0 — Yeow rewrite *(2026-09-12)*
+
+### Breaking Changes
+- Replaced the general-purpose `com.whl.quickjs.wrapper` API with a Yeow-specific bridge
+  in package `wiki.yexin.quickjs` (Maven: `wiki.yexin:yeow-quickjs`). JS object handles no
+  longer cross the boundary; only `create`/`destroy`, `evaluate`, `setGlobalFunction`
+  (upcall), `callGlobal`/`hasGlobalFunction` (downcall), `bindGlobal`/`callHandle`
+  (cached handles), `drainJobs`, and `interrupt` remain.
+- Native layer rewritten in C and built entirely with Zig 0.16 (`build.zig`), replacing
+  CMake + Ninja + Gradle + MinGW. JNI headers are vendored, so native builds need no JDK.
+- Removed unused subsystems: ES modules, bytecode compile/execute, `parseBuffer`/binary
+  reader, base64 globals, date/console polyfills, memory diagnostics.
+
+### Features
+- **Native polyfills** (`native/polyfill/`, C): globals injected at context creation
+  without modifying QuickJS sources. First ones: `performance.now()` (monotonic,
+  sub-millisecond: QueryPerformanceCounter / clock_gettime; its origin is captured per
+  context, so a context created later still starts at ~0) and `performance.timeOrigin`.
+- **`TextEncoder` / `TextDecoder` moved to native**: `text_codec.c` backs them with
+  `JS_ToCStringLen` / `JS_NewStringLen` + a small embedded JS class wrapper, replacing the
+  JS threshold + `util` channel path; `yeow-runtime`'s `polyfill.js` no longer defines them.
+- **Hot-path API**: `bindGlobal(name)` / `callHandle(handle, arg)` cache a global function
+  handle instead of resolving it per call; `drainJobs()` runs the whole microtask queue in
+  one JNI transition (replacing `isJobPending()`/`executePendingJob()` loops); Java string
+  conversion fast-paths ASCII/BMP via `NewStringUTF`.
+- One toolchain cross-compiles all targets from any host:
+  `linux-x86_64`, `linux-arm64`, `macos-x86_64`, `macos-arm64`,
+  `windows-x86_64`, `windows-arm64`.
+- JNI strings now round-trip through standard UTF-8 (surrogate pairs / non-BMP safe).
+- Windows DLL depends only on UCRT + KERNEL32 — the `libwinpthread-1.dll` bundling is gone.
+- Promise rejection queue pairs by promise identity; first job error is reported while the
+  remaining microtasks still run.
+
+### Build
+- `zig build` (host), `zig build all` (all platforms), `zig build jar` (Java + all natives).
+
 ## 3.9.0 *(2026-08-13)*
 
 ### Features
