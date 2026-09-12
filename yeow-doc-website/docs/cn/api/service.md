@@ -170,14 +170,14 @@ const { serviceId, ready } = await registerNativeService('myNative', {
 }, true);
 ```
 
-> **可信性校验与批准**：插件（或依赖包）在 `yeow.config.json` 声明 `native` 字段后，构建时计算二进制 SHA-256 写入 `yeow.json`。
+> **可信性校验与不可信警告**：插件（或依赖包）在 `yeow.config.json` 声明 `native` 字段后，构建时计算二进制 SHA-256 写入 `yeow.json`。
 >
-> - **批准（插件加载层）**：默认情况下，声明了原生服务的插件加载时被拒绝（控制台打印一次性码 `/yeow approve <code>`，批准后自动加载）——插件不运行，`onLoad` 不会执行
+> - **不可信警告（插件加载层）**：申请了 `service:registerNative` 权限的插件正常加载，但控制台打印醒目的不可信警告——插件照常运行，`onLoad` 执行；`native-service-allow-untrusted: false` 时则拒绝加载
 > - **哈希校验（运行时）**：注册原生服务时校验所选二进制 SHA-256，不匹配（可执行文件被篡改）→ **拒绝加载**，`ready()` reject
 >
 > 错误原因可从 `ready()` 的 reject 消息区分：
 >
-> - `Service already registered: <id>` — 服务已存在（用 `err.serviceId` 降级接入，无需批准）
+> - `Service already registered: <id>` — 服务已存在（用 `err.serviceId` 降级接入）
 > - `hash mismatch ... refused to load` — 可执行文件被篡改
 >
 > 完整 try-catch 降级示例见 [编写依赖包](../package-author.md#原生服务的错误处理与降级)。
@@ -369,7 +369,7 @@ const result = await serviceRequest(serviceId, '/render', { width: 1024, height:
 
 ### 错误处理与降级（registerNativeService）
 
-`ready()` 可能因多种原因 reject（服务已存在 / 可执行文件被篡改）。注意：**未批准不再出现在注册错误中**——声明原生服务的插件在加载层就被拒绝（控制台提示 `/yeow approve <code>`，批准后自动加载），插件不运行：
+`ready()` 可能因多种原因 reject（服务已存在 / 可执行文件被篡改）。注意：申请 `service:registerNative` 权限只决定加载时是否警告/拒绝（见上），注册阶段的错误只有以下两类：
 
 ```js
 import { registerNativeService, serviceRequest, log } from 'yeow-api';

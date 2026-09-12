@@ -114,7 +114,7 @@ async function main() {
     console.log('  \u2713 Bundled (' + (statSync(resolve(outDir, 'main.js')).size / 1024).toFixed(1) + ' KB)');
 
     // ── 组装 JAR ──
-    const zip = new AdmZip(resolve(root, '.yeow', 'assets', 'yeow-template-0.5.2.jar'));
+    const zip = new AdmZip(resolve(root, '.yeow', 'assets', 'yeow-template-0.5.3.jar'));
     zip.updateFile('plugin.yml', Buffer.from(
         'name: ' + name + '\n' +
         'version: ' + version + '\n' +

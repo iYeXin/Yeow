@@ -37,7 +37,7 @@ registerNativeService(refName, platforms)
 
 - **Platform granularity**: `windows-x64` / `linux-arm64` etc., exact match takes priority, falls back to `windows` / `linux`
 - **Single instance**: When `isPublic: true`, only one process is started per service name (one registration is retained); duplicate registrations are rejected (returning `err` + `serviceId`); callers use `err.serviceId` to join the existing service as the caller identity
-- **Trustworthiness and approval**: Native binaries support SHA-256 trustworthiness declarations; plugins that declare native services require console approval to load by default — see [Permissions and Native Service Trustworthiness](/permissions)
+- **Trustworthiness and approval**: Native binaries support SHA-256 trustworthiness declarations; plugins requesting native service permission load directly by default with an untrusted warning — see [Permissions and Native Service Trustworthiness](/permissions)
 - **Protocol**: see [Native Service Specification](/specifications/native-service/index)
 
 For API usage, see [Service API](/api/service).

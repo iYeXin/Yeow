@@ -11,4 +11,4 @@
 - [Folia Support (Experimental)](advanced/folia.md) — Regionalized multi-threaded platform runtime architecture, implications, platform transparency and deployment
 - [About Yeow](advanced/about.md) — Positioning, design goals, basic principles, future planning and vision
 
-> Runtime alerts and performance analysis see [Runtime Warning Guide](runtime-warning.md); Runtime operations (`/yeow` commands and configuration) see [Runtime Operations](operations.md); Permissions and security (sensitive permission declaration, native approval, fs path isolation) see [Permissions & Native Service Trust](permissions.md).
+> Runtime alerts and performance analysis see [Runtime Warning Guide](runtime-warning.md); Runtime operations (`/yeow` commands and configuration) see [Runtime Operations](operations.md); Permissions and security (sensitive permission declaration, native untrusted switch, fs path isolation) see [Permissions & Native Service Trust](permissions.md).

@@ -22,7 +22,7 @@ import java.util.zip.ZipFile;
 
 /**
  * 平台无关的运行时核心：插件注册表、包解析加载、任务提交、生命周期、dev WebSocket、
- * 原生服务批准。唯一平台依赖经 {@link PlatformHost}（构造注入）。
+ * 原生服务策略。唯一平台依赖经 {@link PlatformHost}（构造注入）。
  *
  * Paper/Bukkit 的 {@code yeow.paper.YeowRuntime} 是宿主适配层：负责 JavaPlugin
  * 生命周期、tick 驱动、事件/命令桥与 /yeow 管理命令的绑定，其余全部委托本类。
@@ -36,14 +36,11 @@ public class RuntimeCore {
     private final TaskScheduler scheduler;
     private final yeow.service.ServiceManager serviceManager;
     private final yeow.profile.Profiler profiler;
-    private final ApprovalStore approvals;
     private final ConcurrentHashMap<String, PluginEntity> plugins = new ConcurrentHashMap<>();
     private final InstanceRegistry instances = new InstanceRegistry();
     private final String initCode;
     private final boolean devMode;
     private WebSocket devWs;
-    /** 因原生服务未批准而被拒加载的插件（pluginName → 包路径）；批准后自动加载。 */
-    private final Map<String, String> pendingLoads = new ConcurrentHashMap<>();
 
     public RuntimeCore(PlatformHost host, YeowConfig config, TaskScheduler scheduler) {
         this.host = host;
@@ -51,7 +48,6 @@ public class RuntimeCore {
         this.config = config;
         this.scheduler = scheduler;
         this.serviceManager = new yeow.service.ServiceManager(this::getPlugin);
-        this.approvals = new ApprovalStore(host.dataFolder());
         this.profiler = yeow.profile.Profiler.create(yeow.profile.ProfileConfig.from(config), host.dataFolder());
         this.profiler.setAutoReloadAction(this::handleAutoReload);
         // 调度器插桩（ProfileSink/BudgetScaler）由平台在构造其调度器时装配
@@ -87,35 +83,9 @@ public class RuntimeCore {
     /** JS 句柄实例注册表（id → 释放器；平台注册闭包，id 不携带业务信息）。 */
     public InstanceRegistry instances() { return instances; }
 
-    /** 原生服务是否需要批准（config.yml，内存唯一信任源）。 */
-    public boolean requireNativeApproval() { return config.requireNativeApproval(); }
-
-    /** 插件是否已批准原生服务（approve.json，内存唯一信任源）。 */
-    public boolean isNativeApproved(String plugin) { return approvals != null && approvals.isApproved(plugin); }
-
-    /** 批准插件的原生服务（内存修改；服务器关闭时写回 approve.json）。 */
-    public void approveNativePlugin(String plugin) {
-        if (approvals != null) approvals.approve(plugin);
-    }
-
-    /** 生成一次性批准码（只打印在控制台日志，插件不可预知）。 */
-    public String requestApprovalCode(String plugin) {
-        return approvals != null ? approvals.requestApprovalCode(plugin) : null;
-    }
-
-    /** 用一次性 code 批准（成功返回插件名并作废 code；失败返回 null）。 */
-    public String approveNativeByCode(String code) {
-        return approvals != null ? approvals.approveByCode(code) : null;
-    }
-
-    /** 取出并移除因原生服务未批准而被拒加载的插件包路径（批准后自动重载用）。 */
-    public String pendingLoadFor(String plugin) {
-        return pendingLoads.remove(plugin);
-    }
-
     /**
      * 热重载强杀后的实体重建：全新 PluginThread（新线程/新队列/新上下文），
-     * 保留权限与原生哈希声明、dev 资产目录与 dev 模式。
+     * 保留版本/作者/权限与原生哈希声明、内存包、dev 资产目录与 dev 模式。
      * 旧实体被遗弃——其卡死的 JS 线程无法在进程内回收（需原生中断支持），
      * 但已从注册表移除、不再被投递消息，且线程为 daemon。
      */
@@ -126,7 +96,7 @@ public class RuntimeCore {
         host.purgePlatformResources(name);
         if (serviceManager != null) serviceManager.purgePluginServices(name);
         if (profiler != null) profiler.unregisterPlugin(name);
-        var fresh = new PluginThread(name, pt.source(), initCode, newCode, this, pt.permissions(), pt.nativeHashes());
+        var fresh = new PluginThread(name, pt.version(), pt.author(), pt.source(), pt.pluginPackage(), initCode, newCode, this, pt.permissions(), pt.nativeHashes());
         fresh.setDevAssetsDir(pt.getDevAssetsDir());
         fresh.setDevMode(pt.isDevMode());
         return registerPluginEntity(fresh, false);
@@ -204,7 +174,7 @@ public class RuntimeCore {
         }
     }
 
-    /** 关闭：WS、profile、插件、调度器、服务、批准落盘。 */
+    /** 关闭：WS、profile、插件、调度器、服务。 */
     public void shutdown() {
         if (devWs != null) try { devWs.sendClose(1000, "shutdown"); } catch (Exception ignored) {}
         if (profiler != null) profiler.close();
@@ -212,8 +182,6 @@ public class RuntimeCore {
         plugins.values().forEach(PluginEntity::stopAndWait);
         scheduler.shutdown();
         if (serviceManager != null) serviceManager.shutdown();
-        // 所有 Yeow 插件卸载完成后，把内存中的批准写回文件（approve.json；config.yml 为信任源，无需回写）
-        if (approvals != null) approvals.save();
     }
 
     // ── 插件注册 / 卸载 / 重载 ─────────────────────────────────────
@@ -228,16 +196,36 @@ public class RuntimeCore {
      * @return true if the plugin was loaded, false if skipped (duplicate) or failed
      */
     public boolean registerPlugin(String jarPath, boolean sendLoad) {
-        try (var zip = new ZipFile(jarPath)) {
-            var metaEntry = zip.getEntry("yeow.json");
+        // 插件包内存镜像：加载时一步到位——yeow.json / main.js 解析与后续
+        // assets 通道、原生二进制解压共用同一份内存（零重复 open/解析）。
+        // 缓存关闭（assets.cache-enabled=false）或加载失败（ZIP64/非 zip）时回退 ZipFile 直读。
+        PluginPackage pkg = null;
+        if (config.assetsCacheEnabled()) {
+            try {
+                pkg = PluginPackage.load(Path.of(jarPath));
+            } catch (Exception e) {
+                LOG.warning("Asset cache disabled for " + jarPath + " (" + e.getMessage() + ") - falling back to direct read");
+            }
+        }
+        final PluginPackage P = pkg;
+        ZipFile direct = null;
+        try {
+            final java.util.function.Function<String, String> read;
+            if (P != null) {
+                read = name -> readPkgText(P, name);
+            } else {
+                direct = new ZipFile(jarPath);
+                final ZipFile z = direct;
+                read = name -> readZipEntry(z, name);
+            }
+
+            var meta = read.apply("yeow.json");
             var name = "unknown";
             var version = "";
             var author = "";
             var perms = new LinkedHashSet<String>();
             var nativeHashes = new java.util.HashMap<String, String>(); // 打包后路径 → SHA-256
-            var declaresNative = false; // 插件是否声明了原生服务（yeow.json native 非空）
-            if (metaEntry != null) {
-                var meta = new String(zip.getInputStream(metaEntry).readAllBytes(), StandardCharsets.UTF_8);
+            if (meta != null) {
                 var obj = new Gson().fromJson(meta, JsonObject.class);
                 if (obj.has("name")) name = obj.get("name").getAsString();
                 if (obj.has("version")) version = obj.get("version").getAsString();
@@ -249,7 +237,6 @@ public class RuntimeCore {
                 }
                 // 原生服务可信性声明（构建时计算 SHA-256 写入）：打包后路径 → hash
                 if (obj.has("native") && obj.get("native").isJsonArray() && obj.getAsJsonArray("native").size() > 0) {
-                    declaresNative = true;
                     for (var el : obj.getAsJsonArray("native")) {
                         if (!el.isJsonObject()) continue;
                         var e = el.getAsJsonObject();
@@ -269,19 +256,17 @@ public class RuntimeCore {
                 return false;
             }
 
-            // 原生服务批准检查（加载时）：声明了原生服务的插件需要批准，否则拒绝加载本插件。
-            // 一次性批准码只打印在控制台（插件可读日志也无法预知--code 在拒绝时新生成，且
-            // 插件本身未加载，无法 dispatchCommand）。批准后自动重新加载。
-            if (declaresNative && config.requireNativeApproval() && !isNativeApproved(name)) {
-                var code = requestApprovalCode(name);
-                pendingLoads.put(name, jarPath); // 批准后自动加载
-                var banner = "\n" + "=".repeat(60)
-                    + "\n  [Yeow] " + name + " declares NATIVE SERVICES and is NOT approved"
-                    + "\n  The plugin was REFUSED to load (native binaries are untrusted)."
-                    + "\n  To approve and load it, run:  /yeow approve " + code
-                    + "\n  (one-time code - visible to server console only)"
-                    + "\n" + "=".repeat(60);
-                LOG.severe(banner);
+            // 原生服务策略（加载层）：申请了 `service:registerNative` 权限即视为将运行不可信二进制。
+            // config.yml `native-service-allow-untrusted`（默认 true）为 false 时拒绝加载；
+            // 为 true 时正常加载并打印醒目警告。yeow.config.json 的 `native` 声明与
+            // SHA-256 校验不受此开关影响（注册原生服务时始终校验）。
+            boolean wantsNative = perms.contains("service:registerNative") || perms.contains("service:*");
+            if (wantsNative && !config.nativeServiceAllowUntrusted()) {
+                LOG.severe("\n" + "=".repeat(60)
+                    + "\n  [Yeow] " + name + " requests NATIVE SERVICES and was REFUSED to load"
+                    + "\n  (config `native-service-allow-untrusted: false` - untrusted binaries are not allowed)."
+                    + "\n  To allow it, set `native-service-allow-untrusted: true` in plugins/Yeow/runtime/config.yml"
+                    + "\n" + "=".repeat(60));
                 return false;
             }
 
@@ -289,9 +274,8 @@ public class RuntimeCore {
             String devAssetsDir = null;
 
             // Check for dev mode - .yeow/dev.json contains compiled code path
-            var devEntry = zip.getEntry(".yeow/dev.json");
-            if (devMode && devEntry != null) {
-                var devMeta = new String(zip.getInputStream(devEntry).readAllBytes(), StandardCharsets.UTF_8);
+            var devMeta = read.apply(".yeow/dev.json");
+            if (devMode && devMeta != null) {
                 var devObj = new Gson().fromJson(devMeta, JsonObject.class);
                 // Read compiled code from the file path stored in dev.json
                 var codeFile = Path.of(devObj.get("codeFile").getAsString());
@@ -301,12 +285,12 @@ public class RuntimeCore {
                 }
                 LOG.info("Dev mode: reading code from " + codeFile);
             } else {
-                var codeEntry = zip.getEntry(".yeow/main.js");
-                if (codeEntry == null) { LOG.severe("Missing .yeow/main.js in " + jarPath); return false; }
-                userCode = new String(zip.getInputStream(codeEntry).readAllBytes(), StandardCharsets.UTF_8);
+                var code = read.apply(".yeow/main.js");
+                if (code == null) { LOG.severe("Missing .yeow/main.js in " + jarPath); return false; }
+                userCode = code;
             }
 
-            var pt = new PluginThread(name, jarPath, initCode, userCode, this, perms, nativeHashes);
+            var pt = new PluginThread(name, version, author, jarPath, P, initCode, userCode, this, perms, nativeHashes);
             if (devAssetsDir != null) pt.setDevAssetsDir(devAssetsDir);
             if (devMode) pt.setDevMode(true);
             if (!registerPluginEntity(pt, sendLoad)) return false;
@@ -314,10 +298,45 @@ public class RuntimeCore {
             LOG.info("Loaded plugin: " + name + (version.isEmpty() ? "" : " v" + version)
                 + (author.isEmpty() ? "" : " by " + author)
                 + " - permissions: " + displayPermissions(perms));
+            if (wantsNative && config.nativeServiceAllowUntrusted()) {
+                var trust = nativeHashes.isEmpty()
+                    ? "NO SHA-256 pinned (no `native` declaration in yeow.config.json)"
+                    : nativeHashes.size() + " file(s) SHA-256 pinned (verified when the service registers)";
+                LOG.warning("\n" + "!".repeat(60)
+                    + "\n  [Yeow] " + name + " runs UNTRUSTED NATIVE binaries as child processes"
+                    + "\n  " + trust
+                    + "\n  Only install plugins from sources you trust."
+                    + "\n  (Online safety check against the official safety list is planned;"
+                    + "\n   listed binaries will load without this warning.)"
+                    + "\n" + "!".repeat(60));
+            }
             return true;
         } catch (Exception e) {
             LOG.severe("Failed to register plugin " + jarPath + ": " + e.getMessage());
             return false;
+        } finally {
+            if (direct != null) try { direct.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    /** 内存包文本读取（缺失返回 null；损坏按缺失处理，调用方按原有语义报错）。 */
+    private static String readPkgText(PluginPackage pkg, String entry) {
+        try {
+            var b = pkg.read(entry);
+            return b == null ? null : new String(b, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** ZipFile 直读文本（缺失返回 null）。 */
+    private static String readZipEntry(ZipFile zip, String entry) {
+        try {
+            var e = zip.getEntry(entry);
+            if (e == null || e.isDirectory()) return null;
+            return new String(zip.getInputStream(e).readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return null;
         }
     }
 

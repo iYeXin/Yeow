@@ -7,6 +7,8 @@ import { assets } from 'yeow-api';
 
 `assets/` 目录下的文件在构建时自动打包进 JAR，运行时通过此 API 读取。
 
+> **内存缓存**：插件加载时整个包一次性读入内存并预解析中央目录，`read` / `extract` / 原生二进制解压全部走内存（零重复 open）。可用 `config.yml` 的 `assets.cache-enabled: false` 关闭（回退每次 `ZipFile` 直读）。
+
 > `getAssetsPath` 从 **`yeow-dev`**（构建期虚拟模块）引入，而非 `yeow-api`：它按调用方所属依赖项注入命名空间，只有构建器知道当前代码属于哪个包。`yeow-dev` 已发布为空包（可不安装，类型声明由 `yeow-api` 提供）。
 
 ## getAssetsPath(path)

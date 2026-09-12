@@ -56,7 +56,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 完整文档见 [yeow-doc-website/docs/cn/getting-started.md](yeow-doc-website/docs/cn/getting-started.md)。
 
-1. **安装运行时**：将 `yeow-runtime-0.5.2.jar` 放入服务器 `plugins/`
+1. **安装运行时**：将 `yeow-runtime-0.5.3.jar` 放入服务器 `plugins/`
 2. **创建插件**：`npm create yeow@latest -- -y && cd my-plugin && npm install`
 3. **开发**：`npm run dev`（自动下载 Paper、启动热重载）
 4. **构建**：`npm run build` → `dist/<name>-<version>.jar` + `.yeow.zip`

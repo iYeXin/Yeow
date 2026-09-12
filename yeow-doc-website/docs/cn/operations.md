@@ -16,7 +16,6 @@
 | `/yeow unload <plugin\|all>`             | 卸载插件（与热重载相同的卸载逻辑，5s 强制终止）                                                                                                                                      |
 | `/yeow uninstall <plugin>`               | 卸载并把 `plugins/Yeow/` 下对应 `.yeow.zip` 移入 `plugins/Yeow/.backup/`（数据目录 `plugins/<plugin>/` 需手动清理）                                                                  |
 | `/yeow reload <plugin\|all> [path\|url]` | 重新加载。`<plugin>` 可选 `path` 或 `url` 从新来源加载（URL 为临时，不持久化）；`all` 按原路径全部重载                                                                               |
-| `/yeow approve <code>`                   | 用控制台提示中的**一次性批准码**批准插件（声明原生服务的插件被拒后，批准会**自动加载**它；code 用后作废，关闭时写回 `approve.json`）                                                 |
 | `/yeow profile`                          | 性能快照（需 `profile.enabled: true` 开启全量分析）                                                                                                                                  |
 | `/yeow track <plugin> <seconds>`         | 单插件深度追踪（需 `profile.enabled: true`）                                                                                                                                         |
 
@@ -48,8 +47,10 @@ util:
   max-input-bytes: 268435456     # util 通道单次输入上限（原始字节，默认 256 MiB）
   max-output-bytes: 268435456    # gzip 解压输出上限（防压缩炸弹，默认 256 MiB）
 
-native-service-require-approval: true  # 声明原生服务的插件需要批准（默认 true；false = 默认批准）。
-                                       # 运行时直接修改即生效（config.yml 为信任源）。
+native-service-allow-untrusted: true  # 允许加载不可信原生服务（默认 true，加载时警告；false = 申请 registerNative 权限的插件拒绝加载）。
+
+assets:
+  cache-enabled: true          # 插件包内存缓存（assets 通道/原生解压走内存，默认启用；false = 每次 ZipFile 直读）。
 
 profile:
   enabled: false                 # 全量性能分析（逐任务采集），默认关闭
@@ -77,7 +78,9 @@ folia:
   migration-threshold: 2         # 热点迁移阈值（连续非本区域任务数）
 ```
 
-> **运行时配置目录写保护**：`plugins/Yeow/runtime/` 目录（含 `config.yml` / `approve.json`）受 fs 写保护——插件无法通过 fs API 修改其中的文件。
+> **运行时配置目录写保护**：`plugins/Yeow/runtime/` 目录（含 `config.yml`）受 fs 写保护——插件无法通过 fs API 修改其中的文件。
+
+> **配置平滑升级**：运行时加载时若发现已有配置缺失字段，会自动与默认配置合并后写回（用户原有值保留），新版本新增配置项无需手动补写。
 
 ## 告警与性能分析
 

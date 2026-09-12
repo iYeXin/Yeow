@@ -24,7 +24,7 @@ Yeow 是一个面向 Minecraft 服务端的插件开发框架（**Paper 与 [Fol
 
 ```
 快速开始      getting-started.md     创建 → 开发 → 构建 → 部署（第一个插件、异步优先）
-权限与安全    permissions.md          敏感权限声明、原生服务可信性与批准
+权限与安全    permissions.md          敏感权限声明、原生服务可信性与不可信开关
 运行时运维    operations.md           /yeow 管理命令、运行时配置（config.yml）
 API 参考      api/README.md           按模块分组的完整索引（Player / World / Event / Service …）
 进阶知识      advanced.md             架构、线程模型、调度器、热重载、安全

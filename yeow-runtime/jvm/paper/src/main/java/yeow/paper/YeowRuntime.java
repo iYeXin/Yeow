@@ -278,33 +278,12 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                         catch (NumberFormatException e) { s.sendMessage("Invalid seconds: " + a[2]); }
                         yield true;
                     }
-                    case "approve" -> {
-                        if (!s.hasPermission("yeow.admin")) { s.sendMessage("No permission."); yield true; }
-                        if (a.length < 2) { s.sendMessage("Usage: /yeow approve <code>"); yield true; }
-                        var pn = core.approveNativeByCode(a[1]);
-                        if (pn == null) { s.sendMessage("Invalid or expired approval code: " + a[1]); yield true; }
-                        s.sendMessage("Approved native services for " + pn + " (persisted on server shutdown)");
-                        // 被拒加载的插件：自动重新加载
-                        var pending = core.pendingLoadFor(pn);
-                        if (pending != null) {
-                            s.sendMessage("Loading " + pn + " ...");
-                            if (core.registerPlugin(pending, true)) {
-                                s.sendMessage("Loaded " + pn);
-                                syncCommands();
-                            } else {
-                                s.sendMessage("Failed to load " + pn + " (see log)");
-                            }
-                        } else {
-                            s.sendMessage("Run /yeow reload " + pn + " if it is already loaded");
-                        }
-                        yield true;
-                    }
                     default -> { usage(s); yield true; }
                 };
             }
 
             private void usage(CommandSender s) {
-                s.sendMessage("Usage: /yeow load <path|url> | /yeow install <url> | /yeow update <url> | /yeow unload <plugin|all> | /yeow uninstall <plugin> | /yeow reload <plugin|all> [path|url] | /yeow approve <code> | /yeow profile | /yeow track <plugin> <seconds>");
+                s.sendMessage("Usage: /yeow load <path|url> | /yeow install <url> | /yeow update <url> | /yeow unload <plugin|all> | /yeow uninstall <plugin> | /yeow reload <plugin|all> [path|url] | /yeow profile | /yeow track <plugin> <seconds>");
             }
 
             @Override
@@ -312,7 +291,7 @@ public class YeowRuntime extends JavaPlugin implements PlatformHost {
                 var out = new java.util.ArrayList<String>();
                 if (a.length <= 1) {
                     out.add("load"); out.add("install"); out.add("update"); out.add("unload"); out.add("uninstall"); out.add("reload");
-                    out.add("approve"); out.add("profile"); out.add("track");
+                    out.add("profile"); out.add("track");
                 } else if (a.length == 2) {
                     switch (a[0]) {
                         case "unload", "reload" -> { out.add("all"); out.addAll(core.realPluginNames()); }

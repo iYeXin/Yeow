@@ -13,7 +13,7 @@
 | 环境能力                | `https://cn.yexin.wiki/yeow/v1/environment`           | 运行时环境速览：全局能力（$send/fetch/TextEncoder/TextDecoder/定时器）、线程与异步模型、与浏览器/Node 环境的差异、性能建议                          |
 | CLI 参考                | `https://cn.yexin.wiki/yeow/v1/cli`                   | create-yeow 脚手架与 dev-server 的命令行用法：交互式/非交互创建、开发服务器参数（-y/--stop）、构建脚本、调试体验（source-map 错误定位与异步调用链） |
 | 构建与分发              | `https://cn.yexin.wiki/yeow/v1/distribution`          | 两种产物：标准 Paper JAR（plugins/）与平台无关 .yeow.zip（plugins/Yeow/ 自动扫描或 /yeow install）；分发建议与 Modrinth 发布                        |
-| 权限与原生服务可信性    | `https://cn.yexin.wiki/yeow/v1/permissions`           | 敏感权限声明（默认拒绝表/通配规则/computedPermissions）、原生服务 SHA-256 可信性声明与一次性批准码机制                                              |
+| 权限与原生服务可信性    | `https://cn.yexin.wiki/yeow/v1/permissions`           | 敏感权限声明（默认拒绝表/通配规则/computedPermissions）、原生服务 SHA-256 可信性声明与不可信警告开关                                              |
 | 运行时运维              | `https://cn.yexin.wiki/yeow/v1/operations`            | 服主视角：/yeow 管理命令全集、运行时配置（config.yml 含 Folia 节）、部署形态速查                                                                    |
 | 运行时警告              | `https://cn.yexin.wiki/yeow/v1/runtime-warning`       | 预警引擎：heartbeat.timeout / event.slow / plugin.hung / budget.congested 等告警的触发条件、含义与解决方案；配置阈值；动态扩容机制                  |
 | 进阶知识                | `https://cn.yexin.wiki/yeow/v1/advanced`              | 进阶索引：架构/调度器/事件/生命周期/通道/服务/Folia/关于；告警与运维指向根级文档                                                                    |

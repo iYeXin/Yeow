@@ -16,7 +16,6 @@ Runtime provides `/yeow` command with Tab completion support:
 | `/yeow unload <plugin\|all>`               | Unload plugin (same unload logic as hot reload, 5s forced termination)                                                                                                                 |
 | `/yeow uninstall <plugin>`                 | Unload and move corresponding `.yeow.zip` from `plugins/Yeow/` to `plugins/Yeow/.backup/` (data directory `plugins/<plugin>/` needs manual cleanup)                                    |
 | `/yeow reload <plugin\|all> [path\|url]`   | Reload. `<plugin>` can optionally load from new source with `path` or `url` (URL is temporary, not persisted); `all` reloads all by original path                                       |
-| `/yeow approve <code>`                     | Approve plugin with **one-time approval code** from console prompt (plugins declaring native services are refused after approval **automatically loads** it; code invalidated after use, written to `approve.json` on shutdown) |
 | `/yeow profile`                            | Performance snapshot (requires `profile.enabled: true` to enable full analysis)                                                                                                         |
 | `/yeow track <plugin> <seconds>`           | Single plugin deep tracking (requires `profile.enabled: true`)                                                                                                                          |
 
@@ -48,8 +47,10 @@ util:
   max-input-bytes: 268435456     # util channel single input limit (raw bytes, default 256 MiB)
   max-output-bytes: 268435456    # gzip decompression output limit (anti-compression bomb, default 256 MiB)
 
-native-service-require-approval: true  # Plugins declaring native services require approval (default true; false = approve by default).
-                                       # Runtime modification takes effect immediately (config.yml is trusted source).
+native-service-allow-untrusted: true  # Allow loading untrusted native services (default true, warn on load; false = plugins requesting registerNative permission are refused loading).
+
+assets:
+  cache-enabled: true          # In-memory plugin package cache (assets channel / native extraction via memory, enabled by default; false = direct ZipFile read each time).
 
 profile:
   enabled: false                 # Full performance analysis (per-task collection), disabled by default
@@ -77,7 +78,9 @@ folia:
   migration-threshold: 2         # Hot-spot migration threshold (consecutive non-local tasks)
 ```
 
-> **Runtime Configuration Directory Write Protection**: `plugins/Yeow/runtime/` directory (including `config.yml` / `approve.json`) has fs write protection — plugins cannot modify files in it via fs API.
+> **Runtime Configuration Directory Write Protection**: `plugins/Yeow/runtime/` directory (including `config.yml`) has fs write protection — plugins cannot modify files in it via fs API.
+
+> **Smooth configuration upgrade**: when the runtime loads and finds fields missing from an existing config, it merges them with defaults and writes back (existing user values preserved), so new config keys need no manual backfill.
 
 ## Alerts and Performance Analysis
 

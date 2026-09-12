@@ -4,6 +4,10 @@
 
 ---
 
+## 2026-09-06
+
+- yeow-runtime 0.5.2 → 0.5.3: in-memory asset cache (pre-parsed at load, enabled by default) + `__plugin.version/author` fix + native dynamic approval replaced by config switch (allow with warning by default) + auto merge-and-write-back of missing config fields; yeow-template / create-yeow synced to 0.5.3
+
 ## 2026-08-26
 
 - Docs: `setMotd` persists to `server.properties` — use the `serverPing` event write-back for dynamic MOTD (not persisted)

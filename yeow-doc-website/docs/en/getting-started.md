@@ -46,7 +46,7 @@ npm run build                  # Production artifacts → dist/<name>-<version>.
 
 Three deployment methods (choose one):
 
-1. **JAR Method**: Place `yeow-runtime-0.5.2.jar` and plugin JAR together in `plugins/` (same as native Java plugin deployment)
+1. **JAR Method**: Place `yeow-runtime-0.5.3.jar` and plugin JAR together in `plugins/` (same as native Java plugin deployment)
 2. **Auto-scan**: Place plugin `.yeow.zip` in `plugins/Yeow/`, automatically loaded on server startup
 3. **Command Load**: While server is running, execute `/yeow load <path>` (local temporary load), `/yeow load <url>` (download temporary load), `/yeow install <url>` (download and install to `plugins/Yeow/`), `/yeow update <url>` (replace old version)
 
@@ -158,7 +158,7 @@ Complete index see [API Reference](api/README.md).
 
 ## Permissions and Native Services
 
-Yeow implements **declarative permissions** for **sensitive message nodes** (server files, HTTP, native processes, and extracted resources require declaration; plugin data directory does not); plugins declaring native services require console approval to load by default. Complete reference see [Permissions & Native Service Trust](permissions.md).
+Yeow implements **declarative permissions** for **sensitive message nodes** (server files, HTTP, native processes, and extracted resources require declaration; plugin data directory does not); plugins requesting native service permission load directly by default (console prints an untrusted warning). Complete reference see [Permissions & Native Service Trust](permissions.md).
 
 > Quick points: **No permission declaration needed** when only reading/writing plugin's own data directory; using `fetch` / HTTP requires declaring `"http:*"` or `"http:requestAsync"`; declaring native services requires `"service:registerNative"`.
 

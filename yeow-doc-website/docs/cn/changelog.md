@@ -4,6 +4,10 @@
 
 ---
 
+## 2026-09-06
+
+- yeow-runtime 0.5.2 → 0.5.3：资源内存缓存（加载时预解析，默认启用）+ `__plugin.version/author` 修复 + 移除原生动态审批改配置开关（默认允许并警告）+ 配置缺失字段自动合并写回；yeow-template / create-yeow 同步至 0.5.3
+
 ## 2026-08-26
 
 - 文档：`setMotd` 会写入 `server.properties` 持久化——动态 MOTD 请用 `serverPing` 事件回写（不落盘）

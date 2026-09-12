@@ -125,7 +125,7 @@ Key points:
 
 ### Native Service Error Handling and Degradation
 
-`registerNativeService` / `ready()` rejection reasons need distinction (service already exists / executable tampered). **Unapproval handled at loading layer**: Plugins declaring native services are refused loading by default (console prompts one-time code `/yeow approve <code>`, automatically loads after approval), plugin doesn't run; if already approved, registration stage errors only remain following two types:
+`registerNativeService` / `ready()` rejection reasons need distinction (service already exists / executable tampered). Requesting the `service:registerNative` permission only controls the load-time warning or refusal (see above); registration-stage errors are only the following two types:
 
 ```ts
 import { registerNativeService, serviceRequest, log } from 'yeow-api';
@@ -157,7 +157,7 @@ export async function initRenderer(): Promise<ImageRenderer | null> {
 }
 ```
 
-> Native service's **trust declaration (SHA-256) and approval mechanism** see [Permissions & Native Service Trust](permissions.md#2-native-service-trust-declaration).
+> Native service's **trust declaration (SHA-256) and untrusted switch** see [Permissions & Native Service Trust](permissions.md#2-native-service-trust-declaration).
 
 ## Combination — JS Facade + Native Engine (Type 2 + 3)
 

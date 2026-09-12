@@ -92,26 +92,20 @@ Plugins (or dependency packages) can declare `native` field in `yeow.config.json
 - **Regardless of declaration**, loading native service always prints risk log: undeclared → Warns "no trusted SHA-256 declaration, treated as untrusted"; declared → Shows verification result
 - **Trust declaration only valid for single-file mode** (`string` / `{file}`); directory mode (`{dir, entry}`) currently doesn't support declaration and verification
 
-### Approval (Required by Default)
+### Untrusted Service Switch (Load with Warning by Default)
 
-**By default, plugins declaring native services require approval to load** (currently all native services are treated as unsafe, even with hash declaration). When plugin loads and detects `native` declaration without approval → **refuses to load this plugin**, server console prints prominent prompt (one-time approval code):
+**All native services are treated as untrusted by default** (even with hash declaration). Plugins requesting the `service:registerNative` permission load normally, but the console prints a prominent untrusted warning (stating whether SHA-256 is pinned and whether a `native` declaration exists):
 
-```
-/yeow approve <code>    # code is 6-digit 36-hex one-time code (only visible in console)
-                        # After approval, automatically loads rejected plugin, no manual reload needed
-```
-
-- Refuse to load → Plugin doesn't run (`onLoad` won't execute), console prompt includes `/yeow approve <code>`
-- **One-time code mechanism**: Each time loading is refused, generates random 6-digit 36-hex code (only appears in console log) — plugin itself isn't loaded, cannot read logs then `dispatchCommand` to auto-approve; code is invalidated after use
-- **Configuration**: `plugins/Yeow/runtime/config.yml`'s `native-service-require-approval` (default `true`; `false` = approve by default). **Runtime modification takes effect immediately** (config.yml is trusted source)
-- **Approval Storage**: `plugins/Yeow/runtime/approve.json` (plugin name → approval timestamp). **Runtime directory has fs write protection** — plugins cannot modify files in it via fs API (config.yml / approve.json)
+- Allowed to load → Plugin runs normally (`onLoad` executes), console warns it will run untrusted binaries as child processes
+- **Configuration**: `plugins/Yeow/runtime/config.yml`'s `native-service-allow-untrusted` (default `true`; `false` = plugins requesting the `service:registerNative` permission are **refused loading**, console points to this config key). When an existing config lacks the field, the runtime merges defaults on load and writes back (smooth upgrade)
+- **Runtime directory has fs write protection** — plugins cannot modify files in it via fs API (`config.yml`)
 
 > **Developers**: Error handling and degradation examples (distinguishing "service already exists / executable tampered") see [Service API](api/service.md) and [Encapsulating Service Packages](package-service.md).
 
-> **Future Outlook**: Yeow official or community may maintain a list of known safe SHA-256 hashes — if binary hash matches the list, plugin may be marked as safe when published, no risk prompt or approval required when loading.
+> **Future Outlook**: Online safety check (comparing against the officially maintained safety list) is planned — binaries whose hash hits the official safety list will load without this warning (in the current version all binaries are treated as untrusted and warned regardless).
 
 ## 3. Related Documentation
 
 - **Platform Specification · Permission Model** (runtime implementer perspective): [specifications/README.md#permission-model](specifications/README.md#permission-model)
 - **Dependency Package Permission Declaration** (how npm packages declare): [Writing Dependency Packages - Permissions](package-author.md)
-- **Runtime Configuration** (`native-service-require-approval` etc.): [Runtime Operations - Configuration](operations.md#runtime-configuration)
+- **Runtime Configuration** (`native-service-allow-untrusted` etc.): [Runtime Operations - Configuration](operations.md#runtime-configuration)

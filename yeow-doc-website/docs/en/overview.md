@@ -24,7 +24,7 @@ The documentation is extensive, not sure where to start? Find your entry point b
 
 ```
 Quick Start      getting-started.md     Create → Develop → Build → Deploy (first plugin, async-first)
-Permissions & Security permissions.md    Sensitive permission declaration, native service trust and approval
+Permissions & Security permissions.md    Sensitive permission declaration, native service trust and untrusted switch
 Runtime Operations operations.md         /yeow management commands, runtime configuration (config.yml)
 API Reference    api/README.md           Complete index grouped by module (Player / World / Event / Service …)
 Advanced Knowledge advanced.md           Architecture, thread model, scheduler, hot reload, security

@@ -170,14 +170,14 @@ const { serviceId, ready } = await registerNativeService('myNative', {
 }, true);
 ```
 
-> **Trust verification and approval**: Plugin (or dependency package) declares `native` field in `yeow.config.json`, build computes binary SHA-256 writes to `yeow.json`.
+> **Trust verification and untrusted warning**: Plugin (or dependency package) declares `native` field in `yeow.config.json`, build computes binary SHA-256 writes to `yeow.json`.
 >
-> - **Approval (plugin loading layer)**: By default, plugins declaring native services are refused loading (console prints one-time code `/yeow approve <code>`, automatically loads after approval) — plugin doesn't run, `onLoad` won't execute
+> - **Untrusted warning (plugin loading layer)**: Plugins requesting the `service:registerNative` permission load normally, but the console prints a prominent untrusted warning — the plugin runs as usual, `onLoad` executes; with `native-service-allow-untrusted: false` loading is refused instead
 > - **Hash verification (runtime)**: When registering native service verifies selected binary SHA-256, mismatch (executable tampered) → **refuses to load**, `ready()` rejects
 >
 > Error reasons can be distinguished from `ready()`'s reject message:
 >
-> - `Service already registered: <id>` — Service already exists (use `err.serviceId` for degraded access, no approval needed)
+> - `Service already registered: <id>` — Service already exists (use `err.serviceId` for degraded access)
 > - `hash mismatch ... refused to load` — Executable tampered
 >
 > Complete try-catch degradation example see [Writing Dependency Packages](../package-author.md#native-service-error-handling-and-degradation).
@@ -369,7 +369,7 @@ const result = await serviceRequest(serviceId, '/render', { width: 1024, height:
 
 ### Error Handling and Degradation (registerNativeService)
 
-`ready()` may reject for multiple reasons (service already exists / executable tampered). Note: **Unapproval no longer appears in registration errors** — plugins declaring native services are refused at loading layer (console prompts `/yeow approve <code>`, automatically loads after approval), plugin doesn't run:
+`ready()` may reject for multiple reasons (service already exists / executable tampered). Note: requesting the `service:registerNative` permission only controls the load-time warning/refusal (see above); registration-stage errors are only the following two types:
 
 ```js
 import { registerNativeService, serviceRequest, log } from 'yeow-api';

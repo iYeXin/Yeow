@@ -46,7 +46,7 @@ npm run build                  # 生产产物 → dist/<name>-<version>.jar + .y
 
 三种部署方式（任选其一）：
 
-1. **JAR 方式**：把 `yeow-runtime-0.5.2.jar` 和插件 JAR 一同放入 `plugins/`（与原生 Java 插件部署一致）
+1. **JAR 方式**：把 `yeow-runtime-0.5.3.jar` 和插件 JAR 一同放入 `plugins/`（与原生 Java 插件部署一致）
 2. **自动扫描**：把插件 `.yeow.zip` 放入 `plugins/Yeow/`，服务器启动时自动加载
 3. **命令加载**：服务器运行中执行 `/yeow load <path>`（本地临时加载）、`/yeow load <url>`（下载临时加载）、`/yeow install <url>`（下载并安装到 `plugins/Yeow/`）、`/yeow update <url>`（替换旧版本）
 
@@ -158,7 +158,7 @@ const q = Player.getSync('Notch');
 
 ## 权限与原生服务
 
-Yeow 对**敏感消息节点**实施声明式权限（服务器文件、HTTP、原生进程、解压资源需声明，插件数据目录免声明）；声明了原生服务的插件默认需要控制台批准才能加载。完整参考见 [权限与原生服务可信性](permissions.md)。
+Yeow 对**敏感消息节点**实施声明式权限（服务器文件、HTTP、原生进程、解压资源需声明，插件数据目录免声明）；申请了原生服务权限的插件默认直接加载（控制台打印不可信警告）。完整参考见 [权限与原生服务可信性](permissions.md)。
 
 > 快速要点：只读写插件自己的数据目录时**无需声明任何权限**；使用 `fetch` / HTTP 需声明 `"http:*"` 或 `"http:requestAsync"`；声明原生服务需 `"service:registerNative"`。
 

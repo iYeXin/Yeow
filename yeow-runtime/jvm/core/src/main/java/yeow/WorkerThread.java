@@ -248,7 +248,8 @@ public class WorkerThread implements PluginEntity, Runnable {
 
     private void inject() {
         var g = ctx.getGlobalObject();
-        ctx.evaluate("globalThis.__plugin = {name:'" + entityName.replace("'","\\'") + "',version:'',author:''};");
+        // Worker 的 __plugin.name 为注册名（<主插件>.<worker>），version/author 继承主插件（yeow.json）
+        ctx.evaluate("globalThis.__plugin = {name:'" + PluginThread.esc(entityName) + "',version:'" + PluginThread.esc(main.version()) + "',author:'" + PluginThread.esc(main.author()) + "'};");
         ctx.evaluate("globalThis.$dev = " + main.isDevMode() + ";");
 
         g.setProperty("$_send", (JSCallFunction) args -> {

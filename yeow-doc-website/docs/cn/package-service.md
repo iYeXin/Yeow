@@ -125,7 +125,7 @@ export async function initRenderer(): Promise<ImageRenderer> {
 
 ### 原生服务的错误处理与降级
 
-`registerNativeService` / `ready()` 的 reject 原因需要区分（服务已存在 / 可执行文件被篡改）。**未批准在加载层处理**：声明原生服务的插件默认被拒绝加载（控制台提示一次性码 `/yeow approve <code>`，批准后自动加载），插件不运行；若已批准，则注册阶段的错误只剩以下两类：
+`registerNativeService` / `ready()` 的 reject 原因需要区分（服务已存在 / 可执行文件被篡改）。申请 `service:registerNative` 权限只决定加载时警告或拒绝（见上）；注册阶段的错误只剩以下两类：
 
 ```ts
 import { registerNativeService, serviceRequest, log } from 'yeow-api';
@@ -157,7 +157,7 @@ export async function initRenderer(): Promise<ImageRenderer | null> {
 }
 ```
 
-> 原生服务的**可信性声明（SHA-256）与批准机制**见[权限与原生服务可信性](permissions.md#二原生服务可信性声明)。
+> 原生服务的**可信性声明（SHA-256）与不可信开关**见[权限与原生服务可信性](permissions.md#二原生服务可信性声明)。
 
 ## 组合 —— JS 门面 + 原生引擎（类型 2 + 3）
 

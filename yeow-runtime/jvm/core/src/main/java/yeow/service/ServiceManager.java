@@ -138,7 +138,7 @@ public class ServiceManager {
         return gson.toJson(Map.of("serviceId", id, "token", token));
     }
 
-    public String registerNativeService(String refName, String pluginName, JsonObject platforms, boolean isPublic, String jarPath, String devAssetsDir, Map<String, String> nativeHashes) {
+    public String registerNativeService(String refName, String pluginName, JsonObject platforms, boolean isPublic, yeow.PluginPackage pkg, String jarPath, String devAssetsDir, Map<String, String> nativeHashes) {
         var id = allocateId(refName, isPublic);
         if (isPublic && registry.containsKey(id)) {
             return gson.toJson(Map.of("err", "Service already registered: " + id, "serviceId", id));
@@ -167,7 +167,7 @@ public class ServiceManager {
             cleanDir(svcDir);
             Files.createDirectories(svcDir);
 
-            var execFile = extractNativeBinary(platformEl, svcDir, jarPath, devAssetsDir);
+            var execFile = extractNativeBinary(platformEl, svcDir, pkg, jarPath, devAssetsDir);
             if (execFile == null) return gson.toJson(Map.of("err", "Failed to extract native binary"));
 
             // 可信性校验：打包后路径（getAssetsPath 结果，assets/<id>/...）→ yeow.json native 声明的 SHA-256。
@@ -271,7 +271,7 @@ public class ServiceManager {
         }
     }
 
-    private static Path extractNativeBinary(JsonElement platformEl, Path svcDir, String jarPath, String devAssetsDir) throws Exception {
+    private static Path extractNativeBinary(JsonElement platformEl, Path svcDir, yeow.PluginPackage pkg, String jarPath, String devAssetsDir) throws Exception {
         String assetDir = null, entryFile = null, extractFile = null;
 
         if (platformEl.isJsonPrimitive()) {
@@ -306,13 +306,28 @@ public class ServiceManager {
                     return svcDir.resolve(entryFile);
                 }
             }
+            // 优先走加载时预解析的内存包；缓存关闭/加载失败时回退 ZipFile 直读
+            var prefix = assetDir.startsWith("assets/") ? assetDir : "assets/" + assetDir;
+            if (!prefix.endsWith("/")) prefix = prefix + "/";
+            if (pkg != null) {
+                var found = false;
+                for (var name : pkg.names()) {
+                    if (!name.startsWith(prefix) || name.endsWith("/")) continue;
+                    found = true;
+                    var rel = name.substring(prefix.length());
+                    var dst = svcDir.resolve(rel);
+                    Files.createDirectories(dst.getParent());
+                    Files.write(dst, pkg.read(name), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                }
+                if (!found) throw new java.io.FileNotFoundException("asset dir not found: " + assetDir);
+                return svcDir.resolve(entryFile);
+            }
             try (var zip = new ZipFile(jarPath)) {
-                var prefix = assetDir.startsWith("assets/") ? assetDir : "assets/" + assetDir;
                 var entries = zip.entries();
                 while (entries.hasMoreElements()) {
                     var ze = entries.nextElement();
                     var name = ze.getName();
-                    if (!name.startsWith(prefix)) continue;
+                    if (!name.startsWith(prefix) || name.endsWith("/")) continue;
                     var rel = name.substring(prefix.length());
                     if (rel.isEmpty() || ze.isDirectory()) continue;
                     var dst = svcDir.resolve(rel);
@@ -331,6 +346,13 @@ public class ServiceManager {
                 Files.copy(devPath, svcDir.resolve(fileName), StandardCopyOption.REPLACE_EXISTING);
                 return svcDir.resolve(fileName);
             }
+        }
+        // 优先走加载时预解析的内存包；缓存关闭/加载失败时回退 ZipFile 直读
+        if (pkg != null) {
+            var b = pkg.read(extractFile);
+            if (b == null) return null;
+            Files.write(svcDir.resolve(fileName), b, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            return svcDir.resolve(fileName);
         }
         try (var zip = new ZipFile(jarPath)) {
             var ze = zip.getEntry(extractFile);

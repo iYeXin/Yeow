@@ -65,7 +65,7 @@ npm run build                    # Output standard Paper JAR + platform-independ
 | -------------------------------------- | ---------------------------------------------- |
 | [Quick Start](getting-started.md)      | Create project → Develop → Build → Deploy      |
 | [Build & Distribution](distribution.md) | JAR / `.yeow.zip` two formats and one-click install |
-| [Permissions & Native Service Trust](permissions.md) | Sensitive permission declaration, SHA-256 trust, native service approval |
+| [Permissions & Native Service Trust](permissions.md) | Sensitive permission declaration, SHA-256 trust, native service untrusted switch |
 | [Runtime Operations](operations.md)    | `/yeow` management commands, runtime configuration (config.yml) |
 | [API Reference](api/README.md)         | Complete index grouped by module               |
 | [Writing Dependency Packages](package-author.md) | Package structure, resources, build automation |

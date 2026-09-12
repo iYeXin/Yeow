@@ -92,26 +92,20 @@ Yeow 对**敏感消息节点**实施声明式权限：插件在 `yeow.config.jso
 - **无论是否声明**，加载原生服务时都会打印风险日志：未声明 → 警告"无可信 SHA-256 声明，视为不可信"；已声明 → 提示校验结果
 - **可信性声明只对单文件模式有效**（`string` / `{file}`）；目录模式（`{dir, entry}`）暂不支持声明与校验
 
-### 批准（默认需要）
+### 不可信服务开关（默认允许加载并警告）
 
-**默认情况下，声明了原生服务的插件需要批准才能加载**（目前全部原生服务均视为不安全，即使有哈希声明）。插件加载时检测到 `native` 声明且未批准 → **拒绝加载本插件**，服务器控制台打印醒目的提示信息（一次性批准码）：
+**默认情况下全部原生服务均视为不可信**（即使有哈希声明）。申请了 `service:registerNative` 权限的插件正常加载，但控制台会打印醒目的不可信警告（是否固定 SHA-256、有无 `native` 声明一并说明）：
 
-```
-/yeow approve <code>    # code 为 6 位 36 进制一次性码（仅控制台可见）
-                        # 批准后自动加载被拒的插件，无需手动 reload
-```
-
-- 拒绝加载 → 插件不运行（`onLoad` 不会执行），控制台提示包含 `/yeow approve <code>`
-- **一次性 code 机制**：每次拒绝加载时生成随机 6 位 36 进制 code（仅出现在控制台日志）——插件本身未加载，无法读取日志后 `dispatchCommand` 自动批准；code 用后即作废
-- **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-require-approval`（默认 `true`；`false` = 默认批准）。**运行时直接修改即生效**（config.yml 为信任源）
-- **批准存储**：`plugins/Yeow/runtime/approve.json`（插件名 → 批准时间戳）。**runtime 目录受 fs 写保护**——插件无法通过 fs API 修改其中的文件（config.yml / approve.json）
+- 允许加载 → 插件正常运行（`onLoad` 执行），控制台警告提示其将以子进程运行不可信二进制
+- **配置**：`plugins/Yeow/runtime/config.yml` 的 `native-service-allow-untrusted`（默认 `true`；`false` = 申请了 `service:registerNative` 权限的插件**拒绝加载**，控制台提示改配置项）。已有配置缺失该字段时，运行时加载会自动合并默认并写回（平滑升级）
+- **runtime 目录受 fs 写保护**——插件无法通过 fs API 修改其中的文件（`config.yml`）
 
 > **开发者**：错误处理与降级示例（区分"服务已存在 / 可执行文件被篡改"）见 [Service API](api/service.md) 与 [封装 Service 的依赖包](package-service.md)。
 
-> **未来展望**：Yeow 官方或社区可能维护一份已知安全的 SHA-256 列表——若二进制哈希命中该列表，插件发布时可能被标记为安全，加载时不再提示风险、无需批准。
+> **未来展望**：在线安全性校验（比对官方维护的安全清单）能力已在规划中——若二进制哈希命中官方安全清单，加载时将不再提示风险（当前版本命中清单与否均按不可信处理并警告）。
 
 ## 三、相关文档
 
 - **平台规范 · 权限模型**（运行时实现者视角）：[specifications/README.md#权限模型](specifications/README.md#权限模型)
 - **依赖包权限声明**（npm 包如何声明）：[编写依赖包 - 权限](package-author.md)
-- **运行时配置**（`native-service-require-approval` 等）：[运行时运维 - 配置](operations.md#运行时配置)
+- **运行时配置**（`native-service-allow-untrusted` 等）：[运行时运维 - 配置](operations.md#运行时配置)

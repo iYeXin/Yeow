@@ -7,6 +7,8 @@ import { assets } from 'yeow-api';
 
 Files under `assets/` directory are automatically packaged into JAR during build, read via this API at runtime.
 
+> **In-memory cache**: the whole package is read into memory once at plugin load with the central directory pre-parsed; `read` / `extract` / native binary extraction all serve from memory (zero repeated opens). Disable with `assets.cache-enabled: false` in `config.yml` (falls back to direct `ZipFile` reads).
+
 > `getAssetsPath` imported from **`yeow-dev`** (build-time virtual module), not `yeow-api`: It injects namespace by caller's belonging dependency, only builder knows which package current code belongs to. `yeow-dev` published as empty package (can be not installed, type declarations provided by `yeow-api`).
 
 ## getAssetsPath(path)

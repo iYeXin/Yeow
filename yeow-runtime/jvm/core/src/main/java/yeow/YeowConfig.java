@@ -40,8 +40,11 @@ public class YeowConfig {
         if (file.exists() && file.length() > 0) {
             try {
                 Object loaded = new Yaml().load(Files.readString(file.toPath(), StandardCharsets.UTF_8));
-                v = loaded instanceof Map<?, ?> m ? expandFlatKeys(castMap(m)) : new LinkedHashMap<String, Object>();
-                v = merge(defaults, v);
+                var expanded = loaded instanceof Map<?, ?> m ? expandFlatKeys(castMap(m)) : new LinkedHashMap<String, Object>();
+                v = merge(defaults, expanded);
+                // 平滑升级：已有配置缺失新字段时（合并补了默认值），写回文件；
+                // 无缺失则不动文件（保留用户原有格式/注释/顺序）。
+                if (!v.equals(expanded)) save(v);
             } catch (Exception e) {
                 v = defaults;
             }
@@ -117,6 +120,18 @@ public class YeowConfig {
     /** util 通道 gzip 解压输出上限（原始字节，默认 256 MiB）。 */
     public int utilMaxOutputBytes() { return getInt("util.max-output-bytes", 256 * 1024 * 1024); }
 
+    /** 插件包内存缓存（assets 通道 / 原生二进制解压走内存，默认启用）。 */
+    public boolean assetsCacheEnabled() { return getBool("assets.cache-enabled", true); }
+
+    /**
+     * 是否允许加载不可信原生服务（默认 true）。
+     * true = 声明原生服务的插件正常加载，加载时打印醒目的不可信警告；
+     * false = 申请了 `service:registerNative` 权限的插件拒绝加载。
+     * 二进制 SHA-256 声明校验不受此开关影响（始终在注册时校验）。
+     * 在线安全性校验（比对官方维护的安全清单）能力已在规划中，届时命中清单的
+     * 二进制可免警告加载。
+     */
+
     /** Folia：in-flight 任务上限（同时投递未完成数），默认 100（folia section）。 */
     public int maxInflight() { return getInt("folia.max-inflight", 100); }
 
@@ -136,19 +151,7 @@ public class YeowConfig {
      */
     public int migrationThreshold() { return getInt("folia.migration-threshold", 2); }
 
-    /**
-     * 原生服务是否需要批准（默认 true；false = 默认批准）。
-     * config.yml 为信任源--每次调用重新读取文件，运行时直接修改字段即时生效。
-     */
-    public boolean requireNativeApproval() {
-        try {
-            Object loaded = new Yaml().load(Files.readString(file.toPath(), StandardCharsets.UTF_8));
-            var v = loaded instanceof Map<?, ?> m ? m.get("native-service-require-approval") : null;
-            return v instanceof Boolean b ? b : true;
-        } catch (Exception e) {
-            return true;
-        }
-    }
+    public boolean nativeServiceAllowUntrusted() { return getBool("native-service-allow-untrusted", true); }
 
     // ── 默认值 / 合并 / 落盘 ────────────────────────────────────────
 
@@ -191,7 +194,10 @@ public class YeowConfig {
         util.put("max-output-bytes", 256 * 1024 * 1024);  // gzip 解压输出上限（防压缩炸弹）
         m.put("util", util);
         m.put("profile", profile);
-        m.put("native-service-require-approval", true);
+        var assets = new LinkedHashMap<String, Object>();
+        assets.put("cache-enabled", true);               // 插件包内存缓存（assets 通道/原生解压走内存）
+        m.put("assets", assets);
+        m.put("native-service-allow-untrusted", true);   // 允许加载不可信原生服务（默认允许并警告；false = 申请 registerNative 权限的插件拒绝加载）
 
         // ── Folia 专用 section（仅 Folia 生成）：语义与 Paper 不同或仅 Folia 使用的参数 ──
         if (folia) {

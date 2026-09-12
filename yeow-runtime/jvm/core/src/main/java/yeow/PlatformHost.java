@@ -25,7 +25,7 @@ public interface PlatformHost {
     /** 平台名（env 通道 yeow.platform，如 "paper"）。 */
     String platformName();
 
-    /** 运行时数据目录（plugins/Yeow，插件扫描/缓存/批准存储/报告）。 */
+    /** 运行时数据目录（plugins/Yeow，插件扫描/缓存/报告）。 */
     File dataFolder();
 
     /** 当前线程是否宿主游戏线程（Paper：主线程）。 */

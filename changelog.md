@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-09-06
+
+### yeow-runtime 0.5.3（资源内存缓存 + __plugin 修复 + 原生开关 + 配置平滑升级）
+
+- **资源读取性能**：新增 `core/PluginPackage.java`——插件加载时（`RuntimeCore.registerPlugin`）把 `.zip/.jar` 的 zip 部分一次性读入内存并预解析中央目录（仅 STORED/DEFLATED，本地头定位数据，线程安全），`assets` 通道（read/extract/extractDir）与原生二进制解压全部走内存，零重复 open/解析；`config.yml` 新增 `assets.cache-enabled`（默认 `true`，可选关闭回退 `ZipFile` 直读）；dev 模式仍走 `devAssetsDir` 文件；附带修复原生目录模式前缀匹配缺尾斜杠误含同名前缀目录
+- **修复 `__plugin.version/author` 为空**：`registerPlugin` 解析了 `yeow.json` 的 version/author 却从未传入 `PluginThread`（`inject()` 写死空串）——构造新增 version/author/内存包参数并注入（含 JS 转义），`rebuildPluginEntity` 透传，Worker 经主插件继承版本/作者；`global.d.ts` 声明早已存在，行为与文档（spec README / environment）对齐
+- **移除原生服务动态审批**：删除 `ApprovalStore`（`approve.json` + `/yeow approve <code>` 一次性码 + `pendingLoads`），改为运行时配置 `native-service-allow-untrusted`（默认 `true`）：允许时申请 `service:registerNative` 权限的插件正常加载并打印醒目不可信警告（含 SHA-256 是否固定）；`false` 时拒绝加载并指引改配置；`yeow.config.json` 的 `native` 声明与注册时 SHA-256 校验不变；在线安全性校验（比对官方维护的安全清单）能力已在规划中，届时命中清单的二进制免警告加载
+- **配置平滑升级**：`YeowConfig` 加载时若发现已有配置缺失字段，自动与默认配置合并后写回（用户值保留，无缺失则不动文件）——新版本新增配置项无需手动补写
+- **yeow-template 0.5.2 → 0.5.3**：依赖 runtime 0.5.3；`create-yeow 0.5.2 → 0.5.3`
+- **模板**：内置三个 jar 同步至 0.5.3；`build.js` / `dev-server.js` 引用更新；`README`/`CONTRIBUTING`/`AGENTS`/`getting-started`/`folia` 同步
+- **文档**：`permissions`/`api/service`/`package-service`/`native-service` 规范/`operations`（含配置样例）/`fs` 规范/`api/assets`（内存缓存说明）/`getting-started`/`advanced`/`overview`/`sitemap` 等双语同步；`docs/cn|en/changelog.md` 新增 0.5.3 条目
+- 验证：`mvn -pl core test` 66项通过（含新增 `PluginPackageTest` 5项真实 JAR 逐字节对照 + `YeowConfigTest` 写回行为）；`mvn clean install`（core+paper+folia）与 template 通过
+
 ## 2026-08-26
 
 ### 文档：setMotd 持久化行为说明

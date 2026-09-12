@@ -166,17 +166,17 @@ Suitable for complex native services with multi-file dependencies (e.g., Python 
 - Automatically cleaned up on each Runtime startup
 - Automatically cleaned up and re-extracted on plugin hot-reload
 
-## Trust Statement and Approval (SHA-256)
+## Trust Statement and Untrusted Switch (SHA-256)
 
 Plugins or dependency packages can declare a `native` field in `yeow.config.json` to fix binary hashes (the SHA-256 of the packaged path is computed at build time and written to the `native` field in `yeow.json`). **Declarations only apply to single file mode** (`string` / `{file}`); directory mode (`{dir, entry}`) is not yet supported.
 
-**Approval (plugin loading layer)**: By default (`native-service-require-approval: true`), all native services are considered untrusted. Plugins that declare native services are **rejected at load time** — the console prints a prominent prompt containing a one-time approval code (6-digit base-36, visible only in the console; since the plugin isn't loaded, the code cannot be predicted or auto-approved): after an administrator runs `/yeow approve <code>`, the plugin is **automatically loaded**.
+**Untrusted switch (plugin loading layer)**: By default (`native-service-allow-untrusted: true`), all native services are considered untrusted but loading is not blocked. Plugins requesting the `service:registerNative` permission load normally, with a prominent untrusted warning on the console (stating whether SHA-256 is pinned); with `false`, plugins requesting that permission are **rejected at load time** (console points back to `true`).
 
-**Hash verification (runtime)**: After the plugin is loaded, when registering a native service, the SHA-256 of the selected binary (single file mode) is verified: if it doesn't match the declaration → **rejected** (`ready()` rejects, with an error containing the declared/actual hash — the executable may have been tampered with).
+**Hash verification (runtime)**: After the plugin is loaded, when registering a native service, the SHA-256 of the selected binary (single file mode) is verified: if it doesn't match the declaration → **rejected** (`ready()` rejects, with an error containing the declared/actual hash — the executable may have been tampered with). This verification always runs, regardless of the switch above.
 
-**Configuration and approval persistence**:
+**Configuration persistence**:
 
-- `native-service-require-approval` in `config.yml` is the **trust source** — the runtime takes effect immediately upon modification
-- Files are located in `plugins/Yeow/runtime/` (`config.yml`, `approve.json`) — this directory is protected by fs write protection, and plugins cannot modify it through the fs API
+- `native-service-allow-untrusted` in `config.yml` — read by the runtime; when an existing config lacks the field, defaults are merged on load and written back (smooth upgrade)
+- Files are located in `plugins/Yeow/runtime/` (`config.yml`) — this directory is protected by fs write protection, and plugins cannot modify it through the fs API
 
-When not declared/not approved, risk logs are printed as usual (treated as untrusted). In the future, Yeow official or community may maintain a list of known safe SHA-256 hashes: binaries that hit the list may be marked as safe at plugin load time without warnings.
+Whether declared or not, risk logs are printed as usual (treated as untrusted). Online safety check (comparing against the officially maintained safety list) is planned: listed binaries will then load without this warning.

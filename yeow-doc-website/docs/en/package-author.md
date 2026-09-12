@@ -230,7 +230,7 @@ When dependency package carries native service binary, recommend declaring `nati
 
 ## Encapsulating Service Packages
 
-**Three types** of Service encapsulation (inter-plugin communication / native extension) (SDK call encapsulation / JS service / native service) and combination patterns (JS facade + native engine) have been separated into independent article: [Encapsulating Service Packages](package-service.md). Native service's **trust declaration and approval mechanism** see [Permissions & Native Service Trust](permissions.md).
+**Three types** of Service encapsulation (inter-plugin communication / native extension) (SDK call encapsulation / JS service / native service) and combination patterns (JS facade + native engine) have been separated into independent article: [Encapsulating Service Packages](package-service.md). Native service's **trust declaration and untrusted switch** see [Permissions & Native Service Trust](permissions.md).
 
 ---
 

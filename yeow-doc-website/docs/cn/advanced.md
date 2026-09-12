@@ -11,4 +11,4 @@
 - [Folia 支持（实验性）](advanced/folia.md) — 区域化多线程平台的运行时架构、推论、平台透明与部署
 - [关于 Yeow](advanced/about.md) — 定位、设计目标、基本原则、未来规划与愿景
 
-> 运行时告警与性能分析见[运行时警告指南](runtime-warning.md)；运行时运维（`/yeow` 命令与配置）见[运行时运维](operations.md)；权限与安全（敏感权限声明、原生批准、fs 路径隔离）见[权限与原生服务可信性](permissions.md)。
+> 运行时告警与性能分析见[运行时警告指南](runtime-warning.md)；运行时运维（`/yeow` 命令与配置）见[运行时运维](operations.md)；权限与安全（敏感权限声明、原生不可信开关、fs 路径隔离）见[权限与原生服务可信性](permissions.md)。

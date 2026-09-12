@@ -18,7 +18,11 @@ public class PluginThread implements Runnable, PluginEntity {
     static final Gson gson = new Gson();
 
     public final String name;
+    public final String version;
+    public final String author;
     public final String jarPath;
+    /** 插件包内存镜像（加载时一步到位；null = 缓存关闭/加载失败/dev 回退，assets 与原生解压走 ZipFile 直读）。 */
+    public final PluginPackage pkg;
     public final MsgQueue queue = new MsgQueue();
     private String initCode;
     private volatile String userCode;
@@ -95,8 +99,11 @@ public class PluginThread implements Runnable, PluginEntity {
     }
     // ──────────────────────────────────────────────────────────
 
-    public PluginThread(String name, String jarPath, String initCode, String userCode, RuntimeCore core, Set<String> permissions, Map<String, String> nativeHashes) {
-        this.name = name; this.jarPath = jarPath; this.initCode = initCode; this.userCode = userCode;
+    public PluginThread(String name, String version, String author, String jarPath, PluginPackage pkg, String initCode, String userCode, RuntimeCore core, Set<String> permissions, Map<String, String> nativeHashes) {
+        this.name = name;
+        this.version = version != null ? version : "";
+        this.author = author != null ? author : "";
+        this.jarPath = jarPath; this.pkg = pkg; this.initCode = initCode; this.userCode = userCode;
         this.scheduler = core.scheduler();
         this.core = core;
         this.log = core.host().logger();
@@ -104,7 +111,21 @@ public class PluginThread implements Runnable, PluginEntity {
         this.nativeHashes = nativeHashes != null ? Map.copyOf(nativeHashes) : Map.of();
     }
 
+    /** 兼容旧构造（version/author 置空；仅测试用，生产路径必须传 yeow.json 解析值）。 */
+    public PluginThread(String name, String jarPath, String initCode, String userCode, RuntimeCore core, Set<String> permissions, Map<String, String> nativeHashes) {
+        this(name, "", "", jarPath, null, initCode, userCode, core, permissions, nativeHashes);
+    }
+
     public RuntimeCore core() { return core; }
+
+    /** 插件版本（yeow.json；__plugin.version 注入源）。 */
+    public String version() { return version; }
+
+    /** 插件作者（yeow.json；__plugin.author 注入源）。 */
+    public String author() { return author; }
+
+    /** 插件包内存镜像（null = 未启用；Worker 委托时经主插件 assets 通道共享）。 */
+    public PluginPackage pluginPackage() { return pkg; }
 
     /** 权限快照（重建实体用，不可变）。 */
     Set<String> permissions() { return permissions; }
@@ -297,7 +318,8 @@ public class PluginThread implements Runnable, PluginEntity {
 
     private void inject() {
         var g = ctx.getGlobalObject();
-        ctx.evaluate("globalThis.__plugin = {name:'" + name.replace("'","\\'") + "',version:'',author:''};");
+        // __plugin 元信息来自 yeow.json（加载时解析，经构造传入；Worker 见 WorkerThread.inject，继承主插件版本/作者）
+        ctx.evaluate("globalThis.__plugin = {name:'" + esc(name) + "',version:'" + esc(version) + "',author:'" + esc(author) + "'};");
         ctx.evaluate("globalThis.$dev = " + devMode + ";");
 
         g.setProperty("$_send", (JSCallFunction) args -> {
@@ -438,6 +460,12 @@ public class PluginThread implements Runnable, PluginEntity {
         if (consoleObj instanceof JSObject jsConsole) {
             jsConsole.setProperty("log", (JSCallFunction) a -> null);
         }
+    }
+
+    /** JS 单引号字符串转义（__plugin 注入用）。 */
+    static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n").replace("\r", "\\r");
     }
 
     /**
@@ -621,7 +649,7 @@ public class PluginThread implements Runnable, PluginEntity {
             "pluginDir", "plugins/" + name));
     }
 
-    /** 禁止对 Yeow 运行时配置目录（含 approve.json / config.yml）的修改--fs 写操作（全部级别）一律拦截。 */
+    /** 运行时配置目录（含 config.yml）的修改--fs 写操作（全部级别）一律拦截。 */
     private void assertNotRuntimeDir(Path path) throws SecurityException {
         if (path.startsWith(RUNTIME_DIR)) {
             throw new SecurityException("Cannot modify Yeow runtime directory (plugins/Yeow/runtime): " + path);
@@ -968,6 +996,40 @@ public class PluginThread implements Runnable, PluginEntity {
                     default -> gson.toJson(Map.of("err", "Unknown assets op: " + task));
                 };
             }
+            // 生产：优先走加载时预解析的内存包（零 open/close）；缓存关闭或加载失败时回退 ZipFile 直读
+            if (pkg != null) {
+                return switch (task) {
+                    case "read" -> { var b = pkg.read(rawPath); if (b == null) yield "null"; yield gson.toJson(Map.of("data", new String(b, StandardCharsets.UTF_8))); }
+                    case "readBase64" -> { var b = pkg.read(rawPath); if (b == null) yield "null"; yield gson.toJson(Map.of("data", Base64.getEncoder().encodeToString(b))); }
+                    case "extract" -> {
+                        if (!hasDest) yield gson.toJson(Map.of("err", "extract requires dest"));
+                        var b = pkg.read(rawPath);
+                        if (b == null) yield gson.toJson(Map.of("err", "Asset not found: " + rawPath));
+                        var target = assetsTarget(dest);
+                        Files.write(target, b, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                        yield gson.toJson(Map.of("path", Path.of("").toAbsolutePath().normalize().relativize(target).toString()));
+                    }
+                    case "extractDir" -> {
+                        var prefix = rawPath.endsWith("/") ? rawPath : rawPath + "/";
+                        var target = assetsTarget(dest);
+                        var found = false;
+                        for (var zn : pkg.names()) {
+                            if (!zn.startsWith(prefix) || zn.endsWith("/")) continue;
+                            found = true;
+                            var rel = zn.substring(prefix.length());
+                            var dst = target.resolve(rel).normalize();
+                            // zip-slip 防护：entry 相对路径含 ../ 时不得逃逸目标目录
+                            if (!dst.startsWith(target)) throw new SecurityException("Zip entry escapes target dir: " + zn);
+                            assertNotRuntimeDir(dst);
+                            Files.createDirectories(dst.getParent());
+                            Files.write(dst, pkg.read(zn), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                        }
+                        if (!found) yield gson.toJson(Map.of("err", "Asset directory not found: " + rawPath));
+                        yield gson.toJson(Map.of("path", Path.of("").toAbsolutePath().normalize().relativize(target).toString()));
+                    }
+                    default -> gson.toJson(Map.of("err", "Unknown assets op: " + task));
+                };
+            }
             try (var zip = new ZipFile(jarPath)) {
                 return switch (task) {
                     case "read" -> { var entry = zip.getEntry(rawPath); if (entry == null) yield "null"; yield gson.toJson(Map.of("data", new String(zip.getInputStream(entry).readAllBytes(), StandardCharsets.UTF_8))); }
@@ -1165,7 +1227,7 @@ public class PluginThread implements Runnable, PluginEntity {
             var sm = core.serviceManager();
             return switch (t) {
                 case "register" -> { var refName = obj.get("refName").getAsString(); var onReq = obj.get("onRequest").getAsString(); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerPluginService(refName, name, onReq, isPublic); }
-                case "registerNative" -> { var refName = obj.get("refName").getAsString(); var platforms = obj.getAsJsonObject("platforms"); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerNativeService(refName, name, platforms, isPublic, jarPath, devAssetsDir, nativeHashes); }
+                case "registerNative" -> { var refName = obj.get("refName").getAsString(); var platforms = obj.getAsJsonObject("platforms"); var isPublic = obj.has("public") && obj.get("public").getAsBoolean(); yield sm.registerNativeService(refName, name, platforms, isPublic, pkg, jarPath, devAssetsDir, nativeHashes); }
                 case "registerNativeTerminate" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.registerTerminateCb(svcId, cbId, name); yield "true"; }
                 case "request" -> { var svcId = obj.get("serviceId").getAsString(); var path = obj.has("path") ? obj.get("path").getAsString() : "/"; var body = obj.has("body") ? obj.getAsJsonObject("body") : new JsonObject(); var reqId = obj.get("requestId").getAsString(); sm.trackRequestConsumer(reqId, name, svcId); sm.request(svcId, path, body, reqId, name); yield null; }
                 case "awaitReady" -> { var svcId = obj.get("serviceId").getAsString(); var cbId = obj.get("cb").getAsString(); sm.awaitReady(svcId, cbId, name); yield null; }

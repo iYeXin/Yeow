@@ -37,7 +37,7 @@ registerNativeService(refName, platforms)
 
 - **平台粒度**：`windows-x64` / `linux-arm64` 等，精确匹配优先，回退到 `windows` / `linux`
 - **单一实例**：`isPublic: true` 时同名服务只启动一个进程/保留一个注册；重复注册被拒绝（返回 `err` + `serviceId`），调用方用 `err.serviceId` 以调用者身份接入既有服务
-- **可信性与批准**：原生二进制支持 SHA-256 可信性声明；声明了原生服务的插件默认需要控制台批准才能加载——见 [权限与原生服务可信性](/permissions)
+- **可信性与批准**：原生二进制支持 SHA-256 可信性声明；申请原生服务权限的插件默认直接加载并打印不可信警告——见 [权限与原生服务可信性](/permissions)
 - **协议**：见 [Native Service 规范](/specifications/native-service/index)
 
 API 用法见 [Service API](/api/service)。

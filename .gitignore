@@ -35,7 +35,8 @@ bin/
 *.jar
 *.zip
 
-# 必须保留的二进制资产（模板构建必需�?!create-yeow/templates/default/.yeow/assets/*.jar
+# 必须保留的二进制资产（模板构建必需）
+!create-yeow/templates/default/.yeow/assets/*.jar
 !quickjs-wrapper/gradle/wrapper/gradle-wrapper.jar
 
 # ── quickjs-wrapper（native 资源保留，构建产物忽略）────

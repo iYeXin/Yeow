@@ -231,7 +231,7 @@ npm run permissions
 
 ## 封装 Service 的包
 
-封装 Service（插件间通信 / 原生扩展）的**三种类型**（SDK 调用封装 / JS 服务 / 原生服务）与组合模式（JS 门面 + 原生引擎）已独立成篇：[封装 Service 的依赖包](package-service.md)。其中原生服务的**可信性声明与批准机制**见[权限与原生服务可信性](permissions.md)。
+封装 Service（插件间通信 / 原生扩展）的**三种类型**（SDK 调用封装 / JS 服务 / 原生服务）与组合模式（JS 门面 + 原生引擎）已独立成篇：[封装 Service 的依赖包](package-service.md)。其中原生服务的**可信性声明与不可信开关**见[权限与原生服务可信性](permissions.md)。
 
 ---
 

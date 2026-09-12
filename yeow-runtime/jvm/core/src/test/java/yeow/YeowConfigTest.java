@@ -25,6 +25,9 @@ class YeowConfigTest {
         assertEquals(100, cfg.idleSpinUs());
         assertEquals(100, cfg.maxInflight());
         assertEquals(2000, cfg.schedulerIdleWaitUs());
+        // 0.5.3：资源内存缓存默认启用；不可信原生服务默认允许加载（仅警告）
+        assertTrue(cfg.assetsCacheEnabled());
+        assertTrue(cfg.nativeServiceAllowUntrusted());
     }
 
     @Test
@@ -66,6 +69,59 @@ class YeowConfigTest {
         assertEquals(50, cfg.maxInflight());
         // 缺失键补默认
         assertEquals(20_000_000L, cfg.tickBudgetNs());
+    }
+
+    @Test
+    void nativeAllowUntrustedCanBeDisabled() throws Exception {
+        var dir = tmp.resolve("native").toFile();
+        var runtime = new File(dir, "runtime");
+        runtime.mkdirs();
+        Files.writeString(new File(runtime, "config.yml").toPath(),
+            "native-service-allow-untrusted: false\n");
+        var cfg = new YeowConfig(dir, false);
+        assertFalse(cfg.nativeServiceAllowUntrusted());
+        // 未显式配置时默认允许
+        var cfg2 = new YeowConfig(tmp.resolve("native2").toFile(), false);
+        assertTrue(cfg2.nativeServiceAllowUntrusted());
+    }
+
+    @Test
+    void assetsCacheCanBeDisabled() throws Exception {
+        var dir = tmp.resolve("assets").toFile();
+        var runtime = new File(dir, "runtime");
+        runtime.mkdirs();
+        Files.writeString(new File(runtime, "config.yml").toPath(),
+            "assets:\n  cache-enabled: false\n");
+        var cfg = new YeowConfig(dir, false);
+        assertFalse(cfg.assetsCacheEnabled());
+    }
+
+    @Test
+    void missingKeysAreWrittenBack() throws Exception {
+        // 平滑升级：旧配置文件缺失新字段 → 加载时合并默认并写回，用户值保留
+        var dir = tmp.resolve("upgrade").toFile();
+        var runtime = new File(dir, "runtime");
+        runtime.mkdirs();
+        var cfgFile = new File(runtime, "config.yml");
+        Files.writeString(cfgFile.toPath(), "tick-budget-ms: 5\n");
+        assertFalse(Files.readString(cfgFile.toPath()).contains("native-service-allow-untrusted"));
+        new YeowConfig(dir, false);
+        var after = Files.readString(cfgFile.toPath());
+        assertTrue(after.contains("tick-budget-ms: 5"), "用户值必须保留");
+        assertTrue(after.contains("native-service-allow-untrusted: true"), "新字段必须补上并写回");
+        assertTrue(after.contains("cache-enabled: true"), "新增 assets 段必须补上并写回");
+    }
+
+    @Test
+    void completeFileIsUntouched() throws Exception {
+        // 无缺失时不动文件（保留格式，不做多余写回）
+        var dir = tmp.resolve("stable").toFile();
+        new YeowConfig(dir, false);
+        var cfgFile = new File(new File(dir, "runtime"), "config.yml");
+        var before = Files.readString(cfgFile.toPath());
+        new YeowConfig(dir, false);
+        var after = Files.readString(cfgFile.toPath());
+        assertEquals(before, after);
     }
 
     private static String read(File dataFolder, String name) throws Exception {

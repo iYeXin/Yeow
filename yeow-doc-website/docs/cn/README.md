@@ -65,7 +65,7 @@ npm run build                    # 产出标准 Paper JAR + 平台无关 .yeow.z
 | ------------------------------------ | ---------------------------------------------- |
 | [快速开始](getting-started.md)       | 创建项目 → 开发 → 构建 → 部署                  |
 | [构建与分发](distribution.md)        | JAR / `.yeow.zip` 两种格式与一键安装           |
-| [权限与原生服务可信性](permissions.md) | 敏感权限声明、SHA-256 可信性、原生服务批准    |
+| [权限与原生服务可信性](permissions.md) | 敏感权限声明、SHA-256 可信性、原生服务不可信开关    |
 | [运行时运维](operations.md)          | `/yeow` 管理命令、运行时配置（config.yml）     |
 | [API 参考](api/README.md)            | 按模块分组的完整索引                           |
 | [编写依赖包](package-author.md)      | 包结构、资源、构建自动处理                     |
