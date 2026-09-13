@@ -8,6 +8,7 @@
 
 #include "yeow_quickjs.h"
 #include "polyfill.h"
+#include "binary.h"
 
 /* ── tiny growable buffer ──────────────────────────────────────────── */
 
@@ -264,11 +265,20 @@ static JSValue java_exception_to_js(YeowCtx *c, JNIEnv *env) {
     return r;
 }
 
+/* Raise an uncatchable abort (termination requested). JS catch/finally cannot intercept it. */
+static JSValue throw_terminated(YeowCtx *c) {
+    JS_FreeValue(c->ctx, JS_GetException(c->ctx)); /* drop any pending (catchable) exception */
+    JSValue err = JS_ThrowInternalError(c->ctx, "terminated");
+    JS_SetUncatchableException(c->ctx, 1);
+    return err;
+}
+
 static JSValue js_dispatch(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv,
                            int magic, JSValue *func_data) {
     (void)this_val;
     (void)func_data;
     YeowCtx *c = (YeowCtx *)JS_GetRuntimeOpaque(JS_GetRuntime(ctx));
+    if (atomic_load(&c->terminating)) return throw_terminated(c);
     JNIEnv *env = yeow_env(c);
     if (!env) return JS_ThrowInternalError(ctx, "JNI env unavailable");
 
@@ -286,6 +296,10 @@ static JSValue js_dispatch(JSContext *ctx, JSValueConst this_val, int argc, JSVa
     jobject res = (*env)->CallObjectMethod(env, c->self, c->mInvokeCallback, (jint)magic, jargs);
     (*env)->DeleteLocalRef(env, jargs);
 
+    if (atomic_load(&c->terminating)) {
+        if (res) (*env)->DeleteLocalRef(env, res);
+        return throw_terminated(c);
+    }
     if ((*env)->ExceptionCheck(env)) return java_exception_to_js(c, env);
 
     JSValue out = yeow_java_to_js(c, env, res);
@@ -321,9 +335,12 @@ YeowCtx *yeow_create(JNIEnv *env, jobject thiz) {
     JS_SetHostPromiseRejectionTracker(c->rt, on_rejection, c);
     JS_SetInterruptHandler(c->rt, on_interrupt, c);
     atomic_init(&c->interrupted, 0);
+    atomic_init(&c->terminating, 0);
 
     /* Native-backed globals (performance.now(), ...). */
     yeow_install_polyfills(c->ctx);
+    /* Binary transport primitives (__yeowWrite / __yeowRead). */
+    yeow_binary_install(c->ctx);
 
     c->self = (*env)->NewGlobalRef(env, thiz);
     if (!c->self) goto fail;

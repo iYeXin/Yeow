@@ -29,6 +29,9 @@ typedef struct YeowCtx {
     JSRuntime *rt;
     JSContext *ctx;
     atomic_int interrupted;
+    /** Sticky: set once termination is requested. The JS->Java upcall boundary
+        (`$_send`) raises an uncatchable abort while this is set. */
+    atomic_int terminating;
 
     YeowRejection *rejects;
     int reject_len;
@@ -38,6 +41,10 @@ typedef struct YeowCtx {
     JSValue *bound;
     int bound_len;
     int bound_cap;
+
+    /* Resident transport buffer (Java-allocated DirectByteBuffer). */
+    uint8_t *buf;
+    size_t buf_cap;
 
     /* cached Java classes (global refs) */
     jclass clsObject;

@@ -4,7 +4,7 @@
 // 由 "npm run publish" 调用（先 "npm run build" 构建全部语言，再逐个上传）。
 // 配置（.env，不入库；可复制 .env.example）：
 //   YEOW_PUBLISH_API_KEY=your-secret-key
-//   YEOW_PUBLISH_URL=http://your-server:17492/deploy
+//   YEOW_PUBLISH_URL=https://example.com/deploy
 //   CN_PATH=
 //   EN_PATH=
 import { readFileSync, existsSync, rmSync } from 'fs';

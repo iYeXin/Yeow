@@ -1,9 +1,14 @@
-# Yeow 二进制传输格式 — 设计、实现与回退纪要
+# Yeow 二进制传输格式 — 两阶段尝试与回退纪要
 
-> **状态：已废弃。** 2026-07-24 决议：移除二进制快速通道，恢复纯 JSON 传输。
-> 本文档保留完整设计历程与测试数据，供后续参考。
+> **状态：两阶段均已回退，运行时为纯 JSON。**
+> - **阶段一（2026-07-24）**：扁平槽 + FNV-1a 快速通道（2KB）——已移除。
+> - **阶段二（2026-09-13）**：通用树二进制（16KB 常驻缓冲区，随 `yeow-runtime 0.6.1`）——**默认停用、代码隔离保留**（`BinaryCodec.ENABLED = false`，注入为全局 `$binary`）。
+>
+> 本文保留两阶段的设计历程、实测数据与回退原因，供后续参考。
 
 ---
+
+# 阶段一：扁平槽 / FNV-1a 快速通道（2KB，2026-07）
 
 ## 1. 背景
 
@@ -254,3 +259,116 @@ Yeow 的二进制数据交换格式理论上是优雅的：它将所有不一致
 | 2026-07-24       | **决议放弃**                                                                                                                       |
 
 ---
+
+# 阶段二：通用树二进制（16KB 常驻缓冲区，2026-09，`yeow-runtime 0.6.1`）
+
+> 与阶段一的关键差异：阶段一是**定长槽 + 哈希键 + 懒取值**（两侧都不逐键构造对象，靠 schema 路由）；阶段二是**通用树 + 逐节点物化**（C/JS/Java 都构造完整对象树），不做 schema、不做任务白名单，`$send(channel, obj)` 完全透明。这决定了两者的收益与代价完全不同。
+
+## 1. 目标与约束
+
+- 通用：任意可 JSON 化的对象/数组/原始值；无 schema、无任务白名单。
+- 透明：`$send(channel, payload)` 与 `yeow-api` 语义不变；任何失败静默回退 JSON。
+- 键名**直传原始 UTF-8**（明确放弃 FNV-1a——阶段一的教训）。
+- 每插件一块常驻缓冲区，JS 单线程私有，无并发。
+
+## 2. 格式（version 2）
+
+小端；无对齐、无哈希。
+
+```
+header (12B): u32 magic(0x59454F42) | u16 version(=2) | u8 mode | u8 reserved | u32 bodyLen
+mode 0 (binary): u16 channelLen | channel(utf8) | value
+mode 1 (json)  : varint len | utf8          （已定义，未接线）
+mode 2 (null)  : -
+
+value := tag [payload]
+  T_NULL=0  T_FALSE=1  T_TRUE=2
+  T_I32=3 (4B)  T_I64=4 (8B)  T_F64=5 (8B)
+  T_STR=6   varint len | bytes
+  T_BYTES=7 varint len | raw
+  T_OBJ=8   ( T_KEY key value )* T_OBJ_END=9
+  T_ARR=10  value*         T_ARR_END=11
+  T_KEY=12  varint len | key bytes(UTF-8)
+```
+
+- 对象/数组以起止标记界定、无计数；写入为单向递归，解析为 tag 驱动状态机；长度为 LEB128 varint。
+- 键名直传 UTF-8，不做哈希（阶段一的 FNV 被否）。
+- `T_BYTES` 承载 `ArrayBuffer`/`byte[]`（Java 侧解码为 base64 字符串）。
+
+## 3. 传输接线
+
+- **上行**：`$send(channel, payload)` → `__yeowWrite(channel, payload)` 写缓冲区 → `$_send(null, null)`（Java 按 `args[1] == null` 判定二进制）→ `decodeChannel` + `decodeBinary`；结果经 `encodeResult` 回投，返回状态码 0（null）/ 1（结果在缓冲区，JS `__yeowRead`）/ JSON 字符串（回退）。
+- **回退**：`__yeowWrite` 返回 false（>16KB、function、symbol 等）或 payload 为 null/undefined → `$_send(channel, JSON.stringify(payload))`。
+- **下行**：事件/命令/服务/任务回投的生产者只把**原始 Java 对象**放入 `MsgQueue`，由 JS 线程在分发前 `encodeBinary`（失败回退 `gson.toJson` → `$hm` JSON）。
+- **调度器去 JSON 化**：`submitGameSync` 改 `CompletableFuture<Object>`；`PaperScheduler`/`FoliaScheduler` 的 `finish`/`fail`/`purge*` 不再 `gson.toJson`，序列化收归通信层。
+- 桥：`binary.c` 注入 `__yeowWrite`/`__yeowRead`；`QuickJSContext.buffer()` 暴露 16KB `DirectByteBuffer`（`BUFFER_SIZE = 16 * 1024`）。
+
+## 4. 关键缺陷与修复：T_OBJ_END 与键长冲突
+
+**缺陷**：对象结束标记 `T_OBJ_END = 9` 与「键长 varint 低 7 位 = 9」冲突。9 字节键（如 `blockType`）以及 137/265 字节键都会命中。解码端 `peek(b) != T_OBJ_END` 把**键长字节**误判为对象结束，随即错位 → `decodeBinary` 抛异常返回 null → Java `new JsonObject()` → `obj.get("t")` 为 null → 日志 `$_send err: Cannot invoke "JsonElement.getAsString()" because "JsonObject.get(String)" is null`。
+
+**修复**：对象条目前置显式 `T_KEY = 12` 标记，解码端要求 `T_KEY` 而非裸键长；键长不再与结束标记同位置冲突。C（`binary.c`）与 Java（`BinaryCodec`）同步修改；回归覆盖 C `SmokeTest` 与 Java `BinaryCodecTest`（9/137/265 字节键）。
+
+## 5. 性能实测（2026-09-13，Windows / JDK21 / Paper 1.21.4）
+
+### 5.1 端到端（`debug.payload` 同步批量，ms/op）
+
+| 载荷 | 二进制 | JSON | json/bin |
+|---|---|---|---|
+| nested(small) | 0.027 | 0.021 | ×0.79（JSON 快） |
+| world.setBlock | 0.016 | 0.013 | ×0.84（JSON 快） |
+| array x200 | 0.019 | 0.065 | ×3.34（二进制快） |
+| string 1KB | 0.007 | 0.017 | ×2.42 |
+| string 20KB（>16KB） | 0.231 | 0.214 | ×0.93 |
+| array x5000（>16KB） | 1.58 | 1.55 | ×0.98 |
+
+> >16KB 两行的「二进制」列实为回退 JSON（`__yeowWrite` 失败），对照无意义。
+
+### 5.2 阶段归因（StageBench，ms/op，已扣 `evaluate` 基线）
+
+| 载荷 | Cenc | Jdec | Jenc | Cdec | C 占比 |
+|---|---|---|---|---|---|
+| nested(small) | 0.012 | 0.004 | 0.004 | 0.006 | 69% |
+| flat8（8 键单层） | 0.008 | 0.001 | 0.001 | 0.006 | 88% |
+| array x200 | 0.010 | 0.002 | 0.001 | 0.010 | 90% |
+| string 1KB | 0.006 | — | — | 0.005 | 88% |
+| obj200 keys | 0.020 | 0.015 | 0.003 | 0.020 | 69% |
+
+- 同载荷纯 JS 侧对照 QuickJS 自带 JSON：我们的 codec 比 `JSON.stringify` + `JSON.parse` 快 **1.3–2.6×**（array x200：0.020 vs 0.052）。
+- C 侧微调（`JS_DefinePropertyValueStr/Uint32` vs `JS_SetPropertyStr/Uint32`、`JS_NewAtomLen`）实测 ≈0 → 逐节点物化已到 QuickJS 公开 API 地板。
+
+### 5.3 Java 侧（`JavaBench`，ms/op 与分配）
+
+| 载荷 | 我们解码 | 我们编码 | gson parse | gson toJson |
+|---|---|---|---|---|
+| nested | 0.001 | 0.001 | 0.002 | 0.004 |
+| array200 int | 0.002 | 0.002 | 0.005 | 0.014 |
+| obj200 keys | 0.011 | 0.004 | 0.014 | 0.025 |
+
+- 堆 buffer vs direct buffer 无差异；我们的 codec 比 gson 快 1.2–7×、分配少 2–10×（array200 编码 24B vs gson 48KB）。
+- 已做优化：整数编码改 `T_I32` + `getAsNumber`（array200 Java 编码 0.008→0.001，分配 ~48KB→24B）；解码 `byte[]→String` 用 ThreadLocal scratch（解码分配 −16~49%）；缓存布尔 `JsonPrimitive`。
+
+## 6. 为什么仍然不够（回退原因）
+
+1. **小对象（最常见）二进制反而慢 16–21%**：固定「常驻缓冲区 + `$_send(null,null)` + `__yeowRead`」协同开销，加上每对象固定开销（`JS_GetOwnPropertyNames` / `JS_NewObject`），盖过了编码收益；JSON 的内建 `stringify/parse` 对少量键足够快。
+2. **63–90% 成本在 C 侧逐节点 QuickJS API 调用**，公开 API 无法再优化（实测为 0）。
+3. **16KB 上限**：chunk/NBT/大数组这类节点数最多、二进制收益最大的载荷永远回退 JSON。
+4. 要拿到阶段一级别的收益，必须回到「扁平槽 + 懒取值 + schema」——即阶段一被否掉的路线。
+
+## 7. 决议：默认停用（隔离保留）
+
+- 运行时恢复**纯 JSON**：`$send` → `$_send(channel, JSON.stringify(payload))`；下行 `gson.toJson`。
+- 二进制代码**不删除**，通过单一开关 `BinaryCodec.ENABLED = false`（注入为全局 `$binary`）隔离：`init.js` 的 `$send`/`$hm`、`PluginThread`/`WorkerThread` 的 `$_send` / `encodeResult` / 消息循环均按该开关分流；C 侧 `__yeowWrite`/`__yeowRead` 仍注册但不会被调用。
+- 重新启用只需把 `BinaryCodec.ENABLED` 置 `true`（C/Java/JS 自动一致）。
+- 实现说明见 `yeow-doc-website/docs/{cn,en}/advanced/binary-transport.md`（顶部标注默认停用）。
+
+## 8. 时间线（第二阶段）
+
+| 日期 | 事件 |
+|---|---|
+| 2026-09-13 | 在 `quickjs-wrapper`（C + Zig）重写基础上实现通用树二进制（`native/src/binary.{c,h}` + `yeow/transport/BinaryCodec.java`），集成进 `yeow-runtime 0.6.1` |
+| 2026-09-13 | 修复 `T_OBJ_END` 与 9 字节键长冲突（引入 `T_KEY`），C/Java 同步 + 回归用例 |
+| 2026-09-13 | 基准与阶段归因：确认 C 侧逐节点为瓶颈、小对象劣于 JSON、>16KB 回退 |
+| 2026-09-13 | Java 侧优化：`T_I32`、解码 scratch、布尔缓存 |
+| 2026-09-13 | **决议默认停用（`BinaryCodec.ENABLED = false`），代码隔离保留，运行时纯 JSON** |
+

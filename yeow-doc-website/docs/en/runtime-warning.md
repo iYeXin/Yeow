@@ -105,7 +105,11 @@ eventOn('playerJoin', (e) => {
 
 **Meaning:** JS thread stuck in **infinite loop / deadlock / complete block**, plugin functionality completely stopped.
 
-**Solutions:** Check for exitless `while(true)` in `onLoad`/`onInit`; move heavy computation to native services; `/yeow reload` or restart server.
+When a hang occurs, the runtime follows [Unload and Forced Termination](specifications/runtime/index.md#unload-and-forced-termination) (prefer graceful unload; otherwise controlled forced termination): **graceful exit** (wait for `unloadDone`) → timeout → **forced termination** (uncatchable interrupt + grace period) → **abandon and quarantine** (create a fresh execution unit if a reload is required).
+
+> Put cleanup logic in `onUnload` — forced termination is uncatchable, so JS `catch` / `finally` are not guaranteed to run.
+
+**Solutions:** Check for exitless `while(true)` in `onLoad`/`onInit`; avoid catastrophic regex backtracking and huge JSON; move heavy computation to native services; `/yeow reload` or restart server.
 
 ### budget.congested / budget.restored (real-time queue backlog)
 
@@ -199,7 +203,7 @@ No. LOW queue carries large batch repetitive tasks, allows backlog and delayed c
 
 ### Q: Will plugin thread hang automatically recover?
 
-Probably not (infinite loops don't exit themselves). Development environment can hot reload (5s forced destroy old context); production environment `/yeow reload` or restart server.
+Usually not — an infinite loop does not exit by itself. The runtime follows [Unload and Forced Termination](specifications/runtime/index.md#unload-and-forced-termination): graceful exit → timeout → uncatchable interrupt + grace period → abandon and quarantine (rebuilding a fresh execution unit if a reload is required). A pure JS infinite loop is aborted by the interrupt; a thread stuck in an **uninterruptible native operation** (catastrophic regex, huge JSON, etc.) may only be reclaimed when it returns (abandonment is temporary). Development supports hot reload; production uses `/yeow reload` or a server restart.
 
 ### Q: How to completely disable certain type of alert?
 

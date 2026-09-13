@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-09-13
+
+### yeow-runtime 0.6.1（强制终止鲁棒性）
+
+- **强制终止鲁棒性**：`QuickJSContext` 恢复**线程亲和守卫**（除 `interrupt()` 外跨线程调用一律抛错，避免跨线程 `JS_FreeContext`/`JS_Call` 的 use-after-free / JVM 崩溃）；强杀路径区分「卡在 JS/原生长运算」与「阻塞在 Java 调用」；原生中断（**不可捕获**，JS `catch`/`finally` 吞不掉）无法终止时打印 `severe` 警告并**遗弃 + 隔离**该引擎——不再投递消息/事件（`postMessage`/`ping` 丢弃）、其 `$send` **立即触发不可捕获中止**（把 JS→Java 上行边界当作安全点：`catch`/`finally` 拦不住、无副作用）、需要重载则重建全新实体；**遗弃是临时的**：卡住的调用一旦返回或到达中断检查点，该线程即走正常路径自行销毁上下文并回收（仅**永不返回**的原生运算才永久泄漏）；其作为**平台通用行为**写入[运行时环境标准](yeow-doc-website/docs/cn/specifications/runtime/index.md)（新增「卸载与强制终止」节：两条强制要求——**顺序与受控终止**、**优先优雅卸载**——另附**示例流程**，插件与 Worker 同适用）；`runtime-warning` 的 `plugin.hung` 与 `advanced/lifecycle` 链接引用该节
+- **版本 0.6.0 → 0.6.1**（runtime core/paper/folia、yeow-template、create-yeow、`wiki.yexin:yeow-quickjs`）；模板内置 jar 同步为 `yeow-runtime-0.6.1.jar` / `yeow-runtime-folia-0.6.1.jar` / `yeow-template-0.6.1.jar`
+- 验证：桥 SmokeTest ALL PASS；`mvn test`（core 95 / paper 16 / folia 23）通过
+
 ## 2026-09-12
 
 ### quickjs-wrapper 重写（C + Zig）+ 统一权限门控 + 原生服务协议 v2 / 强制声明 + service OOP + 0.6.0

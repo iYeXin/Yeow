@@ -45,10 +45,12 @@ class LoadTargetTest {
 
     @Test
     void caseInsensitiveButExactPreferred() throws Exception {
-        var ci = touch("myplugin-1.0.0.yeow.zip");       // wrong case
+        var ci = touch("myplugin-1.0.0.yeow.zip");       // wrong case, but made newest
         var exact = touch("myPlugin-2.0.0.yeow.zip");    // exact case
+        ci.setLastModified(System.currentTimeMillis() + 60_000);
+        // Exact-case prefix wins even though the wrong-case file is newer.
         assertEquals(exact, RuntimeCore.resolveLoadTarget("myPlugin", tmp.toFile()));
-        // No exact-case match → case-insensitive fallback.
+        // No exact-case match for "MyPlugin" → case-insensitive fallback, newest wins.
         assertEquals(ci, RuntimeCore.resolveLoadTarget("MyPlugin", tmp.toFile()));
     }
 

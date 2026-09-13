@@ -89,26 +89,33 @@ dev-server → WebSocket hot-reload → Java main thread
   ├─ command.unregisterAll      ← Clean up old commands
   ├─ eventBridge.unsubscribeAll ← Clean up old events
   ├─ purgePluginServices        ← Clean up old services (including native subprocesses)
-  └─ pt.reload(newCode)         ← Blocking wait, max 5s
+  └─ pt.reload(newCode)         ← Blocking wait
        │
-       ├─ Send RELOAD → JS queue → Wait for JS thread to exit naturally
+       ├─ Phase 1: Send RELOAD → JS queue → wait for graceful exit (up to ~5s)
        │    ├─ _hm → onUnload callback
        │    ├─ $send('lifecycle', {type:'unloadDone'})
        │    └─ running = false → Message loop exits → Old context destroyed (JS thread self-destructs)
        │
-       ├─ Timeout without exit → Force-kill path (since 2026-08-13)
-       │    ├─ ctx.interrupt() (wrapper 3.9.0 native interrupt) → JS thread aborts within its own execution flow, then self-destructs the context
-       │    ├─ Still cannot exit → Rebuild an entirely new entity (new thread / new queue / new context), old entity is abandoned
-       │    └─ **Never destroy a context across threads** (QuickJS single-thread model; cross-thread destruction = crash)
+       ├─ Phase 2: Timeout without unloadDone → graceful exit failed
        │
+       ├─ Phase 3: Forced termination + grace period (~1s)
+       │    ├─ ctx.interrupt(): one flag drives both the QuickJS interpreter interrupt and the $_send checkpoint (uncatchable)
+       │    ├─ thread.interrupt(): wake interruptible Java blocking points
+       │    └─ Thread aborts within the grace period → self-destructs the context and is reclaimed
+       │
+       ├─ Phase 4: Still alive after the grace period → abandon + quarantine
+       │    ├─ No further messages/events (postMessage/ping dropped); its $send raises an uncatchable abort
+       │    └─ Rebuild a fresh entity (new thread/queue/context); the old entity is abandoned temporarily (reclaimed when the stuck call returns)
+       │
+       ├─ **Never destroy a context across threads** (QuickJS single-thread model; cross-thread destruction = crash)
        ├─ Clean up old timers / io / http / lingering tasks
        ├─ Clear the message queue
        └─ start() → New thread → New context → New code
 ```
 
-Hot reload waits synchronously on the main thread (max 5s), without affecting other Yeow plugins.
+Hot reload waits synchronously on the main thread, without affecting other Yeow plugins.
 
-> **Force-kill mechanism**: A thread stuck in a **pure JS infinite loop** is interrupted by QuickJS native interrupt (`QuickJSContext.interrupt()`, wrapper 3.9.0+ via `JS_SetInterruptHandler`) within **its own execution flow** — the thread then exits normally and destroys its own context; when stuck in a Java call that cannot return to JS, hot reload rebuilds an entirely new entity (old entity is abandoned, thread is a daemon and does not block server shutdown).
+> **Force-kill mechanism (four phases)** (normative requirements + example flow: [Unload and Forced Termination](../specifications/runtime/index.md#unload-and-forced-termination)): ① send `DISABLE`/`RELOAD` and wait for the JS side's `onUnload` + `unloadDone` (up to ~5s); ② timeout without exit; ③ enter forced termination with a ~1s grace period — the **same flag** from `QuickJSContext.interrupt()` drives both the QuickJS interpreter interrupt and the `$_send` upcall checkpoint (**both uncatchable**; JS `catch`/`finally` cannot intercept), plus `Thread.interrupt()` to wake Java blocking points; ④ still alive after the grace period → **abandon and quarantine** the engine (no further dispatch; its `$send` raises an uncatchable abort; a reload rebuilds a fresh entity). Abandonment is **temporary**: once the stuck call returns the thread still self-destructs its context and is reclaimed (only a **never-returning** native operation leaks, needing a restart). **Never destroy a context across threads** (QuickJS single-thread model; cross-thread destruction = crash).
 
 ### Production reload / unload
 

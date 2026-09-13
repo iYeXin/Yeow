@@ -157,7 +157,7 @@ public class FoliaScheduler implements TaskScheduler {
     /** 上次从 LOW 池取任务时刻（LOW 饿死保护用）。 */
     private volatile long lastLowPickNs = System.nanoTime();
 
-    record PendingTask(String taskType, JsonObject params, CompletableFuture<String> future, Consumer<Object> callback, Priority priority, String pluginName, long enqueuedAtNs) {
+    record PendingTask(String taskType, JsonObject params, CompletableFuture<Object> future, Consumer<Object> callback, Priority priority, String pluginName, long enqueuedAtNs) {
         boolean isAsync() { return callback != null; }
     }
 
@@ -228,7 +228,7 @@ public class FoliaScheduler implements TaskScheduler {
     // ── 提交 ───────────────────────────────────────────────────────
 
     @Override
-    public void submitGameSync(String taskType, JsonObject params, CompletableFuture<String> future, Priority priority, String pluginName) {
+    public void submitGameSync(String taskType, JsonObject params, CompletableFuture<Object> future, Priority priority, String pluginName) {
         submit(taskType, params, future, null, priority, pluginName);
     }
 
@@ -238,7 +238,7 @@ public class FoliaScheduler implements TaskScheduler {
     }
 
     /** 入队 + 唤醒（驻留标记由 FoliaTasks.getScheduler 计算——纯字符串，任意线程可算）。 */
-    private void submit(String taskType, JsonObject params, CompletableFuture<String> future, Consumer<Object> callback, Priority priority, String pluginName) {
+    private void submit(String taskType, JsonObject params, CompletableFuture<Object> future, Consumer<Object> callback, Priority priority, String pluginName) {
         var effective = effectivePriority(priority, pluginName, taskType);
         pool(effective).add(new PendingTask(taskType, params, future, callback, effective, pluginName, System.nanoTime()));
         wake(FoliaTasks.getScheduler(taskType, params).marker());
@@ -549,7 +549,7 @@ public class FoliaScheduler implements TaskScheduler {
 
     /** 对排队超时的同步任务补 err（不执行任务体）。 */
     private static void errStale(PendingTask t) {
-        t.future().complete(gson.toJson(Map.of("err", "task queue timed out: " + t.taskType())));
+        t.future().complete(Map.of("err", "task queue timed out: " + t.taskType()));
     }
 
     /**
@@ -604,7 +604,7 @@ public class FoliaScheduler implements TaskScheduler {
 
     private static void completeTask(PendingTask t, Object result) {
         if (t.isAsync()) t.callback().accept(result);
-        else t.future().complete(gson.toJson(result));
+        else t.future().complete(result);
     }
 
     private static Object executeOrErr(String taskType, JsonObject params) {
@@ -766,7 +766,7 @@ public class FoliaScheduler implements TaskScheduler {
 
     private boolean purge(PendingTask t, String pluginName) {
         if (!pluginName.equals(t.pluginName())) return false;
-        if (!t.isAsync()) t.future().complete(gson.toJson(Map.of("err", "plugin unloaded")));
+        if (!t.isAsync()) t.future().complete(Map.of("err", "plugin unloaded"));
         return true;
     }
 }

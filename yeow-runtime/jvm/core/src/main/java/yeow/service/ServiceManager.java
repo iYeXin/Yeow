@@ -394,8 +394,8 @@ public class ServiceManager {
             b.addProperty("base64", java.util.Base64.getEncoder().encodeToString(body == null ? new byte[0] : body));
             r.add("body", b);
         }
-        // 所有者插件的 onRequestCb 收到请求，经 service.response 回投
-        pt.postMessage(gson.toJson(Map.of("t", "cb", "p", entry.onRequestCb, "r", r)));
+        // 所有者插件的 onRequestCb 收到请求，经 service.response 回投（原始对象 → JS 线程编码）
+        pt.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(entry.onRequestCb, r));
     }
 
     private void requestNative(ServiceEntry entry, String path, JsonObject headers, String contentType, byte[] body, String requestId, String consumerPlugin) {
@@ -468,7 +468,7 @@ public class ServiceManager {
         if (consumerPlugin == null) return;
         var pt = pluginLookup.apply(consumerPlugin);
         if (pt != null) {
-            pt.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(requestId, result));
+            pt.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(requestId, result));
         }
     }
 
@@ -489,7 +489,7 @@ public class ServiceManager {
         r.add("headers", h);
         r.addProperty("contentType", h.get("content-type").getAsString());
         r.addProperty("base64", java.util.Base64.getEncoder().encodeToString(body == null ? new byte[0] : body));
-        pt.postMessage(gson.toJson(Map.of("t", "cb", "p", requestId, "r", r)));
+        pt.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(requestId, r));
     }
 
     /**
@@ -534,13 +534,15 @@ public class ServiceManager {
     private void publishByService(String serviceId, String eventPath, JsonObject body) {
         var set = subscriptions.get(serviceId);
         if (set == null) return;
-        var payload = Map.of("serviceId", serviceId, "eventPath", eventPath,
-            "body", (Object)(body != null ? gson.fromJson(body.toString(), Object.class) : null));
+        var payload = new LinkedHashMap<String, Object>();
+        payload.put("serviceId", serviceId);
+        payload.put("eventPath", eventPath);
+        payload.put("body", body != null ? gson.fromJson(body.toString(), Object.class) : null);
         for (var sub : set) {
             if (!eventPath.equals(sub.eventPath)) continue;
             var pt = pluginLookup.apply(sub.subscriberPlugin);
             if (pt != null) {
-                pt.postMessage(gson.toJson(Map.of("t", "cb", "p", sub.subscriberCb, "r", payload)));
+                pt.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(sub.subscriberCb, payload));
             }
         }
     }
@@ -663,7 +665,7 @@ public class ServiceManager {
             try { if (!e.nativeProc.isAlive()) payload.put("exitCode", e.nativeProc.exitValue()); } catch (Exception ignored) {}
         }
         if (e.outputLog != null && e.outputLog.length() > 0) payload.put("output", e.outputLog.toString().trim());
-        pt.postMessage(gson.toJson(Map.of("t", "cb", "p", cb, "r", payload)));
+        pt.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(cb, payload));
     }
 
     private void failPendingRequests(String serviceId, String reason) {

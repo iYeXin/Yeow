@@ -141,6 +141,29 @@ Steps of a complete message loop:
 
 ---
 
+## Unload and Forced Termination
+
+Plugins and **Workers (virtual plugins)** both run in a **dedicated single-threaded** JS execution unit (see [Environment Capabilities](../../environment.md)). The runtime **MUST** satisfy the following two points:
+
+1. **Ordering and controlled termination**: on unload, reload or shutdown the runtime must ensure that **the old code has stopped before** new code starts; an execution unit that cannot stop on its own must be terminated **in a controlled way**, without crashing the host or blocking it for long.
+2. **Prefer graceful unload**: prefer sending an unload message so the execution unit exits by itself — running every callback in `__yeowUnloadCbs` and then sending [`unloadDone`](../message/lifecycle.md#unloaddone) over the `lifecycle` channel — rather than terminating it directly.
+
+**Example flow (non-normative, for reference)**
+
+The four-phase flow below is one typical implementation that satisfies the requirements above; **platforms may choose not to adopt it**. If adopted, the constraints after it apply.
+
+1. **Graceful exit**: the runtime sends an unload request (e.g. `DISABLE` / `RELOAD`) and waits for `unloadDone` for a bounded time.
+2. **Graceful exit failed**: the timeout expires with no `unloadDone`.
+3. **Forced termination (with a grace period)**: the runtime requests an **interrupt**. It takes effect at interpreter checkpoints **and** at the JS→Java upcall boundary (`$send`), aborting with an **uncatchable** error — JS `catch` / `finally` **do not run**; interruptible host blocking points are also woken. A bounded **grace period** then follows for the thread to exit and release its resources.
+4. **Abandon and rebuild**: if it is still alive after the grace period, the execution unit is **abandoned and quarantined**: it no longer receives or delivers any messages / events, and its `$send` aborts immediately with an uncatchable error. If the operation requires a reload, the runtime **creates a fresh execution unit** and keeps running.
+
+Constraints when adopting the example flow:
+
+- The interrupt is only observed at checkpoints; if the thread is stuck in an **uninterruptible native operation** (e.g. catastrophic regex backtracking, huge JSON encode/decode), it may not be aborted within the grace period.
+- An abandoned execution unit is **temporary**: once the stuck call returns it must still be reclaimed (its engine context destroyed); only a **never-returning** operation leaks permanently.
+- The host must **never** destroy a running engine context from another thread (this causes use-after-free / process crash).
+- Because forced termination is uncatchable, JS `catch` / `finally` are **not guaranteed to run**; cleanup belongs in `__yeowUnloadCbs` (the normal unload path).
+
 ## Per-Channel cb Semantics
 
 The following specifies the behavior of each channel's support for the `cb` field:

@@ -41,6 +41,20 @@ JNIEXPORT jlong JNICALL Java_wiki_yexin_quickjs_QuickJSContext_nativeCreate(JNIE
     return (jlong)(intptr_t)c;
 }
 
+JNIEXPORT void JNICALL Java_wiki_yexin_quickjs_QuickJSContext_nativeRegisterBuffer(
+    JNIEnv *env, jobject thiz, jlong handle, jobject buffer) {
+    (void)thiz;
+    YeowCtx *c = (YeowCtx *)(intptr_t)handle;
+    if (!c) return;
+    if (buffer == NULL) {
+        c->buf = NULL;
+        c->buf_cap = 0;
+        return;
+    }
+    c->buf = (uint8_t *)(*env)->GetDirectBufferAddress(env, buffer);
+    c->buf_cap = (size_t)(*env)->GetDirectBufferCapacity(env, buffer);
+}
+
 JNIEXPORT void JNICALL Java_wiki_yexin_quickjs_QuickJSContext_nativeDestroy(JNIEnv *env, jobject thiz,
                                                                          jlong handle) {
     (void)thiz;
@@ -243,4 +257,7 @@ JNIEXPORT void JNICALL Java_wiki_yexin_quickjs_QuickJSContext_nativeInterrupt(JN
     YeowCtx *c = (YeowCtx *)(intptr_t)handle;
     if (!c) return;
     atomic_store(&c->interrupted, 1);
+    /* Sticky: from now on the JS->Java upcall boundary aborts uncatchably, so a plugin
+       that keeps calling $_send cannot keep producing side effects during termination. */
+    atomic_store(&c->terminating, 1);
 }

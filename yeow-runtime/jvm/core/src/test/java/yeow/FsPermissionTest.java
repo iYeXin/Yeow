@@ -32,8 +32,8 @@ class FsPermissionTest {
         return new TaskScheduler() {
             @Override public void start() {}
             @Override public void shutdown() {}
-            @Override public void submitGameSync(String taskType, com.google.gson.JsonObject params, java.util.concurrent.CompletableFuture<String> future, Priority priority, String pluginName) {
-                future.complete("null");
+            @Override public void submitGameSync(String taskType, com.google.gson.JsonObject params, java.util.concurrent.CompletableFuture<Object> future, Priority priority, String pluginName) {
+                future.complete(null);
             }
             @Override public void submitGameAsync(String taskType, com.google.gson.JsonObject params, java.util.function.Consumer<Object> callback, Priority priority, String pluginName) {}
             @Override public void purgePluginTasks(String pluginName) {}

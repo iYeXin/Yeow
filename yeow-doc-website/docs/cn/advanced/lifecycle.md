@@ -89,26 +89,33 @@ dev-server → WebSocket hot-reload → Java 主线程
   ├─ command.unregisterAll      ← 清理旧命令
   ├─ eventBridge.unsubscribeAll ← 清理旧事件
   ├─ purgePluginServices        ← 清理旧服务（含 native 子进程）
-  └─ pt.reload(newCode)         ← 阻塞等待，最多 5s
+  └─ pt.reload(newCode)         ← 阻塞等待
        │
-       ├─ 发送 RELOAD → JS 队列 → 等待 JS 线程自然退出
+       ├─ 阶段1 发送 RELOAD → JS 队列 → 等待优雅退出（最长约 5s）
        │    ├─ _hm → onUnload 回调
        │    ├─ $send('lifecycle', {type:'unloadDone'})
        │    └─ running = false → 消息循环退出 → 旧上下文销毁（JS 线程自毁）
        │
-       ├─ 超时未退出 → 强杀路径（2026-08-13 起）
-       │    ├─ ctx.interrupt()（wrapper 3.9.0 原生中断）→ JS 线程在自身执行流中止后自毁上下文
-       │    ├─ 仍无法退出 → 重建全新实体（新线程/新队列/新上下文），旧实体被遗弃
-       │    └─ **绝不跨线程 destroy 上下文**（QuickJS 单线程模型，跨线程销毁 = 崩溃）
+       ├─ 阶段2 超时未收到 unloadDone → 优雅退出失败
        │
+       ├─ 阶段3 强杀 + 宽恕期（约 1s）
+       │    ├─ ctx.interrupt()：同一标志驱动 QuickJS 解释器中断与 $_send 检查点（不可捕获）
+       │    ├─ thread.interrupt()：唤醒可中断的 Java 阻塞点
+       │    └─ 宽恕期内线程自行中止 → 自毁上下文并回收
+       │
+       ├─ 阶段4 宽恕期超时仍未退出 → 遗弃并隔离
+       │    ├─ 不再投递消息/事件（postMessage/ping 丢弃）；其 $send 抛不可捕获错误
+       │    └─ 重建全新实体（新线程/新队列/新上下文）；旧实体遗弃为临时（卡住调用返回即自毁回收）
+       │
+       ├─ **绝不跨线程 destroy 上下文**（QuickJS 单线程模型，跨线程销毁 = 崩溃）
        ├─ 清理旧 timer / io / http / 残留任务
        ├─ 清空消息队列
        └─ start() → 新线程 → 新上下文 → 新代码
 ```
 
-热重载在主线程上同步等待（最多 5s），期间不影响其他 Yeow 插件。
+热重载在主线程上同步等待，期间不影响其他 Yeow 插件。
 
-> **强杀机制**：卡死在**纯 JS 死循环**的线程由 QuickJS 原生中断（`QuickJSContext.interrupt()`，wrapper 3.9.0+ 经 `JS_SetInterruptHandler`）在**其自身执行流**中止——线程随后正常退出并销毁自己的上下文；卡在无法返回 JS 的 Java 调用时，热重载会重建全新实体（旧实体被遗弃，线程为 daemon 不阻塞关服）。
+> **强杀机制（四阶段）**（规范要求与示例流程见[卸载与强制终止](../specifications/runtime/index.md#卸载与强制终止)）：① 发 `DISABLE`/`RELOAD` 等待 JS 侧 `onUnload` + `unloadDone` 优雅退出（最长约 5s）；② 超时未退出；③ 进入强杀并给约 1s 宽恕期——`QuickJSContext.interrupt()` 的**同一标志同时驱动 QuickJS 解释器中断与 `$_send` 上行检查点**（均为**不可捕获**错误，JS `catch`/`finally` 拦不住），并 `Thread.interrupt()` 唤醒 Java 阻塞点；④ 宽恕期结束仍存活 → **遗弃并隔离**引擎（不再分发、其 `$send` 立即触发不可捕获中止；需要重载则重建全新实体）。遗弃是**临时**的：卡住的调用一旦返回，线程仍走正常路径自毁上下文并回收（仅**永不返回**的原生运算才永久泄漏，需重启）。**绝不跨线程 destroy 上下文**（QuickJS 单线程模型，跨线程销毁 = 崩溃）。
 
 ### 生产环境 reload / unload
 

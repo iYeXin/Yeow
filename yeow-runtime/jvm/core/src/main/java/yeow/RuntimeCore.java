@@ -393,10 +393,10 @@ public class RuntimeCore {
      * @param entity  提交方实体（注册表中的插件）
      * @param message 任务消息：JSON 字符串，或 POJO（**直接使用**，避免序列化开销--
      *               gson `JsonObject` 零转换直接执行；一般 POJO 由运行时一次转换）
-     * @return 结果 JSON（同步）或 null（异步）
+     * @return 结果原始对象（同步）或 null（异步）；序列化由通信层负责
      */
-    public String submitTask(PluginEntity entity, Object message) {
-        if (entity == null) return gson.toJson(Map.of("err", "unknown plugin entity"));
+    public Object submitTask(PluginEntity entity, Object message) {
+        if (entity == null) return Map.of("err", "unknown plugin entity");
         try {
             JsonObject obj;
             if (message instanceof String s) {
@@ -418,15 +418,15 @@ public class RuntimeCore {
             var priority = parsePriority(obj.has("priority") ? obj.get("priority").getAsString() : null);
             if (hasCb) {
                 var cbId = obj.get("cb").getAsString();
-                scheduler.submitGameAsync(taskType, params, r -> entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, r)), priority, entity.name());
+                scheduler.submitGameAsync(taskType, params, r -> entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(cbId, r)), priority, entity.name());
                 return null;
             }
-            var future = new java.util.concurrent.CompletableFuture<String>();
+            var future = new java.util.concurrent.CompletableFuture<Object>();
             scheduler.submitGameSync(taskType, params, future, priority, entity.name());
             try { return future.get(config.taskSyncTimeoutMs(), TimeUnit.MILLISECONDS); }
-            catch (Exception e) { return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString())); }
+            catch (Exception e) { return Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()); }
         } catch (Exception e) {
-            return gson.toJson(Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString()));
+            return Map.of("err", e.getMessage() != null ? e.getMessage() : e.toString());
         }
     }
 
@@ -443,7 +443,7 @@ public class RuntimeCore {
      * 批量任务：按顺序提交 `tasks` 数组，结果按原顺序收集（同步阻塞返回结果数组 JSON；
      * 含非空 `cb` 时异步——全部完成后一次回调结果数组）。任务逐个独立执行，无原子性。
      */
-    private String submitTasks(PluginEntity entity, JsonObject obj) {
+    private Object submitTasks(PluginEntity entity, JsonObject obj) {
         var tasks = obj.getAsJsonArray("tasks");
         var hasCb = obj.has("cb") && !obj.get("cb").getAsString().isEmpty();
         if (hasCb) {
@@ -451,41 +451,35 @@ public class RuntimeCore {
             submitTasksAsync(entity, tasks, cbId);
             return null;
         }
-        var sb = new StringBuilder();
-        sb.append('[');
-        boolean first = true;
+        var out = new java.util.ArrayList<Object>();
         for (var el : tasks) {
             String taskType = null;
-            String item;
+            Object item;
             try {
                 var t = el.getAsJsonObject();
                 taskType = t.get("type").getAsString();
                 var params = t.has("params") ? t.getAsJsonObject("params") : new JsonObject();
                 params.addProperty("_plugin", entity.name());
                 var priority = parsePriority(t.has("priority") ? t.get("priority").getAsString() : null);
-                var future = new java.util.concurrent.CompletableFuture<String>();
+                var future = new java.util.concurrent.CompletableFuture<Object>();
                 scheduler.submitGameSync(taskType, params, future, priority, entity.name());
                 try {
-                    var r = future.get(config.taskSyncTimeoutMs(), TimeUnit.MILLISECONDS);
-                    item = r.isEmpty() ? "null" : r;
+                    item = future.get(config.taskSyncTimeoutMs(), TimeUnit.MILLISECONDS);
                 } catch (Exception e) {
-                    item = gson.toJson(batchErr(e, taskType));
+                    item = batchErr(e, taskType);
                 }
             } catch (Exception e) {
-                item = gson.toJson(batchErr(e, taskType));
+                item = batchErr(e, taskType);
             }
-            if (!first) sb.append(',');
-            sb.append(item);
-            first = false;
+            out.add(item);
         }
-        sb.append(']');
-        return sb.toString();
+        return out;
     }
 
     /** 批量异步：全部任务完成后一次回调结果数组（按提交顺序）。 */
     private void submitTasksAsync(PluginEntity entity, JsonArray tasks, String cbId) {
         int n = tasks.size();
-        if (n == 0) { entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, java.util.List.of())); return; }
+        if (n == 0) { entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(cbId, java.util.List.of())); return; }
         var results = new Object[n];
         var pending = new java.util.concurrent.atomic.AtomicInteger(n);
         for (int i = 0; i < n; i++) {
@@ -500,13 +494,13 @@ public class RuntimeCore {
                 scheduler.submitGameAsync(taskType, params, r -> {
                     results[idx] = r;
                     if (pending.decrementAndGet() == 0) {
-                        entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, java.util.Arrays.asList(results)));
+                        entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(cbId, java.util.Arrays.asList(results)));
                     }
                 }, priority, entity.name());
             } catch (Exception e) {
                 results[idx] = batchErr(e, taskType);
                 if (pending.decrementAndGet() == 0) {
-                    entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessage(cbId, java.util.Arrays.asList(results)));
+                    entity.postMessage(yeow.channel.SyncCallbackHelper.cbMessageObject(cbId, java.util.Arrays.asList(results)));
                 }
             }
         }

@@ -13,7 +13,10 @@ import java.util.HashMap;
  * microtask pump and the interrupt hook. JS objects never cross the boundary;
  * values are converted to/from plain Java types.
  *
- * <p>All methods must be called from the thread that created the context.
+ * <p>All methods must be called from the thread that created the context, except
+ * {@link #interrupt()}, which is thread-safe (it only flips a native atomic flag).
+ * A foreign-thread call to any other method throws {@link QuickJSException} instead
+ * of corrupting the engine.
  */
 public final class QuickJSContext implements Closeable {
 
@@ -23,7 +26,13 @@ public final class QuickJSContext implements Closeable {
         Object call(Object... args);
     }
 
-    private long handle;
+    /** Resident transport buffer size shared with native (bytes). */
+    public static final int BUFFER_SIZE = 16 * 1024;
+
+    private volatile long handle;
+    private final long ownerThreadId = Thread.currentThread().threadId();
+    private final java.nio.ByteBuffer buffer =
+            java.nio.ByteBuffer.allocateDirect(BUFFER_SIZE).order(java.nio.ByteOrder.LITTLE_ENDIAN);
     private final HashMap<Integer, Callback> callbacks = new HashMap<>();
     private int callbackSeq = 0;
 
@@ -37,7 +46,13 @@ public final class QuickJSContext implements Closeable {
             throw new QuickJSException("Failed to create QuickJS context");
         }
         ctx.handle = h;
+        ctx.nativeRegisterBuffer(h, ctx.buffer);
         return ctx;
+    }
+
+    /** The resident transport buffer shared with native (little-endian). */
+    public java.nio.ByteBuffer buffer() {
+        return buffer;
     }
 
     public Object evaluate(String code) {
@@ -95,6 +110,11 @@ public final class QuickJSContext implements Closeable {
     /**
      * Requests that the currently executing JS code be aborted. Thread-safe;
      * one-shot. Aborts the current (or next) evaluate/call with an error.
+     *
+     * <p>The interrupt is raised as an <b>uncatchable</b> error: JS {@code catch}
+     * and {@code finally} blocks do not run for it. It is only observed at
+     * interpreter poll points, so a long-running native operation (e.g.
+     * catastrophic regex backtracking) may not be interrupted promptly.
      */
     public void interrupt() {
         if (handle != 0) nativeInterrupt(handle);
@@ -102,6 +122,7 @@ public final class QuickJSContext implements Closeable {
 
     public void destroy() {
         if (handle == 0) return;
+        checkThread();
         long h = handle;
         handle = 0;
         callbacks.clear();
@@ -120,13 +141,23 @@ public final class QuickJSContext implements Closeable {
         return cb.call(args);
     }
 
+    private void checkThread() {
+        if (Thread.currentThread().threadId() != ownerThreadId) {
+            throw new QuickJSException(
+                    "QuickJS context must be used from its creating thread (owner=" + ownerThreadId + ")");
+        }
+    }
+
     private void checkAlive() {
+        checkThread();
         if (handle == 0) {
             throw new QuickJSException("QuickJS context has been destroyed");
         }
     }
 
     private native long nativeCreate();
+
+    private native void nativeRegisterBuffer(long handle, java.nio.ByteBuffer buffer);
 
     private native void nativeDestroy(long handle);
 

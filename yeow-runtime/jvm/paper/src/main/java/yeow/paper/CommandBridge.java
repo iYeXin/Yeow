@@ -73,7 +73,7 @@ public class CommandBridge {
                 var payload = Map.of("sender",Map.of("name",s.getName(),"uuid",s instanceof Player pl?pl.getUniqueId().toString():"CONSOLE","isPlayer",s instanceof Player),"args",List.of(a),"label",l);
                 if (cbId != null && !cbId.isEmpty()) {
                     var pt = runtime.getPlugin(pluginName);
-                    if (pt != null) pt.postMessage(gson.toJson(Map.of("t","cb","p",cbId,"r",payload)));
+                    if (pt != null) pt.postMessage(SyncCallbackHelper.cbMessageObject(cbId, payload));
                 }
                 return true;
             }
@@ -84,9 +84,9 @@ public class CommandBridge {
                 if (pt == null) return super.tabComplete(s, l, a);
                 long t0 = System.nanoTime();
                 var pend = SyncCallbackHelper.register(compCbId);
-                pt.postMessage(gson.toJson(Map.of("t","cb","p",compCbId,"r",Map.of(
+                pt.postMessage(SyncCallbackHelper.cbMessageObject(compCbId, Map.of(
                     "sender", Map.of("name",s.getName(),"uuid",s instanceof Player p?p.getUniqueId().toString():"CONSOLE","isPlayer",s instanceof Player),
-                    "args", List.of(a)))));
+                    "args", List.of(a))));
                 long timeout = timeoutMs;
                 var deadline = System.nanoTime() + timeout * 1_000_000;
                 while (System.nanoTime() < deadline && !pend.isDone()) {

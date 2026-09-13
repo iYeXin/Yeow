@@ -4,6 +4,10 @@
 
 ---
 
+## 2026-09-13
+
+- **yeow-runtime 0.6.1**: forced-termination robustness — `QuickJSContext` enforces thread affinity (foreign-thread calls other than `interrupt()` throw, avoiding use-after-free/crash); the native interrupt is uncatchable (`catch`/`finally` cannot swallow it); if termination fails the engine is abandoned + quarantined (`postMessage`/`ping` dropped, its `$send` raises an uncatchable abort) and a fresh entity is rebuilt (**abandonment is temporary**: once the stuck call returns or a checkpoint fires the thread destroys its own context and is reclaimed; only a never-returning native op leaks). The timeline is explicit: graceful exit (wait for `unloadDone`) → timeout → forced kill (interrupt + grace period) → abandon/rebuild; it is documented as platform-agnostic behavior in the Runtime Environment Standard (new "Unload and Forced Termination" section: two MUSTs — **ordering and controlled termination**, **prefer graceful unload** — plus an **example flow**; applies to plugins and Workers alike), referenced by `runtime-warning` / `advanced/lifecycle`
+
 ## 2026-09-12
 
 - quickjs-wrapper rewritten as a Yeow-specific bridge: native C + **Zig 0.16** single-toolchain build (six-platform cross-compilation), Java package `wiki.yexin.quickjs` keeping only evaluate / global function up- and down-calls / job pump / interrupt; Maven group `io.yeow` → `wiki.yexin`, new artifact `wiki.yexin:yeow-quickjs`

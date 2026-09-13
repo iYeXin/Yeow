@@ -1,6 +1,6 @@
 name: Release
 
-# Tag a version (e.g. `git tag v0.6.0 && git push origin v0.6.0`) to build the
+# Tag a version (e.g. `git tag v0.6.1 && git push origin v0.6.1`) to build the
 # JAR with Zig and publish it as a GitHub Release. Release notes are taken from
 # the matching CHANGELOG.md section.
 on:

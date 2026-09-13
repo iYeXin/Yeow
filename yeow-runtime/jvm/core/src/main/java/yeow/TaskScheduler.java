@@ -22,8 +22,8 @@ public interface TaskScheduler {
     /** 停止调度（RuntimeCore.shutdown 时调用）。 */
     void shutdown();
 
-    /** 提交同步任务：结果经 future 完成（JS 线程阻塞等待）。 */
-    void submitGameSync(String taskType, JsonObject params, CompletableFuture<String> future, Priority priority, String pluginName);
+    /** 提交同步任务：结果经 future 完成（原始对象；序列化由通信层负责）。 */
+    void submitGameSync(String taskType, JsonObject params, CompletableFuture<Object> future, Priority priority, String pluginName);
 
     /** 提交异步任务：结果经 callback 回投。 */
     void submitGameAsync(String taskType, JsonObject params, Consumer<Object> callback, Priority priority, String pluginName);

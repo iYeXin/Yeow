@@ -4,6 +4,10 @@
 
 ---
 
+## 2026-09-13
+
+- **yeow-runtime 0.6.1**：强制终止鲁棒性——`QuickJSContext` 线程亲和守卫（跨线程调用除 `interrupt()` 外抛错，避免 use-after-free/崩溃）；原生中断不可捕获（`catch`/`finally` 吞不掉），无法终止时遗弃+隔离引擎（`postMessage`/`ping` 丢弃、其 `$send` 立即触发不可捕获中止）并重建实体（**遗弃为临时**：卡住调用返回/检查点触发即自毁回收，仅永不返回者泄漏）；作为**平台通用行为**写入运行时环境标准（新增「卸载与强制终止」节：两条强制要求——**顺序与受控终止**、**优先优雅卸载**——另附**示例流程**，插件与 Worker 同适用），`runtime-warning` / `advanced/lifecycle` 链接引用
+
 ## 2026-09-12
 
 - quickjs-wrapper 重写为 Yeow 专用桥：原生层 C + **Zig 0.16** 单工具链构建（六平台交叉编译），Java 包名 `wiki.yexin.quickjs`，仅保留 evaluate / 全局函数上下行 / job 泵 / 中断；Maven 组 `io.yeow` → `wiki.yexin`，新构件 `wiki.yexin:yeow-quickjs`

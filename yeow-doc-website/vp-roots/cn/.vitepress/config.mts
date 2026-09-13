@@ -162,6 +162,7 @@ export default defineConfig({
                     { text: '事件与回调', link: '/advanced/events' },
                     { text: '生命周期与热重载', link: '/advanced/lifecycle' },
                     { text: '环境能力与通道', link: '/advanced/channels' },
+                    { text: '二进制传输', link: '/advanced/binary-transport' },
                     { text: '服务机制', link: '/advanced/service' },
                     { text: '关于 Yeow', link: '/advanced/about' },
                 ],

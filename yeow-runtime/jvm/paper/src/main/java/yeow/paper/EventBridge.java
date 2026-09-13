@@ -198,7 +198,7 @@ public class EventBridge implements Listener {
                 var r = new java.util.HashMap<>(data);
                 r.put("_eventId", eventId);
                 try {
-                    pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",r,"eventId",eventId)));
+                    pt.postMessage(eventEnvelope(cb, r, eventId));
                 } catch (Exception ex) {
                     // 投递失败：完成 latch 并移除 pend，防止注册表泄漏
                     latch.countDown();
@@ -356,6 +356,19 @@ public class EventBridge implements Listener {
         return d;
     }
 
+    /**
+     * Java→JS 事件回调消息（含 eventId）：返回原始对象，由 JS 线程编码为二进制
+     * （越界/不支持时回退 JSON）。LinkedHashMap 允许 null 值（Map.of 会 NPE）。
+     */
+    private static Map<String, Object> eventEnvelope(String cb, Object r, String eventId) {
+        var m = new java.util.LinkedHashMap<String, Object>();
+        m.put("t", "cb");
+        m.put("p", cb);
+        m.put("r", r);
+        m.put("eventId", eventId);
+        return m;
+    }
+
     private void dispatchSerial(Event ev, String et, Map<String, Set<String>> pluginMap, Map<String,Object> data) {
         for (var entry : pluginMap.entrySet()) {
             var pn = entry.getKey();
@@ -366,7 +379,7 @@ public class EventBridge implements Listener {
                     long t0 = System.nanoTime();
                     eventId = newEventId(et);
                     var pend = SyncCallbackHelper.register(eventId);
-                    pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",withEventId(data, eventId),"eventId",eventId)));
+                    pt.postMessage(eventEnvelope(cb, withEventId(data, eventId), eventId));
                     long timeout = timeoutMs;
                     var deadline = System.nanoTime() + timeout * 1_000_000;
                     boolean primary = Bukkit.isPrimaryThread();
@@ -412,7 +425,7 @@ public class EventBridge implements Listener {
                 startNs.put(eventId, System.nanoTime());
                 SyncCallbackHelper.register(eventId, latch::countDown);
                 try {
-                    pt.postMessage(gson.toJson(Map.of("t","cb","p",cb,"r",withEventId(data, eventId),"eventId",eventId)));
+                    pt.postMessage(eventEnvelope(cb, withEventId(data, eventId), eventId));
                 } catch (Exception ex) {
                     // 投递失败：完成 latch 并移除 pend，防止注册表泄漏
                     latch.countDown();

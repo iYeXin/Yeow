@@ -175,14 +175,40 @@ globalThis.console = {
 };
 
 // ── $send (high-level bridge) ─────────────────────────────────────
-// $_send(channel, jsonString) is the low-level Java bridge.
-// $send(channel, payload) wraps it with JSON conversion.
-globalThis.$send = (channel, payload) => {
+// 传输开关 $binary（由 Java BinaryCodec.ENABLED 注入）。默认 false = 纯 JSON：
+//   $send(channel, payload) → $_send(channel, JSON.stringify(payload)) → 结果 JSON.parse。
+// 二进制快速通道（常驻缓冲区 __yeowWrite/__yeowRead）代码保留、隔离在 $binary 分支内，
+// 默认不可达；重新启用只需把 BinaryCodec.ENABLED 置 true。
+const _binary = !!globalThis.$binary;
 
-    const raw = $_send(channel, JSON.stringify(payload));
-    if (raw == null) return null;
-    // 防御：非 JSON 返回（如错误文本）原样返回，避免 JSON.parse 抛 SyntaxError 掩盖真实结果
-    try { return JSON.parse(raw); } catch (ex) { return raw; }
+const _decodeSendResult = (raw) => {
+    // 上行结果：数字 = 状态码（0 = null；1 = 二进制结果在常驻缓冲区，经 __yeowRead 取）；
+    // 字符串 = JSON 回退（直接解析）；其余原样返回（如 Java null / 布尔）。
+    if (typeof raw === 'number') return raw === 0 ? null : (_binary ? __yeowRead() : null);
+    if (typeof raw === 'string') {
+        try { return JSON.parse(raw); } catch (ex) { return raw; }
+    }
+    return raw;
+};
+
+globalThis.$send = (channel, payload, options) => {
+    if (_binary) {
+        // options.json：强制该次走 JSON 文本路径（与二进制路径对照用）。
+        if (options && options.json) {
+            const j = JSON.stringify(payload);
+            return _decodeSendResult($_send(channel, j === undefined ? 'null' : j));
+        }
+        // 二进制请求 payload 优先写入常驻缓冲区（同一 JS 线程私有，安全），并以
+        // $_send(null,null) 作为"去缓冲区读取"的信号（Java 侧 args[1] == null 即二进制）。
+        // __yeowWrite 失败（越界/不支持类型/function 等）或 payload 为 null/undefined 时回退 JSON。
+        const useBin = payload !== null && payload !== undefined && __yeowWrite(channel, payload);
+        const json = useBin ? null : JSON.stringify(payload);
+        return _decodeSendResult(useBin ? $_send(null, null) : $_send(channel, json === undefined ? 'null' : json));
+    }
+
+    // 纯 JSON 路径（默认）：一次字符串进出，结果 JSON.parse。
+    const json = JSON.stringify(payload);
+    return _decodeSendResult($_send(channel, json === undefined ? 'null' : json));
 };
 
 // ── Timers ──────────────────────────────────────────────────────────
@@ -350,7 +376,11 @@ function _hm(msg) {
 
 globalThis.$hm = (json) => {
     try {
-        _hm(JSON.parse(json));
+        // 二进制路径（$binary 开启时）：Java 已把消息写入常驻缓冲区并以无参调用 $hm → __yeowRead() 解码。
+        // JSON 路径（默认）：直接传入现成 JSON 字符串。
+        const msg = (typeof json === 'string') ? JSON.parse(json)
+                  : (json == null) ? (_binary ? __yeowRead() : null) : json;
+        _hm(msg);
         return null;
     } catch (e) {
         if (e instanceof SyntaxError) return null;

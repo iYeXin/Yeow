@@ -37,6 +37,10 @@ public class PluginThread implements Runnable, PluginEntity {
     private volatile boolean running = false;
     /** 强杀标记：waitForExit 超时且 interrupt 无法退出时置位，调用方必须重建全新实体。 */
     private volatile boolean forceKilled = false;
+    /** 已遗弃（原生中断 / Thread.interrupt 均无法终止）：不再接收或分发任何消息；其上下文与线程泄漏。 */
+    private volatile boolean abandoned = false;
+    /** 是否正身处 JS 执行——强杀时用于区分"卡在 JS/原生运算"与"阻塞在 Java 调用"。 */
+    private volatile boolean executingJs = false;
     private Thread thread;
     private ScheduledExecutorService timer;
     private ExecutorService ioExecutor;
@@ -57,6 +61,10 @@ public class PluginThread implements Runnable, PluginEntity {
     /** HTTP 请求无响应超时：JS 侧从未 respond 时关闭连接并移除（防连接/内存泄漏）。 */
     private static final long HTTP_PENDING_TIMEOUT_MS = 30_000;
     private static final long HTTP_SWEEP_INTERVAL_MS = 10_000;
+    /** 终止阶段 1：优雅退出等待（等待 JS 侧 unloadDone）。 */
+    private static final long TERMINATE_GRACEFUL_MS = 5000;
+    /** 终止阶段 3：强杀宽恕期（触发中断后等待线程自行退出）。 */
+    private static final long TERMINATE_KILL_GRACE_MS = 1000;
     private final java.util.concurrent.atomic.AtomicBoolean httpSweepStarted = new java.util.concurrent.atomic.AtomicBoolean();
 
     public void setDevAssetsDir(String d) { devAssetsDir = d; }
@@ -70,12 +78,14 @@ public class PluginThread implements Runnable, PluginEntity {
     @Override public String type() { return "js"; }
     @Override public boolean isVirtual() { return false; }
     @Override public void postMessage(Object message) {
-        // JS 实体需要 JSON 字符串：POJO 由运行时序列化，String 原样投递
-        queue.sendJs(message instanceof String s ? s : gson.toJson(message));
+        if (abandoned) return; // 已遗弃引擎：不再分发（避免消息在死队列中无界累积）
+        // 原始对象（JS 线程负责编码为二进制）；字符串走 JSON 回退路径
+        queue.sendJs(message);
     }
 
     @Override
     public CompletableFuture<Long> ping() {
+        if (abandoned) return null; // 遗弃引擎不再探活
         synchronized (this) {
             if (pendingPing != null) return null; // in-flight，不重复发起
             var fut = new CompletableFuture<Long>();
@@ -183,40 +193,82 @@ public class PluginThread implements Runnable, PluginEntity {
     }
 
     /**
-     * 等待 JS 线程退出（最长 5s）。超时未退出 → 强杀路径：
-     * ① {@code ctx.interrupt()}（wrapper 3.9.0+，JS_SetInterruptHandler）原生中断——
-     * JS 线程在自身执行流中中止（解释器周期性检查中断标志），随后正常退出并在
-     * run() finally 自毁上下文；
-     * ② 卡在 Java 调用无法回 JS 的线程：thread.interrupt() 唤醒阻塞点，
-     * 仍无法退出则置 forceKilled 标记，由调用方重建全新实体将其遗弃。
+     * 终止时序（四阶段）：
+     * <ol>
+     *   <li><b>优雅退出</b>：调用方已发送 DISABLE/RELOAD，本方法最多等待
+     *       {@link #TERMINATE_GRACEFUL_MS}，直到 JS 侧执行完 onUnload 并回投
+     *       {@code lifecycle:unloadDone}（{@code running=false}）。</li>
+     *   <li><b>优雅失败</b>：超时仍未退出（未收到 unloadDone）。</li>
+     *   <li><b>强杀</b>：置 {@code running=false}，触发 {@code ctx.interrupt()}（同一标志
+     *       同时驱动 QuickJS 解释器中断与 {@code $_send} 上行检查点，均为不可捕获），并
+     *       {@code thread.interrupt()} 唤醒 Java 阻塞点；随后等待
+     *       {@link #TERMINATE_KILL_GRACE_MS} 的宽恕期让线程自行中止/回收。</li>
+     *   <li><b>遗弃</b>：宽恕期结束仍存活 → 置 {@code abandoned}/{@code forceKilled} 并输出
+     *       severe 警告，由调用方重建全新实体；旧线程一旦从卡住的原生调用返回，仍会在自身
+     *       线程走 run() finally 销毁上下文（遗弃是临时的）。</li>
+     * </ol>
      *
-     * **绝不在本线程调用 ctx.destroy()**：QuickJS wrapper 的 destroy() 要求创建线程调用
-     * （checkSameThread 守卫），跨线程调用必然抛异常（原实现 destroy 恒为空操作，上下文
-     * 从未被释放），若去掉守卫又会演变为 use-after-free。上下文一律由 JS 线程自身销毁；
-     * JS 线程为 daemon，不会阻塞 JVM 退出。
+     * <b>绝不在本线程调用 ctx.destroy()</b>：跨线程销毁会导致 use-after-free / JVM 崩溃；
+     * 上下文一律由创建它的 JS 线程自行销毁。JS 线程为 daemon，不阻塞 JVM 退出。
      */
     private void waitForExit() {
-        long deadline = System.currentTimeMillis() + 5000;
-        while (running && System.currentTimeMillis() < deadline) {
+        // 阶段 1-2：优雅退出（等待 unloadDone），超时进入强杀
+        long gracefulDeadline = System.currentTimeMillis() + TERMINATE_GRACEFUL_MS;
+        while (running && System.currentTimeMillis() < gracefulDeadline) {
             try { Thread.sleep(10); } catch (InterruptedException e) { break; }
         }
 
         if (running) {
-            log.warning("[" + name + "] JS thread unresponsive for 5s - forcing stop");
+            boolean inJs = executingJs;
+            log.warning("[" + name + "] graceful unload timed out after "
+                + (TERMINATE_GRACEFUL_MS / 1000) + "s - entering forced termination "
+                + (inJs ? "(executing JS)" : "(blocked outside JS)"));
+            // 阶段 3：强杀——中断（QuickJS poll + $_send 检查点）+ 唤醒 Java 阻塞点，并提供宽恕期
             running = false;
             var c = ctx;
-            if (c != null) { try { c.interrupt(); } catch (Exception ignored) {} } // 原生中断（3.9.0+）
-            thread.interrupt();
-            try { thread.join(1000); } catch (InterruptedException ignored) {}
+            if (c != null) { try { c.interrupt(); } catch (Exception ignored) {} } // 不可捕获中断
+            thread.interrupt(); // 唤醒可中断的 Java 阻塞点
+            try { thread.join(TERMINATE_KILL_GRACE_MS); } catch (InterruptedException ignored) {}
             if (thread.isAlive()) {
-                // 线程仍卡住（卡在无法返回 JS 的 Java 调用等）。不跨线程 destroy
-                // （见方法注释）：标记强杀，让调用方重建实体。
+                // 阶段 4：宽恕期结束仍存活 → 遗弃 + 隔离（由调用方重建全新实体）
+                abandoned = true;
                 forceKilled = true;
-                try { thread.join(1000); } catch (InterruptedException ignored) {}
+                log.severe("[" + name + "] JS thread could not be terminated by native interrupt "
+                    + (inJs ? "(stuck in an uninterruptible native operation, e.g. catastrophic regex/JSON)"
+                            : "(blocked in a Java call that ignored Thread.interrupt())")
+                    + "; the QuickJS engine is ABANDONED and QUARANTINED — no further messages/events will be "
+                    + "delivered and its $send raises an uncatchable abort. It is reclaimed automatically if the "
+                    + "stuck call ever returns; otherwise its context, thread and memory are leaked until a server restart.");
+                try { thread.join(TERMINATE_KILL_GRACE_MS); } catch (InterruptedException ignored) {}
             }
         } else if (thread != null) {
             try { thread.join(2000); } catch (InterruptedException ignored) {}
         }
+    }
+
+    /** 上行结果：优先写入常驻缓冲区（返回状态码 1），越界/不支持则回退 JSON 字符串（$send 解析）。 */
+    private Object encodeResult(Object result) {
+        // 二进制传输停用（默认）：结果统一走 JSON 字符串，二进制分支保留但不可达。
+        if (!yeow.transport.BinaryCodec.ENABLED) return gson.toJson(result);
+        if (result == null) return 0;
+        if (ctx != null && yeow.transport.BinaryCodec.encodeBinary(ctx.buffer(), null, result, gson)) return 1;
+        return gson.toJson(result);
+    }
+
+    /** JS 入口包装：标记"执行中"，供强杀时区分卡在 JS 还是 Java 阻塞。 */
+    private Object jsEval(String code, String file) {
+        executingJs = true;
+        try { return ctx.evaluate(code, file); } finally { executingJs = false; }
+    }
+
+    private Object jsCall(long handle, String arg) {
+        executingJs = true;
+        try { return ctx.callHandle(handle, arg); } finally { executingJs = false; }
+    }
+
+    private void jsDrain() {
+        executingJs = true;
+        try { ctx.drainJobs(); } finally { executingJs = false; }
     }
 
     private void cleanupResources() {
@@ -262,13 +314,13 @@ public class PluginThread implements Runnable, PluginEntity {
         try {
             inject();
             if (initCode == null) { log.warning("[" + name + "] initCode is null"); return; }
-            ctx.evaluate(initCode, "init.js");
+            jsEval(initCode, "init.js");
             if (userCode == null) { log.warning("[" + name + "] userCode is null"); return; }
-            ctx.evaluate(userCode, "main.js");
+            jsEval(userCode, "main.js");
 
             long hmHandle = ctx.bindGlobal("$hm");
             if (hmHandle == 0) log.warning("[" + name + "] $hm not found");
-            if (hmHandle != 0) ctx.callHandle(hmHandle, gson.toJson(Map.of("t", "INIT")));
+            if (hmHandle != 0) jsCall(hmHandle, gson.toJson(Map.of("t", "INIT")));
 
             var prof = core.profiler();
             if (prof != null) prof.registerPlugin(PluginThread.this);
@@ -283,14 +335,22 @@ public class PluginThread implements Runnable, PluginEntity {
                     if (raw == null) break;
                     try {
                         if (hmHandle != 0) {
-                            ctx.callHandle(hmHandle, raw);
+                            if (raw instanceof String s) {
+                                jsCall(hmHandle, s); // ready JSON
+                            } else if (yeow.transport.BinaryCodec.ENABLED
+                                    && yeow.transport.BinaryCodec.encodeBinary(ctx.buffer(), null, raw, gson)) {
+                                jsCall(hmHandle, null); // binary in resident buffer
+                            } else {
+                                jsCall(hmHandle, gson.toJson(raw)); // JSON (default / overflow / unsupported)
+                            }
                         } else {
-                            var escaped = raw.replace("\\","\\\\").replace("'","\\'");
-                            ctx.evaluate("$hm('" + escaped + "')");
+                            String json = (raw instanceof String s) ? s : gson.toJson(raw);
+                            var escaped = json.replace("\\","\\\\").replace("'","\\'");
+                            jsEval("$hm('" + escaped + "')", "dispatch.js");
                         }
                     } catch (QuickJSException ex) { handleJSError(ex); } catch (Exception ignored) {}
                     try {
-                        ctx.drainJobs();
+                        jsDrain();
                     } catch (QuickJSException ex) {
                         // A pending job threw (e.g. an async error surfaced by the native wrapper).
                         // Report it but keep the message loop alive - the plugin must not die here.
@@ -304,12 +364,17 @@ public class PluginThread implements Runnable, PluginEntity {
         } catch (QuickJSException e) { handleJSError(e); } catch (Exception e) {
             log.warning("[" + name + "] " + (e.getMessage() != null ? e.getMessage() : e.toString()));
         } finally {
-            // Only destroy the context this thread created. If reload() force-destroyed it
-            // (ctx set to null) or a new thread already created a new one, leave it alone.
+            // Always destroy the context on the thread that created it (the only safe place).
+            // This also RECLAIMS an abandoned engine as soon as the stuck call returns or an
+            // interrupt checkpoint fires — abandonment is temporary, not a permanent leak.
+            // (Only a native operation that never returns leaks forever.)
             var myCtx = ctx;
             if (myCtx != null && myCtx == ctx) {
                 ctx = null;
                 try { myCtx.destroy(); } catch (Exception ignored) {}
+                if (abandoned) {
+                    log.warning("[" + name + "] abandoned JS engine reclaimed — thread and context released");
+                }
             }
         }
     }
@@ -318,23 +383,42 @@ public class PluginThread implements Runnable, PluginEntity {
         // __plugin 元信息来自 yeow.json（加载时解析，经构造传入；Worker 见 WorkerThread.inject，继承主插件版本/作者）
         ctx.evaluate("globalThis.__plugin = {name:'" + esc(name) + "',version:'" + esc(version) + "',author:'" + esc(author) + "'};");
         ctx.evaluate("globalThis.$dev = " + devMode + ";");
+        ctx.evaluate("globalThis.$binary = " + yeow.transport.BinaryCodec.ENABLED + ";");
 
         ctx.setGlobalFunction("$_send", args -> {
+            if (abandoned) {
+                // 已遗弃/隔离的引擎：拒绝任何 JS → Java 调用（不产生副作用），直接抛错回 JS。
+                throw new QuickJSException("this JS engine is abandoned and quarantined; $send is disabled");
+            }
             try {
-                var channel = String.valueOf(args[0]); var pld = String.valueOf(args.length > 1 ? args[1] : "{}");
+                // 上行请求 payload：二进制（args[1] == null，载荷已由 $send 写入常驻缓冲区）
+                // 或 JSON 字符串。二进制停用时恒为 JSON 字符串。
+                boolean binary = yeow.transport.BinaryCodec.ENABLED && args.length > 1 && args[1] == null;
+                String channel;
+                JsonObject obj;
+                String pld = null;
+                if (binary) {
+                    channel = yeow.transport.BinaryCodec.decodeChannel(ctx.buffer());
+                    JsonElement e = yeow.transport.BinaryCodec.decodeBinary(ctx.buffer());
+                    obj = (e != null && e.isJsonObject()) ? e.getAsJsonObject() : new JsonObject();
+                } else {
+                    channel = String.valueOf(args[0]);
+                    pld = String.valueOf(args.length > 1 ? args[1] : "{}");
+                    obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
+                }
                 var rt = core;
                 if ("worker".equals(channel)) {
                     // Worker 通道（内部控制，不受权限模型约束）：创建/卸载/投递/重载主插件的 Worker
-                    return handleWorker(pld);
+                    return handleWorker(obj);
                 } else if ("task".equals(channel)) {
                     // task 通道为共有接口（与 YeowRuntime.submitTask 同一实现）；
                     // 经统一门控（task:* 默认拥有，仅 Worker 的 allow/deny 会收紧）
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var denied = checkTaskPermission(obj);
                     if (denied != null) return permissionDenied(obj, denied);
-                    return rt != null ? rt.submitTask(PluginThread.this, obj) : gson.toJson(Map.of("err", "runtime unavailable"));
+                    Object result = rt != null ? rt.submitTask(PluginThread.this, obj) : Map.of("err", "runtime unavailable");
+                    return encodeResult(result);
                 } else if ("timer".equals(channel)) {
-                    var obj = gson.fromJson(pld, JsonObject.class); var type = obj.get("type").getAsString();
+                    var type = obj.get("type").getAsString();
                     var denied = checkChannelPermission("timer", type);
                     if (denied != null) return gson.toJson(Map.of("err", denied));
                     if ("clear".equals(type)) {
@@ -360,7 +444,6 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     return null;
                 } else if ("fs".equals(channel)) {
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var denied = checkChannelPermission("fs", obj.has("t") ? obj.get("t").getAsString() : "");
                     if (denied != null) {
                         if (obj.has("cb")) { var cbId = obj.get("cb").getAsString(); queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",Map.of("err", denied)))); return null; }
@@ -368,58 +451,57 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
-                        ioExecutor.submit(() -> { var result = handleFs(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
+                        ioExecutor.submit(() -> { var result = handleFs(obj); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
                         return null;
                     }
-                    return handleFs(pld);
+                    return handleFs(obj);
                 } else if ("http".equals(channel)) {
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var denied = checkChannelPermission("http", obj.has("t") ? obj.get("t").getAsString() : "");
                     if (denied != null) {
                         if (obj.has("cb")) { var cbId = obj.get("cb").getAsString(); queue.sendJs(gson.toJson(Map.of("t","cb","p",cbId,"r",Map.of("err", denied)))); return null; }
                         return gson.toJson(Map.of("err", denied));
                     }
-                    return handleHttp(pld);
+                    return handleHttp(obj);
                 } else if ("assets".equals(channel)) {
                     // assets 资源只读 / 解压被限定在本插件数据目录内（见 handleAssets）；
                     // 统一门控下默认允许，仅 Worker 的 allow/deny 可收紧
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var denied = checkChannelPermission("assets", obj.has("t") ? obj.get("t").getAsString() : "");
                     if (denied != null) return permissionDenied(obj, denied);
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
-                        ioExecutor.submit(() -> { var result = handleAssets(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
+                        ioExecutor.submit(() -> { var result = handleAssets(obj); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
                         return null;
                     }
-                    return handleAssets(pld);
+                    return handleAssets(obj);
                 } else if ("util".equals(channel)) {
                     // util 通道（纯计算）：gzip 压缩/解压 + UTF-8 ↔ 字节转换。
                     // 字节数据以 base64 字符串承载（JS 侧引擎原生 Uint8Array.toBase64/fromBase64）；
                     // encode/decode 语义 = buffer ↔ 字符串，base64 只是承载形式。
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var denied = checkChannelPermission("util", obj.has("t") ? obj.get("t").getAsString() : "");
                     if (denied != null) return permissionDenied(obj, denied);
                     if (obj.has("cb")) {
                         var cbId = obj.get("cb").getAsString();
-                        ioExecutor.submit(() -> { var result = handleUtil(pld); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
+                        ioExecutor.submit(() -> { var result = handleUtil(obj); queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, result)); });
                         return null;
                     }
-                    return handleUtil(pld);
+                    return handleUtil(obj);
                 } else if ("debug".equals(channel)) {
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var dt = obj.get("t").getAsString();
                     if ("reportError".equals(dt)) { handleJSReport(gson.toJson(obj.get("p"))); }
                     else if ("pong".equals(dt)) { onPong(); }
                     else if ("payload".equals(dt)) {
                         // 任意载荷回显（基准测试/往返延迟测量）：内容即原样返回，零解释。
-                        // 同步（无 cb）直接返回原载荷 JSON；含 cb 时经回调异步回投。
-                        var echo = obj.has("p") ? gson.toJson(obj.get("p")) : "null";
+                        // 传输方向与请求保持对称：二进制请求（binary=true）→ 二进制结果；
+                        // JSON 请求（$send 的 json 开关，含 >16KB 回退）→ JSON 字符串结果。
+                        var body = obj.has("p") ? obj.get("p") : null;
                         if (obj.has("cb")) {
                             var cbId = obj.get("cb").getAsString();
-                            queue.sendJs(yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, echo));
+                            queue.sendJs(binary
+                                ? yeow.channel.SyncCallbackHelper.cbMessageObject(cbId, body)
+                                : yeow.channel.SyncCallbackHelper.cbMessageRaw(cbId, gson.toJson(body)));
                             return null;
                         }
-                        return echo;
+                        return binary ? encodeResult(body) : gson.toJson(body);
                     }
                     else if ("command".equals(dt)) {
                         // 运行时内部测试节点（如性能基准）：**仅开发模式开放**（-Dyeow.dev=true，
@@ -432,18 +514,17 @@ public class PluginThread implements Runnable, PluginEntity {
                     }
                     return null;
                 } else if ("lifecycle".equals(channel)) {
-                    var o = gson.fromJson(pld, JsonObject.class); var lt = o.has("type") ? o.get("type").getAsString() : "";
+                    var lt = obj.has("type") ? obj.get("type").getAsString() : "";
                     if ("gc-collect".equals(lt)) {
-                        var ids = o.getAsJsonArray("ids");
+                        var ids = obj.getAsJsonArray("ids");
                         for (var el : ids) { core.instances().release(el.getAsString()); }
                         return null;
                     }
                     if ("unloadDone".equals(lt)) { running = false; return null; }
                     running = false; return null;
                 } else if ("log".equals(channel)) {
-                    var o = gson.fromJson(pld, JsonObject.class);
-                    var msg = o.has("message") ? o.get("message").getAsString() : pld;
-                    var level = o.has("level") ? o.get("level").getAsString() : "INFO";
+                    var msg = obj.has("message") ? obj.get("message").getAsString() : (pld != null ? pld : obj.toString());
+                    var level = obj.has("level") ? obj.get("level").getAsString() : "INFO";
                     // 被门控拒绝时静默丢弃（避免错误日志再触发日志通道形成回环）
                     if (checkChannelPermission("log", level) != null) return null;
                     switch (level) {
@@ -458,10 +539,9 @@ public class PluginThread implements Runnable, PluginEntity {
                     return handleEnv();
                 }
                 else if ("service".equals(channel)) {
-                    var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
                     var denied = checkChannelPermission("service", obj.has("t") ? obj.get("t").getAsString() : "");
                     if (denied != null) return gson.toJson(Map.of("err", denied));
-                    return handleService(pld);
+                    return handleService(obj);
                 }
                 else { return null; }
             } catch (Exception ex) {
@@ -521,9 +601,8 @@ public class PluginThread implements Runnable, PluginEntity {
      * Worker 通道：主插件 JS 侧的 createWorker/load/unload/postMessage/reload。
      * 请求：{ "t": "create|unload|post|reload|postToMain", "p": {...} }--p 含 cb（异步回调 ok/err）。
      */
-    private String handleWorker(String pld) {
+    private String handleWorker(JsonObject obj) {
         try {
-            var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
             var t = obj.get("t").getAsString();
             var p = obj.has("p") ? obj.getAsJsonObject("p") : new JsonObject();
             var cb = p.has("cb") ? p.get("cb").getAsString() : null;
@@ -651,9 +730,12 @@ public class PluginThread implements Runnable, PluginEntity {
 
     public TaskScheduler getSchedulerRef() { return scheduler; }
     public String checkChannelPermissionPublic(String channel, String op) { return checkChannelPermission(channel, op); }
-    public String handleFsPublic(String pld) { return handleFs(pld); }
-    public String handleAssetsPublic(String pld) { return handleAssets(pld); }
-    public String handleHttpPublic(String pld) { return handleHttp(pld); }
+    public String handleFsPublic(JsonObject obj) { return handleFs(obj); }
+    public String handleAssetsPublic(JsonObject obj) { return handleAssets(obj); }
+    public String handleHttpPublic(JsonObject obj) { return handleHttp(obj); }
+    public String handleFsPublic(String pld) { return handleFs(gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class)); }
+    public String handleAssetsPublic(String pld) { return handleAssets(gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class)); }
+    public String handleHttpPublic(String pld) { return handleHttp(gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class)); }
     public void handleJSReportPublic(String pld, String origin) { handleJSReport(pld, origin); }
     public void handleJSErrorPublic(QuickJSException e, String origin) { handleJSError(e, origin); }
     public String handleEnvPublic() { return handleEnv(); }
@@ -710,8 +792,8 @@ public class PluginThread implements Runnable, PluginEntity {
         });
     }
 
-    private String handleFs(String pld) {        try {
-            var obj = gson.fromJson(pld, JsonObject.class); var task = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
+    private String handleFs(JsonObject obj) {        try {
+            var task = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
             var dot = task.indexOf('.');
             var level = dot > 0 ? task.substring(0, dot) : "plugin";
             var op = dot > 0 ? task.substring(dot + 1) : task;
@@ -845,9 +927,9 @@ public class PluginThread implements Runnable, PluginEntity {
         }
     }
 
-    private String handleHttp(String pld) {
+    private String handleHttp(JsonObject obj) {
         try {
-            var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class); var t = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
+            var t = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
             return switch (t) {
                 case "listen" -> {
                     var pluginName = p.get("pluginName").getAsString(); var callbackId = p.get("callbackId").getAsString(); var port = p.get("port").getAsInt();
@@ -994,9 +1076,9 @@ public class PluginThread implements Runnable, PluginEntity {
         return target;
     }
 
-    private String handleAssets(String pld) {
+    private String handleAssets(JsonObject obj) {
         try {
-            var obj = gson.fromJson(pld, JsonObject.class); var task = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
+            var task = obj.get("t").getAsString(); var p = obj.get("p").getAsJsonObject();
             var rawPath = p.get("path").getAsString();
             // extract 必须指定 dest；extractDir 的 dest 可选（默认 assets/<path>）——dest 均基于插件数据目录计算并限定其内
             var hasDest = p.has("dest") && !p.get("dest").isJsonNull();
@@ -1140,9 +1222,8 @@ public class PluginThread implements Runnable, PluginEntity {
      * 字节数据一律以 base64 字符串承载；流式操作分块显式响应（背压基于调用方等待返回值）。
      * 输入/输出上限由 config.yml `util` 段配置（默认 256 MiB）。
      */
-    private String handleUtil(String pld) {
+    private String handleUtil(JsonObject obj) {
         try {
-            var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
             var t = obj.get("t").getAsString();
             var p = obj.has("p") ? obj.getAsJsonObject("p") : new JsonObject();
             int maxInput = core.config().utilMaxInputBytes();
@@ -1250,9 +1331,8 @@ public class PluginThread implements Runnable, PluginEntity {
         if (h != null) h.close();
     }
 
-    private String handleService(String pld) {
+    private String handleService(JsonObject obj) {
         try {
-            var obj = gson.fromJson(pld.isEmpty() ? "{}" : pld, JsonObject.class);
             var t = obj.get("t").getAsString();
             var sm = core.serviceManager();
             return switch (t) {

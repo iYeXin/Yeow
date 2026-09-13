@@ -1,5 +1,20 @@
 # Change Log
 
+## 0.6.1 *(2026-09-13)*
+
+### Features
+- **Thread affinity enforced**: `QuickJSContext` records its owner thread; any method other
+  than `interrupt()` called from another thread throws instead of causing cross-thread
+  `JS_FreeContext`/`JS_Call` (use-after-free). `interrupt()` remains thread-safe (native
+  atomic flag).
+- **Interrupt semantics documented**: the interrupt is raised as an **uncatchable** QuickJS
+  error (`JS_SetUncatchableException`), so JS `catch`/`finally` cannot swallow it; it is only
+  observed at interpreter poll points, so a long-running native operation (e.g. catastrophic
+  regex backtracking, huge JSON) may not be interrupted promptly.
+- **Upcall checkpoint**: once termination has been requested via `interrupt()`, the JS→Java
+  global-function boundary (Yeow's `$_send`) also raises an **uncatchable** abort on entry, so
+  a plugin already in the termination phase cannot keep producing side effects.
+
 ## 0.6.0 — Yeow rewrite *(2026-09-12)*
 
 ### Breaking Changes

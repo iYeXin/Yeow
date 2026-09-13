@@ -54,7 +54,7 @@ public class PaperScheduler implements TaskScheduler {
     private static final long LOW_QUEUE_WARN_INTERVAL_MS = 60_000;
     private static final long LOW_QUEUE_WARN_THRESHOLD = 100_000;
 
-    record PendingTask(String taskType, JsonObject params, CompletableFuture<String> future, Consumer<Object> callback, Priority priority, String pluginName) {
+    record PendingTask(String taskType, JsonObject params, CompletableFuture<Object> future, Consumer<Object> callback, Priority priority, String pluginName) {
         boolean isAsync() { return callback != null; }
     }
 
@@ -93,7 +93,7 @@ public class PaperScheduler implements TaskScheduler {
     // ── 提交 ───────────────────────────────────────────────────────
 
     @Override
-    public void submitGameSync(String taskType, JsonObject params, CompletableFuture<String> future, Priority priority, String pluginName) {
+    public void submitGameSync(String taskType, JsonObject params, CompletableFuture<Object> future, Priority priority, String pluginName) {
         var effective = effectivePriority(priority, pluginName, taskType);
         pool(effective).add(new PendingTask(taskType, params, future, null, effective, pluginName));
     }
@@ -187,13 +187,13 @@ public class PaperScheduler implements TaskScheduler {
                 elapsed));
         }
         if (t.isAsync()) t.callback().accept(result);
-        else t.future().complete(gson.toJson(result));
+        else t.future().complete(result);
     }
 
     private void fail(PendingTask t, Exception e) {
         var err = errObject(e, t.taskType());
         if (t.isAsync()) t.callback().accept(err);
-        else t.future().complete(gson.toJson(err));
+        else t.future().complete(err);
     }
 
     private Object waitMain(CompletableFuture<Object> fut, String taskType) {
@@ -336,7 +336,7 @@ public class PaperScheduler implements TaskScheduler {
             if (!pluginName.equals(t.pluginName())) return false;
             // Release sync callers (JS threads blocked in future.get) immediately
             // instead of leaving them to wait out the timeout.
-            if (!t.isAsync()) t.future().complete(gson.toJson(Map.of("err", "plugin unloaded")));
+            if (!t.isAsync()) t.future().complete(Map.of("err", "plugin unloaded"));
             return true;
         });
     }

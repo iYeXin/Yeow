@@ -101,6 +101,19 @@ public class FoliaEventBridge implements Listener {
     /** 一次 dispatch 的派发单元：eventId 按（插件, 回调）逐个生成，latch 计数与实际投递数一致。 */
     private record Dispatch(String plugin, String cb, String eventId) {}
 
+    /**
+     * Java→JS 事件回调消息（含 eventId）：返回原始对象，由 JS 线程编码为二进制
+     * （越界/不支持时回退 JSON）。LinkedHashMap 允许 null 值（Map.of 会 NPE）。
+     */
+    private static Map<String, Object> eventEnvelope(String cb, Object r, String eventId) {
+        var m = new java.util.LinkedHashMap<String, Object>();
+        m.put("t", "cb");
+        m.put("p", cb);
+        m.put("r", r);
+        m.put("eventId", eventId);
+        return m;
+    }
+
     public static void init(FoliaRuntime rt, FoliaScheduler sched) {
         runtime = rt;
         scheduler = sched;
@@ -174,7 +187,7 @@ public class FoliaEventBridge implements Listener {
                 // 事件数据携带 _eventId（_eventId 契约）：JS 侧 event.complete 原样回传精确匹配
                 var r = new java.util.HashMap<>(data);
                 r.put("_eventId", eventId);
-                pt.postMessage(gson.toJson(Map.of("t", "cb", "p", cb, "r", r, "eventId", eventId)));
+                pt.postMessage(eventEnvelope(cb, r, eventId));
             }
         }
         // 与事件派发同机制：进入事件模式自旋，只取订阅插件的任务（handler 的
@@ -376,7 +389,7 @@ public class FoliaEventBridge implements Listener {
             r.put("_eventId", d.eventId());
             try {
                 // 事件数据内携带 _eventId：JS 侧 event.ts 从 `data._eventId` 取事件 id 回传
-                pt.postMessage(gson.toJson(Map.of("t", "cb", "p", d.cb(), "r", r, "eventId", d.eventId())));
+                pt.postMessage(eventEnvelope(d.cb(), r, d.eventId()));
             } catch (Exception e) {
                 latch.countDown(); // 投递失败：不悬挂自旋
             }

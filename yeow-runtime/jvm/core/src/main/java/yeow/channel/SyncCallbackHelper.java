@@ -24,6 +24,19 @@ public class SyncCallbackHelper {
     }
 
     /**
+     * Same envelope as {@link #cbMessage}, but returned as a raw Map object so the
+     * JS thread can encode it into the binary resident buffer (with JSON fallback if
+     * it does not fit). Null-safe like {@link #cbMessage}.
+     */
+    public static Object cbMessageObject(String cbId, Object result) {
+        var m = new LinkedHashMap<String, Object>();
+        m.put("t", "cb");
+        m.put("p", cbId);
+        m.put("r", result);
+        return m;
+    }
+
+    /**
      * Same envelope, but the result is already a serialized JSON string —
      * concatenated directly instead of parsed and re-serialized. `resultJson`
      * must be valid JSON, or null for a JSON null.

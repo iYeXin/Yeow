@@ -57,6 +57,27 @@ try (QuickJSContext ctx = QuickJSContext.create()) {
 
 热路径辅助：`long bindGlobal(name)` 绑定全局函数并返回句柄（`0` = 不存在），`Object callHandle(fnHandle, arg)` 直接调用句柄、免去每次全局属性查找；`void drainJobs()` 用**单次 JNI 调用**跑完整个微任务队列。`callGlobal` / `hasGlobalFunction` 保留用于一次性调用。
 
+除 `interrupt()` 外，所有方法都必须在**创建该上下文的线程**上调用：`QuickJSContext` 记录 owner 线程，跨线程调用会抛 `QuickJSException`（跨线程 `JS_FreeContext`/`JS_Call` 是 use-after-free，会导致 JVM 崩溃）。`interrupt()` 是唯一线程安全的入口，仅置位一个原生 atomic 标志。
+
+## 中断与终止语义
+
+- `interrupt()` 置位原生中断标志；QuickJS 解释器**周期性检查**（约每 1 万条字节码指令）并抛出 `InternalError: interrupted`。
+- 该错误被 QuickJS 标记为**不可捕获**（`JS_SetUncatchableException`）：JS 的 `catch` 与 `finally` **都不会执行**，`while (true) { try { ... } catch (e) {} }` **无法吞掉**它。
+- 因为只在解释器安全点检查，**长时间运行的原生运算无法被及时中断**（例如灾难性回溯正则 `/(a+)+$/`、超大 `JSON` 编解码）——这类线程可能长时间无响应。
+- 一旦请求过终止（`interrupt()`），JS→Java 的**全局函数上行边界**（Yeow 中即 `$_send`）也是一个安全检查点：再次调用它会直接抛出**不可捕获**错误，阻止已进入终止阶段的插件继续产生副作用。
+- 中断成功后，执行流以异常退出 `evaluate` / `callHandle`，宿主捕获 `QuickJSException` 并回到自己的循环（Yeow 运行时据此退出并在该线程上销毁上下文）。
+
+## 二进制传输缓冲区
+
+`QuickJSContext` 为每个上下文持有 **16KB 常驻 `ByteBuffer`**（小端，`buffer()` 访问，`nativeRegisterBuffer` 注册给 native）。桥在上下文创建时安装两个 JS 全局函数：
+
+- `__yeowWrite(channel, obj) -> boolean`：把对象编码进缓冲区（对象/数组起止标记 + LEB128 varint + 原始 UTF-8 键的 tag 状态机格式）；越界或含不可编码值时返回 `false`（调用方回退 JSON）。
+- `__yeowRead() -> any`：把缓冲区解码为 JS 对象。
+
+布局的 Java 侧镜像在运行时的 `yeow.transport.BinaryCodec`。**缓冲区是创建上下文的 JS 线程私有的**，跨线程访问是未定义行为。详见文档站「进阶 · 二进制传输」。
+
+> 硬终止**不保证** JS `finally` / 用户清理逻辑执行；清理应放在 `onUnload`（正常路径）。若线程在宽限期内无法终止，宿主应**遗弃并隔离**该上下文（引擎不能被跨线程安全销毁），而不是强杀。
+
 ## 原生 Polyfill
 
 `native/polyfill/` 存放**随 JS 上下文创建注入**的原生（C）全局 API——用于需要平台能力、无法用 JS 引导脚本实现的接口。QuickJS 源码不改动，polyfill 只是在上下文全局对象上做 `JS_NewCFunction` 绑定：

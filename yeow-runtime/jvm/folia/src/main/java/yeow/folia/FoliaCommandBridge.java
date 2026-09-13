@@ -68,7 +68,7 @@ public class FoliaCommandBridge {
                     "args", List.of(a), "label", l);
                 if (cbId != null && !cbId.isEmpty()) {
                     var pt = runtime.core().getPlugin(pluginName);
-                    if (pt != null) pt.postMessage(gson.toJson(Map.of("t", "cb", "p", cbId, "r", payload)));
+                    if (pt != null) pt.postMessage(SyncCallbackHelper.cbMessageObject(cbId, payload));
                 }
                 return true;
             }
@@ -78,11 +78,11 @@ public class FoliaCommandBridge {
                 var pt = runtime.core().getPlugin(pluginName);
                 if (pt == null) return super.tabComplete(s, l, a);
                 var pend = SyncCallbackHelper.register(compCbId);
-                pt.postMessage(gson.toJson(Map.of("t", "cb", "p", compCbId, "r", Map.of(
+                pt.postMessage(SyncCallbackHelper.cbMessageObject(compCbId, Map.of(
                     "sender", Map.of("name", s.getName(),
                         "uuid", s instanceof Player p ? p.getUniqueId().toString() : "CONSOLE",
                         "isPlayer", s instanceof Player),
-                    "args", List.of(a)))));
+                    "args", List.of(a))));
                 // 进入补全模式（与通用执行器互斥；与事件/其他补全可并发），只取本插件任务
                 SpinPump.spin(scheduler, java.util.Set.of(pluginName), pend::isDone, timeoutMs);
                 var result = (pend.isDone() && pend.getResult() instanceof java.util.List<?> list)

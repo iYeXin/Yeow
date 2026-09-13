@@ -27,6 +27,7 @@ const bridge_sources = [_][]const u8{
     "native/src/bridge.c",
     "native/src/context.c",
     "native/src/convert.c",
+    "native/src/binary.c",
 };
 
 const polyfill_sources = [_][]const u8{
