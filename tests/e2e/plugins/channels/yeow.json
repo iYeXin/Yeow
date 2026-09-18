@@ -1,0 +1,9 @@
+{
+    "name": "e2e-channels",
+    "version": "1.0.0",
+    "description": "Yeow e2e channel test plugin",
+    "api": "1.18",
+    "typecheck": false,
+    "permissions": [],
+    "computedPermissions": []
+}

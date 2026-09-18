@@ -64,3 +64,10 @@ Yeow-Docs/zh/public/docs.zip
 
 # ── 本地测试（不追踪）────────────────────────
 /test/
+
+# ── 测试产物（不追踪）────────────────────────
+tests/quickjs/out/
+tests/e2e/.work/
+tests/e2e/.paper/
+# 测试插件源码必须追踪（上方通用 `plugins/` 规则会误伤 tests/e2e/plugins/）
+!tests/e2e/plugins/

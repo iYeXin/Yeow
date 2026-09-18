@@ -53,6 +53,15 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 - 运行时/模板构建：见 [CONTRIBUTING.md](CONTRIBUTING.md)（Maven 本地安装流程）
 - 插件开发：`npm create yeow@latest`（脚手架本身不依赖本仓库）
 
+## 测试
+
+```bash
+node tests/run.mjs simple   # 快速层：QuickJS 桥测试组件 + runtime 单元测试（Maven），不启动服务器
+node tests/run.mjs full     # 全量层：启动真实 Paper，加载测试插件并校验断言
+```
+
+分层、前置与选项见 [tests/README.md](tests/README.md)。
+
 ## 快速开始
 
 完整文档见 [yeow-doc-website/docs/cn/getting-started.md](yeow-doc-website/docs/cn/getting-started.md)。

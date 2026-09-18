@@ -4,6 +4,16 @@
 
 ---
 
+## 2026-09-18
+
+### 测试套件重写（两层：简易 / 全量）
+
+- **统一入口**：新增顶层 `tests/` 与 `node tests/run.mjs <simple|full>`。`simple` 不启动服务器（QuickJS 桥测试组件 + `mvn -q test`）；`full` 启动真实 Paper，加载测试插件并校验断言。完整用法见 `tests/README.md`
+- **QuickJS 桥测试组件**（`tests/quickjs/`）：零依赖 Runner，编译并以构建出的 wrapper 驱动用例，支持 `--filter`/`--json`/退出码；覆盖上下文生命周期、值映射、上行/下行、`bindGlobal`/`callHandle`、`drainJobs`/Promise、异常、线程亲和、不可捕获中断，以及保留的二进制编解码原语；另有 JS 语料层（`test()`/`testAsync()`/`assert`）
+- **Paper 全量测试**（`tests/e2e/`）：harness 负责定位/缓存 Paper、部署运行时与测试插件、启动服务器、收集插件在 LOAD 阶段输出的 `[YEOW-E2E] {json}` 哨兵并汇总退出码；测试插件为纯 JS（无构建步骤），放入 `tests/e2e/plugins/<name>/` 即自动纳入。首批场景覆盖 `env`、`task`（同步/批量）、`debug.payload` 往返、`util`（UTF-8/gzip）、`fs`（plugin 级读写/删除）与默认权限拒绝；并含**通信层性能基准**（`tests/e2e/plugins/bench/`，基于 `debug.payload` 的固定小规模同步往返，回传 mean/p50/p99/max）
+- 文档同步：`README.md` / `CONTRIBUTING.md` / `AGENTS.md` 增加测试说明
+- **迭代同步要求**：实现变更须在同一次改动中同步更新对应测试组件（组件↔测试对应关系见 `AGENTS.md`）；提交前至少 `simple`，涉及协议/运行时行为再 `full`
+
 ## 2026-09-13
 
 ### yeow-runtime 0.6.1（强制终止鲁棒性）

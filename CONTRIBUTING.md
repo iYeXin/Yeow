@@ -153,13 +153,19 @@ mvn install:install-file \
 
 ### 测试
 
-- `yeow-runtime/jvm`：`mvn test`（JUnit 5）——直方图、窗口聚合、检测器阈值均有单测，改动 profile 相关代码需同步更新
-- 实机验证：`npm run dev` 启动测试服务器（热重载）；生产行为用 `plugins/Yeow/*.yeow.zip` 自动扫描验证
+测试套件分为两层，统一入口 `node tests/run.mjs <tier>`（详见 [tests/README.md](tests/README.md)）：
+
+- **simple**（不启动服务器）：`node tests/run.mjs simple`——QuickJS 桥测试组件 + `mvn -q test`（core/paper/folia）。改动 `quickjs-wrapper` 或运行时逻辑后应先跑此层。
+- **full**（实机 Paper）：`node tests/run.mjs full`——启动 Paper，加载 `tests/e2e/plugins/*` 测试插件并校验断言。需要 JDK 21；Paper jar 自动定位或下载（或 `--paper=<jar>`）。
+
+profile 相关改动需同步更新对应单测；`tests/e2e/plugins/` 新增场景只需添加插件目录（`main.js` + `yeow.json`）。
+
+**迭代同步要求（强制）**：改动实现必须**在同一次改动中**更新对应测试组件，不得留待后续；组件与测试层的对应关系见 `AGENTS.md` 的「迭代同步要求」表格。只改实现不改测试视为未完成。
 
 ---
 
 ## 提交规范
 
 - 遵循 conventional commits：`feat:` / `fix:` / `docs:` / `refactor:` / `chore:`
-- 提交前运行 `mvn test` 与 `tsc --noEmit`（yeow-api）
+- 提交前运行 `node tests/run.mjs simple`；涉及协议/运行时行为再运行 `full`。改动实现必须同步更新对应测试（见「测试」与 `AGENTS.md`）
 - 二进制产物（`target/`、`node_modules/`、`dist/`）不提交，模板资产 jar 除外（见 `.gitignore`）
