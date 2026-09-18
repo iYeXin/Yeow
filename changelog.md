@@ -14,6 +14,12 @@
 - 文档同步：`README.md` / `CONTRIBUTING.md` / `AGENTS.md` 增加测试说明
 - **迭代同步要求**：实现变更须在同一次改动中同步更新对应测试组件（组件↔测试对应关系见 `AGENTS.md`）；提交前至少 `simple`，涉及协议/运行时行为再 `full`
 
+### quickjs-wrapper 构建与许可
+
+- **polyfill JS 资源化 + Node 代码生成**：`native/polyfill/js/*.js` 存放 JS 引导（如 `text_codec.js`），`scripts/gen-polyfill.mjs` 在构建前生成 `native/polyfill/js.generated.h`（C 字符串字面量）；`text_codec.c` 不再手工内联 JS
+- **构建入口 `build.mjs`**：代码生成与构建编排归 `build.mjs`，由其调用 `zig build`（参数透传）；CI 与文档同步为 `node build.mjs jar`
+- **许可改为 MIT**：`quickjs-wrapper` 由 Apache-2.0 改为 MIT（不再继承原 `com.whl` 实现的遗产）；仓库 `LICENSE` 与根 `README`、`quickjs-wrapper/README` 同步
+
 ## 2026-09-13
 
 ### yeow-runtime 0.6.1（强制终止鲁棒性）

@@ -31,7 +31,7 @@ jobs:
           java-version: 21
 
       - name: Build JAR
-        run: zig build jar
+        run: node build.mjs jar
 
       - name: Collect artifacts
         run: |

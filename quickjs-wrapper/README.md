@@ -13,13 +13,15 @@ Promise 微任务泵与中断钩子。JS 对象句柄不跨越边界。
 
 ## 构建
 
-需要 [Zig 0.16.0](https://ziglang.org/download/0.16.0/)；打 JAR 时另需 `javac` / `jar`（JDK 21+）。
+需要 [Zig 0.16.0](https://ziglang.org/download/0.16.0/) 与 Node.js；打 JAR 时另需 `javac` / `jar`（JDK 21+）。
+
+构建入口是 `build.mjs`：先生成 polyfill JS 的 C 头（见下），再调用 `zig build`。
 
 ```bash
-zig build                 # 本机平台的动态库 → zig-out/lib 或 zig-out/bin
-zig build all             # 全部平台 → zig-out/native/<platform>/
-zig build jar             # Java 类 + 全部平台原生库 → zig-out/yeow-quickjs.jar
-zig build -Dtarget=x86_64-linux-gnu        # 选择目标平台
+node build.mjs                            # 本机平台的动态库 → zig-out/lib 或 zig-out/bin
+node build.mjs all                        # 全部平台 → zig-out/native/<platform>/
+node build.mjs jar                        # Java 类 + 全部平台原生库 → zig-out/yeow-quickjs.jar
+node build.mjs -Dtarget=x86_64-linux-gnu  # 选择目标平台（参数透传给 zig）
 ```
 
 平台目录命名与类路径资源一致：
@@ -85,14 +87,15 @@ try (QuickJSContext ctx = QuickJSContext.create()) {
 - `polyfill.h`：统一入口 `yeow_install_polyfills(JSContext*)` 与各 installer 声明
 - `polyfill.c`：注册表，逐个调用 installer（`context.c` 创建上下文时调用一次）
 - `performance.c`：`performance.now()`（单调高精度毫秒；Windows `QueryPerformanceCounter`、POSIX `clock_gettime(CLOCK_MONOTONIC)`）与 `performance.timeOrigin`
-- `text_codec.c`：`TextEncoder` / `TextDecoder`（utf-8）——C 提供 `__yeowUtf8Encode` / `__yeowUtf8Decode` 原语，安装时以一小段内嵌 JS 包成两个类并从全局移除原语
+- `text_codec.c`：`TextEncoder` / `TextDecoder`（utf-8）——C 提供 `__yeowUtf8Encode` / `__yeowUtf8Decode` 原语，安装时用一段 JS 引导包成两个类并从全局移除原语
+- `js/*.js`：polyfill 的 JS 引导代码（资源）；`scripts/gen-polyfill.mjs` 在构建前生成 `native/polyfill/js.generated.h`（C 字符串字面量，命名 `<file>.js → <FILE>_JS`），生成的 `.h` 不入库
 
-新增 polyfill：实现 `void yeow_<name>_install(JSContext *ctx)` → 在 `polyfill.h` 声明、`polyfill.c` 调用、`build.zig` 的 `polyfill_sources` 登记。
+新增 polyfill：实现 `void yeow_<name>_install(JSContext *ctx)` → 在 `polyfill.h` 声明、`polyfill.c` 调用、`build.zig` 的 `polyfill_sources` 登记；需要 JS 引导时写入 `native/polyfill/js/`（无需手工内联字符串）。
 
 ## 运行冒烟测试
 
 ```bash
-zig build jar
+node build.mjs jar
 javac -d out/classes java/src/main/java/wiki/yexin/quickjs/*.java java/src/test/java/wiki/yexin/quickjs/SmokeTest.java
 java -cp "zig-out/yeow-quickjs.jar;out/classes" wiki.yexin.quickjs.SmokeTest
 ```
@@ -105,4 +108,4 @@ ESModule/字节码/二进制解析/内存诊断等未被 Yeow 使用的部分。
 
 ## 许可证
 
-本目录为 Apache-2.0（继承自原 quickjs-wrapper）；QuickJS 引擎为 MIT（Fabrice Bellard）。
+本目录为 MIT；QuickJS 引擎为 MIT（Fabrice Bellard）。

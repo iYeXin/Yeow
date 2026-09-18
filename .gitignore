@@ -43,6 +43,7 @@ bin/
 quickjs-wrapper/wrapper-java/build/
 quickjs-wrapper/wrapper-java/bin/
 quickjs-wrapper/.gradle/
+quickjs-wrapper/native/polyfill/js.generated.h
 
 # ── 文档站点 ────────────────────────────────────────────
 yeow-doc-website/.vitepress/dist/

@@ -6,12 +6,14 @@ const std = @import("std");
 // compiled by Zig and linked into a single shared library, then packaged with
 // the Java API into one JAR.
 //
-//   zig build                 # native library for the host platform
-//   zig build all             # native libraries for every platform -> zig-out/native/
-//   zig build jar             # Java + every platform native -> zig-out/yeow-quickjs.jar
+// Build through build.mjs (it runs the polyfill JS codegen first):
+//   node build.mjs            # native library for the host platform
+//   node build.mjs all        # native libraries for every platform -> zig-out/native/
+//   node build.mjs jar        # Java + every platform native -> zig-out/yeow-quickjs.jar
 //
+// `zig build` also works standalone once native/polyfill/js.generated.h exists.
 // Cross targets are selected with -Dtarget=<arch>-<os>-<abi>, e.g.
-//   zig build -Dtarget=aarch64-linux-gnu
+//   node build.mjs -Dtarget=aarch64-linux-gnu
 
 const quickjs_version = "2026-06-04";
 

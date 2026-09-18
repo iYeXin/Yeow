@@ -35,7 +35,7 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 | `yeow-template` | 空 JAR 骨架 | `mvn package`（依赖 yeow-runtime，需先安装到本地 Maven 仓库） |
 | `yeow-api` | TS 库 | 无构建步骤（源码直接随插件 bundle）；类型检查 `tsc --noEmit` |
 | `create-yeow` | CLI 脚手架 | 无构建步骤；模板改动直接生效 |
-| `quickjs-wrapper` | QuickJS 专用 JNI 桥（原生 C + Java `wiki.yexin.quickjs`） | Zig 0.16（`zig build jar`，详见下文） |
+| `quickjs-wrapper` | QuickJS 专用 JNI 桥（原生 C + Java `wiki.yexin.quickjs`） | Zig 0.16 + Node（`node build.mjs jar`，详见下文） |
 | `yeow-tools` | 开发基准/诊断工具 | `mvn package`（独立，不依赖运行时） |
 | `yeow-dev` | 构建期虚拟模块（空 npm 包） | 无构建；发布 `npm publish`（构建时被 esbuild 拦截，不实际加载） |
 | `yeow-doc-website` | 文档源 + 文档站点 | 文档目录 `docs/cn/`（仓库内直接提交）；`npm run build` 产出 `/v1/` 站点 |
@@ -51,18 +51,19 @@ git clone --recursive https://github.com/iYeXin/Yeow.git
 
 ```bash
 cd quickjs-wrapper
-zig build jar          # 产出 zig-out/yeow-quickjs.jar（Java 类 + 全部平台原生库）
+node build.mjs jar     # 生成 polyfill JS 头 + 产出 zig-out/yeow-quickjs.jar（Java 类 + 全部平台原生库）
 mvn install:install-file \
   -Dfile=zig-out/yeow-quickjs.jar \
   -DgroupId=wiki.yexin -DartifactId=yeow-quickjs -Dversion=0.6.1 -Dpackaging=jar
 ```
 
-- 只构建本机原生库：`zig build`
-- 只构建各平台原生库：`zig build all` → `zig-out/native/<platform>/`
-- 交叉编译：`zig build -Dtarget=aarch64-linux-gnu` 等（单工具链产出 linux/macos/windows × x86_64/arm64）
+- 构建由 `build.mjs` 主持：先生成 `native/polyfill/js/*.js` 对应的 C 头（`scripts/gen-polyfill.mjs`），再调用 `zig build`。
+- 只构建本机原生库：`node build.mjs`
+- 只构建各平台原生库：`node build.mjs all` → `zig-out/native/<platform>/`
+- 交叉编译：`node build.mjs -Dtarget=aarch64-linux-gnu` 等（单工具链产出 linux/macos/windows × x86_64/arm64）
 - 冒烟测试与 API 说明：见 `quickjs-wrapper/README.md`
 
-> 修改原生 C（`quickjs-wrapper/native/src/*`）或 Java API 后，重新执行 `zig build jar` 并重装该依赖，再重建 yeow-runtime。
+> 修改原生 C（`quickjs-wrapper/native/src/*`、`native/polyfill/**`）或 Java API 后，重新执行 `node build.mjs jar` 并重装该依赖，再重建 yeow-runtime。
 
 ### 2. yeow-runtime（core + paper + folia 多模块）
 
@@ -99,7 +100,7 @@ cp target/yeow-template-0.6.1.jar ../create-yeow/templates/default/.yeow/assets/
 `quickjs-wrapper/` 现在是 **Yeow 专用实现**（不再是外部镜像），接口、包名与构件坐标见 `quickjs-wrapper/README.md`。升版步骤：
 
 1. 修改 C / Java 代码，`quickjs-wrapper/CHANGELOG.md` 顶部新增版本条目（`## X.Y.Z *(YYYY-MM-DD)*`）
-2. `cd quickjs-wrapper && zig build jar`
+2. `cd quickjs-wrapper && node build.mjs jar`
 3. 安装到本地 Maven 仓库：
 
 ```bash

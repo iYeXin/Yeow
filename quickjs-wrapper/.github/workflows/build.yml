@@ -24,10 +24,10 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      # Compiles QuickJS + the bridge, cross-compiles every platform and
-      # assembles the JAR (Java classes + all native libraries).
+      # Codegen (polyfill JS -> C header) + compiles QuickJS + the bridge,
+      # cross-compiles every platform and assembles the JAR.
       - name: Build JAR
-        run: zig build jar
+        run: node build.mjs jar
 
       - name: Smoke test
         run: |

@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "polyfill.h"
+#include "js.generated.h" /* TEXT_CODEC_JS — generated from native/polyfill/js/text_codec.js */
 
 /* string -> ArrayBuffer (UTF-8 bytes). */
 static JSValue js_utf8_encode(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv) {
@@ -66,39 +67,10 @@ static JSValue js_utf8_decode(JSContext *ctx, JSValueConst this_val, int argc, J
 }
 
 /*
- * Wraps the primitives into Web-compatible classes. Kept as a string because
- * class/getter syntax and instanceof are far cleaner here than via JS_NewClass.
+ * The wrapping classes live in native/polyfill/js/text_codec.js and are embedded
+ * by scripts/gen-polyfill.mjs into js.generated.h (TEXT_CODEC_JS): class/getter
+ * syntax and instanceof are far cleaner there than via JS_NewClass.
  */
-static const char TEXT_CODEC_JS[] =
-    "(() => {\n"
-    "  const _enc = globalThis.__yeowUtf8Encode;\n"
-    "  const _dec = globalThis.__yeowUtf8Decode;\n"
-    "  try { delete globalThis.__yeowUtf8Encode; } catch (e) {}\n"
-    "  try { delete globalThis.__yeowUtf8Decode; } catch (e) {}\n"
-    "  const isUtf8 = (label) => String(label).toLowerCase().replace(/[-_]/g, '') === 'utf8';\n"
-    "  class TextEncoder {\n"
-    "    constructor(encoding = 'utf-8') {\n"
-    "      if (!isUtf8(encoding)) throw new RangeError('TextEncoder supports utf-8 only');\n"
-    "    }\n"
-    "    get encoding() { return 'utf-8'; }\n"
-    "    encode(str = '') { return new Uint8Array(_enc(String(str))); }\n"
-    "  }\n"
-    "  class TextDecoder {\n"
-    "    constructor(encoding = 'utf-8') {\n"
-    "      if (!isUtf8(encoding)) throw new RangeError('TextDecoder supports utf-8 only');\n"
-    "    }\n"
-    "    get encoding() { return 'utf-8'; }\n"
-    "    decode(input) {\n"
-    "      if (input === undefined) return '';\n"
-    "      if (!(input instanceof ArrayBuffer) && !ArrayBuffer.isView(input)) {\n"
-    "        throw new TypeError('TextDecoder.decode expects an ArrayBuffer or ArrayBufferView');\n"
-    "      }\n"
-    "      return _dec(input);\n"
-    "    }\n"
-    "  }\n"
-    "  globalThis.TextEncoder = TextEncoder;\n"
-    "  globalThis.TextDecoder = TextDecoder;\n"
-    "})();\n";
 
 void yeow_text_codec_install(JSContext *ctx) {
     JSValue global = JS_GetGlobalObject(ctx);

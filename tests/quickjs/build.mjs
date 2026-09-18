@@ -1,6 +1,6 @@
 // 编译并运行 QuickJS 桥测试组件。
 //   node tests/quickjs/build.mjs [--build] [--filter=<substr>] [--json=<path>] [--quiet]
-// --build：先执行 `zig build jar` 重建 wrapper（否则要求 zig-out/yeow-quickjs.jar 已存在）。
+// --build：先执行 `node quickjs-wrapper/build.mjs jar` 重建 wrapper（否则要求 zig-out/yeow-quickjs.jar 已存在）。
 import { existsSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -36,13 +36,13 @@ function listJava(dir, acc = []) {
 
 if (wantBuild || !existsSync(JAR)) {
   if (wantBuild) {
-    console.log('[quickjs] zig build jar …');
-    const r = spawnSync('zig', ['build', 'jar'], { cwd: WRAPPER, stdio: 'inherit', shell: false });
+    console.log('[quickjs] building wrapper (node build.mjs jar) …');
+    const r = spawnSync(process.execPath, [join(WRAPPER, 'build.mjs'), 'jar'], { cwd: WRAPPER, stdio: 'inherit', shell: false });
     if (r.status !== 0) process.exit(r.status ?? 1);
   }
 }
 if (!existsSync(JAR)) {
-  console.error(`[quickjs] missing wrapper jar: ${JAR}\n  build it with: cd quickjs-wrapper && zig build jar`);
+  console.error(`[quickjs] missing wrapper jar: ${JAR}\n  build it with: node quickjs-wrapper/build.mjs jar`);
   process.exit(1);
 }
 
