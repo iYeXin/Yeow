@@ -360,7 +360,7 @@ value := tag [payload]
 - 运行时恢复**纯 JSON**：`$send` → `$_send(channel, JSON.stringify(payload))`；下行 `gson.toJson`。
 - 二进制代码**不删除**，通过单一开关 `BinaryCodec.ENABLED = false`（注入为全局 `$binary`）隔离：`init.js` 的 `$send`/`$hm`、`PluginThread`/`WorkerThread` 的 `$_send` / `encodeResult` / 消息循环均按该开关分流；C 侧 `__yeowWrite`/`__yeowRead` 仍注册但不会被调用。
 - 重新启用只需把 `BinaryCodec.ENABLED` 置 `true`（C/Java/JS 自动一致）。
-- 实现说明见 `yeow-doc-website/docs/{cn,en}/advanced/binary-transport.md`（顶部标注默认停用）。
+- 实现说明原见文档站「进阶 · 二进制传输」，该页面已随停用一并从站点撤除；代码与格式见 `quickjs-wrapper/native/src/binary.{c,h}` 与 `yeow-runtime/.../transport/BinaryCodec.java`。
 
 ## 8. 时间线（第二阶段）
 

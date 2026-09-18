@@ -22,7 +22,6 @@
 | 进阶 · 事件与回调       | `https://cn.yexin.wiki/yeow/v1/advanced/events`       | 事件桥（EventBridge）：并发/串行、事件数据、处理器操作与模式选择、事件重入死锁                                                                      |
 | 进阶 · 生命周期与热重载 | `https://cn.yexin.wiki/yeow/v1/advanced/lifecycle`    | onInit/onLoad/onUnload、统一回调系统、热重载（强杀机制：原生中断 + 实体重建）、生产 /yeow reload/unload                                             |
 | 进阶 · 环境能力与通道   | `https://cn.yexin.wiki/yeow/v1/advanced/channels`     | $send 封装（底层桥 $_send 为内部实现，闭包持有不外露）、各消息通道说明（运行时配置指向 /operations）                                                |
-| 进阶 · 二进制传输 | `https://cn.yexin.wiki/yeow/v1/advanced/binary-transport` | JS↔Java 二进制传输：16KB 常驻缓冲区、tag 状态机 + 起止标记 + varint 布局、双向编解码与 JSON 回退、调度器去 JSON 化、线程约束与已知限制              |
 | 进阶 · 服务机制         | `https://cn.yexin.wiki/yeow/v1/advanced/service`      | Plugin Service（插件间通信）与 Native Service（原生扩展）的机制（API 用法见 /api/service）                                                          |
 | 关于 Yeow               | `https://cn.yexin.wiki/yeow/v1/advanced/about`        | 关于 Yeow                                                                                                                                           |
 | 编写依赖包              | `https://cn.yexin.wiki/yeow/v1/package-author`        | 将共享逻辑与资源封装为 npm 依赖包：assets 命名空间、依赖项识别、构建自动处理（多副本共存/权限合并/native 清单）                                     |

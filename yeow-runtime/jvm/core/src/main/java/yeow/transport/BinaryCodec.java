@@ -41,7 +41,7 @@ public final class BinaryCodec {
      *
      * <p>{@code false} (current default): the runtime transports messages as JSON only. The binary
      * codec below is retained, tested and isolated — nothing calls it. Set to {@code true} to
-     * re-enable the resident-buffer transport (see {@code docs/.../advanced/binary-transport.md}).
+     * re-enable the resident-buffer transport.
      */
     public static final boolean ENABLED = false;
 

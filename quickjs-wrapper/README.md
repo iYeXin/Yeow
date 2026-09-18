@@ -74,7 +74,7 @@ try (QuickJSContext ctx = QuickJSContext.create()) {
 - `__yeowWrite(channel, obj) -> boolean`：把对象编码进缓冲区（对象/数组起止标记 + LEB128 varint + 原始 UTF-8 键的 tag 状态机格式）；越界或含不可编码值时返回 `false`（调用方回退 JSON）。
 - `__yeowRead() -> any`：把缓冲区解码为 JS 对象。
 
-布局的 Java 侧镜像在运行时的 `yeow.transport.BinaryCodec`。**缓冲区是创建上下文的 JS 线程私有的**，跨线程访问是未定义行为。详见文档站「进阶 · 二进制传输」。
+布局的 Java 侧镜像在运行时的 `yeow.transport.BinaryCodec`。**缓冲区是创建上下文的 JS 线程私有的**，跨线程访问是未定义行为。
 
 > 硬终止**不保证** JS `finally` / 用户清理逻辑执行；清理应放在 `onUnload`（正常路径）。若线程在宽限期内无法终止，宿主应**遗弃并隔离**该上下文（引擎不能被跨线程安全销毁），而不是强杀。
 

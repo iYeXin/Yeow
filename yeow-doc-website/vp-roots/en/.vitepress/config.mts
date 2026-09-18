@@ -161,7 +161,6 @@ export default defineConfig({
                     { text: 'Events & Callbacks', link: '/advanced/events' },
                     { text: 'Lifecycle & Hot Reload', link: '/advanced/lifecycle' },
                     { text: 'Environment & Channels', link: '/advanced/channels' },
-                    { text: 'Binary Transport', link: '/advanced/binary-transport' },
                     { text: 'Service Mechanism', link: '/advanced/service' },
                     { text: 'About Yeow', link: '/advanced/about' },
                 ],
