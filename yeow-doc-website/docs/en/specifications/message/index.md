@@ -19,7 +19,7 @@ All channels use the same `$send(channel, payload)` entry point, where `payload`
 | `assets`       | Reading the plugin's built-in assets       | [assets channel](assets.md)            |
 | `lifecycle`    | Lifecycle acknowledgement + resource reclamation | [lifecycle channel](lifecycle.md) |
 | `log`          | Logging                                    | [log channel](log.md)                  |
-| `env`          | Runtime environment info + microsecond timestamps | See below                        |
+| `env`          | Runtime environment info + millisecond timestamp (microsecond precision) | See below                        |
 | `debug`        | Debugging / error reporting / Ping         | [debug channel](debug.md)              |
 | `service`      | Service registration / request / subscribe / publish | [service channel](service.md) |
 | `util`         | gzip + UTF-8 ↔ byte conversion             | [util channel](util.md)                |
@@ -41,7 +41,7 @@ All channels use the same `$send(channel, payload)` entry point, where `payload`
   "arch": "windows-x64",
   "minecraftVersion": "1.21.4",
   "yeow": { "platform": "paper", "version": "0.5.0" },
-  "now": 1723100000000000,
+  "timestamp": 1723100000000.123,
   "pluginDir": "plugins/my-plugin"
 }
 ```
@@ -49,7 +49,7 @@ All channels use the same `$send(channel, payload)` entry point, where `payload`
 - `cpus`: number of CPU logical cores; `memory`: JVM total memory (bytes)
 - `arch`: system architecture (`<os>-<arch>`, e.g. `windows-x64`)
 - `minecraftVersion`: Minecraft version; `yeow`: runtime info (platform/version)
-- `now`: **epoch microseconds** timestamp (communication overhead is on the microsecond scale, so nanoseconds are meaningless)
+- `timestamp`: epoch milliseconds (microsecond precision)
 - `pluginDir`: **plugin data directory path** (e.g. `plugins/<pluginName>`; the former `dir` channel has been merged in; in a Worker it is the main plugin directory)
 
 ---

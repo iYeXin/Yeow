@@ -747,7 +747,7 @@ public class PluginThread implements Runnable, PluginEntity {
      * - arch：系统架构（如 windows-x64 / linux-x64 / linux-arm64）
      * - minecraftVersion：Minecraft 版本（如 1.21.4）
      * - yeow：运行时信息 { platform, version }
-     * - now：epoch 微秒时间戳（通信开销在微秒级，纳秒无意义）
+     * - timestamp：epoch 毫秒时间戳（小数部分为微秒，即微秒精度）
      * - pluginDir：插件数据目录路径（原 dir 通道并入；fs plugin 级 base，如 plugins/<pluginName>）
      */
     private String handleEnv() {
@@ -757,8 +757,8 @@ public class PluginThread implements Runnable, PluginEntity {
         String arch = archRaw.contains("aarch64") || archRaw.contains("arm64") ? "arm64"
             : archRaw.contains("x86_64") || archRaw.contains("amd64") ? "x64"
             : archRaw.contains("arm") ? "armv7" : archRaw;
-        var now = java.time.Instant.now();
-        long nowUs = now.getEpochSecond() * 1_000_000L + now.getNano() / 1000L;
+        var instant = java.time.Instant.now();
+        double timestamp = instant.getEpochSecond() * 1000.0 + instant.getNano() / 1_000_000.0;
         String yeowVersion = core.host().runtimeVersion();
         if (yeowVersion == null) yeowVersion = "0.5.0";
         return gson.toJson(Map.of(
@@ -767,7 +767,7 @@ public class PluginThread implements Runnable, PluginEntity {
             "arch", os + "-" + arch,
             "minecraftVersion", core.host().minecraftVersion(),
             "yeow", Map.of("platform", core.host().platformName(), "version", yeowVersion),
-            "now", nowUs,
+            "timestamp", timestamp,
             // 原 dir 通道并入 env：插件数据目录（fs plugin 级 base；Worker 共享主插件目录）
             "pluginDir", "plugins/" + name));
     }

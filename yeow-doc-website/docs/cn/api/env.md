@@ -18,7 +18,7 @@ console.log(env.arch, env.minecraftVersion, env.yeow.version);
 | `arch`             | string                | 系统架构（如 `windows-x64` / `linux-x64` / `linux-arm64`）                        |
 | `minecraftVersion` | string                | Minecraft 版本（如 `1.21.4`）                                                     |
 | `yeow`             | { platform, version } | 运行时信息（如 `{ platform: 'paper', version: '0.5.0' }`）                        |
-| `now`              | number                | **epoch 微秒**时间戳                                                              |
+| `timestamp`        | number                | epoch 毫秒时间戳（小数部分为微秒，微秒精度）                                      |
 | `pluginDir`        | string                | 插件数据目录路径（Paper/Folia 平台如 `plugins/my-plugin`；Worker 中为主插件目录） |
 
-> `now` 为微秒级时间戳——通信开销在微秒级，纳秒无意义。
+> `timestamp` 单位毫秒、精度微秒（小数部分即微秒）。

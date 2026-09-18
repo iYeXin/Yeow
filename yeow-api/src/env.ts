@@ -10,8 +10,8 @@ export interface EnvInfo {
   minecraftVersion: string;
   /** 运行时信息。 */
   yeow: { platform: string; version: string };
-  /** epoch 微秒时间戳。 */
-  now: number;
+  /** epoch 毫秒时间戳（小数部分为微秒，即微秒精度）。 */
+  timestamp: number;
   /** 插件数据目录路径（如 `plugins/my-plugin`；Worker 中为主插件目录）。 */
   pluginDir: string;
 }

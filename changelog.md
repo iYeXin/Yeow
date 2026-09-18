@@ -20,6 +20,11 @@
 - **构建入口 `build.mjs`**：代码生成与构建编排归 `build.mjs`，由其调用 `zig build`（参数透传）；CI 与文档同步为 `node build.mjs jar`
 - **许可改为 MIT**：`quickjs-wrapper` 由 Apache-2.0 改为 MIT（不再继承原 `com.whl` 实现的遗产）；仓库 `LICENSE` 与根 `README`、`quickjs-wrapper/README` 同步
 
+### yeow-runtime 0.6.2（env.timestamp）
+
+- `getEnv()` 的时间戳字段由 `now`（epoch 微秒）改为 **`timestamp`（epoch 毫秒，微秒精度）**；`EnvInfo` 类型与文档（`specifications/message`、`specifications/runtime`、`api/env`、`advanced/channels`、`api/README`、sitemap）同步
+- 版本 0.6.1 → 0.6.2（runtime core/paper/folia、yeow-template、create-yeow、yeow-api、`wiki.yexin:yeow-quickjs`）；**暂不发布**（模板资产 jar 与安装文档待发布时同步）
+
 ## 2026-09-13
 
 ### yeow-runtime 0.6.1（强制终止鲁棒性）

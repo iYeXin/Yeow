@@ -66,7 +66,7 @@ Complete API index grouped by module. Marked ⭐ are **common APIs** (core capab
 | Documentation | Description |
 | ------------- | ----------- |
 | [Server](server.md) | Server-level: Broadcast, MOTD, version, TPS |
-| [Env](env.md) | Runtime environment info + microsecond timestamp |
+| [Env](env.md) | Runtime environment info + millisecond timestamp (microsecond precision) |
 | [Worker](worker.md) | Virtual plugins (independent thread): `createWorker` (**advanced**) |
 | [Util](util.md) | Data tools: gzip, UTF-8 ↔ bytes |
 

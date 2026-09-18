@@ -36,7 +36,7 @@
       assert(typeof env.minecraftVersion === 'string', 'minecraftVersion');
       assert(env.yeow && typeof env.yeow.version === 'string', 'yeow.version');
       assert(typeof env.pluginDir === 'string', 'pluginDir');
-      assert(typeof env.now === 'number', 'now');
+      assert(typeof env.timestamp === 'number', 'timestamp');
     });
 
     check('task-sync', () => {

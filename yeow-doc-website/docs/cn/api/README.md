@@ -66,7 +66,7 @@
 | 文档 | 说明 |
 |------|------|
 | [Server](server.md) | 服务器级：广播、MOTD、版本、TPS |
-| [Env](env.md) | 运行时环境信息 + 微秒时间戳 |
+| [Env](env.md) | 运行时环境信息 + 毫秒时间戳（微秒精度） |
 | [Worker](worker.md) | 虚拟插件（独立线程）：`createWorker`（**进阶**） |
 | [Util](util.md) | 数据工具：gzip、UTF-8 ↔ 字节 |
 

@@ -448,7 +448,7 @@ The first parameter of `$send`, `channel`, determines how messages are routed. S
 | `assets`    | Built-in resources      | Direct processing. Uses IO thread for async | Yes | [assets channel](../message/assets.md)          |
 | `lifecycle` | Lifecycle confirmation / Resource reclamation | Direct processing | No | [lifecycle channel](../message/lifecycle.md)    |
 | `log`       | Logging                 | Direct processing                  | No          | [log channel](../message/log.md)                |
-| `env`       | Runtime environment info + Microsecond timestamp | Direct processing (sync) | No | —                                   |
+| `env`       | Runtime environment info + millisecond timestamp (microsecond precision) | Direct processing (sync) | No | —                                   |
 | `debug`     | Debug / Error reporting / Ping | Direct processing             | No          | —                                               |
 | `service`   | Service register/request/subscribe/publish | Direct processing / Cross-thread routing | Yes | [service channel](../message/service.md) |
 | `util`      | gzip + UTF-8 ↔ byte conversion | Direct processing. Uses IO thread for async | Yes | [util channel](../message/util.md) |
@@ -492,7 +492,7 @@ Synchronously returns runtime environment information (JSON, `$send('env', {})`)
   "arch": "windows-x64",
   "minecraftVersion": "1.21.4",
   "yeow": { "platform": "paper", "version": "0.5.0" },
-  "now": 1723100000000000,
+  "timestamp": 1723100000000.123,
   "pluginDir": "plugins/my-plugin"
 }
 ```
@@ -504,5 +504,5 @@ Synchronously returns runtime environment information (JSON, `$send('env', {})`)
 | `arch` | string | System architecture (`<os>-<arch>`, e.g., `windows-x64` / `linux-x64` / `linux-arm64`) |
 | `minecraftVersion` | string | Minecraft version (e.g., `1.21.4`) |
 | `yeow` | object | Runtime information: `{ "platform": "paper", "version": "<runtime version>" }` |
-| `now` | number | **Epoch microsecond** timestamp (communication overhead is at the microsecond level; nanoseconds are meaningless) |
+| `timestamp` | number | Epoch milliseconds (microsecond precision) |
 | `pluginDir` | string | Plugin data directory path (e.g., `plugins/<pluginName>`; merged from former `dir` channel; in Worker, refers to the main plugin directory) |

@@ -1,5 +1,15 @@
 # Change Log
 
+## 0.6.2 *(2026-09-18)*
+
+### Changes
+- **Polyfill JS as resources + codegen**: the `TextEncoder` / `TextDecoder` bootstrap now lives in
+  `native/polyfill/js/*.js`; `scripts/gen-polyfill.mjs` generates `native/polyfill/js.generated.h`
+  (C string literals, `<file>.js` → `<FILE>_JS`), so `text_codec.c` no longer inlines JS by hand.
+- **`build.mjs` build entry**: runs the codegen then `zig build` (args passed through); CI and docs
+  use `node build.mjs jar`.
+- **License: Apache-2.0 → MIT** (no longer inherits the original `com.whl` implementation).
+
 ## 0.6.1 *(2026-09-13)*
 
 ### Features

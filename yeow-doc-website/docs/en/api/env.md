@@ -18,7 +18,7 @@ Returns `EnvInfo`:
 | `arch`            | string                | System architecture (e.g. `windows-x64` / `linux-x64` / `linux-arm64`)                             |
 | `minecraftVersion`| string                | Minecraft version (e.g. `1.21.4`)                                                                  |
 | `yeow`            | { platform, version } | Runtime information (e.g. `{ platform: 'paper', version: '0.5.0' }`)                              |
-| `now`             | number                | **Epoch microseconds** timestamp                                                                   |
+| `timestamp`       | number                | Epoch milliseconds (fractional part is microseconds; microsecond precision)                        |
 | `pluginDir`       | string                | Plugin data directory path (e.g. `plugins/my-plugin` on Paper/Folia; the main plugin directory in a Worker) |
 
-> `now` is a microsecond-level timestamp — communication overhead is at the microsecond level, so nanoseconds are meaningless.
+> `timestamp` is in milliseconds with microsecond precision (the fractional part is microseconds).

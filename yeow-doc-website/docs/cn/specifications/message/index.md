@@ -19,7 +19,7 @@
 | `assets`    | 插件的内置资源读取      | [assets 通道](assets.md)          |
 | `lifecycle` | 生命周期确认 + 资源回收 | [lifecycle 通道](lifecycle.md)    |
 | `log`       | 日志                    | [log 通道](log.md)                |
-| `env`       | 运行时环境信息 + 微秒时间戳 | 见下方                         |
+| `env`       | 运行时环境信息 + 毫秒时间戳（微秒精度） | 见下方                         |
 | `debug`     | 调试 / 错误上报 / Ping  | [debug 通道](debug.md)            |
 | `service`   | 服务注册/请求/订阅/发布 | [service 通道](service.md)        |
 | `util`      | gzip + UTF-8 ↔ 字节转换 | [util 通道](util.md)              |
@@ -41,7 +41,7 @@
   "arch": "windows-x64",
   "minecraftVersion": "1.21.4",
   "yeow": { "platform": "paper", "version": "0.5.0" },
-  "now": 1723100000000000,
+  "timestamp": 1723100000000.123,
   "pluginDir": "plugins/my-plugin"
 }
 ```
@@ -49,7 +49,7 @@
 - `cpus`：CPU 逻辑核心数；`memory`：JVM 总内存（字节）
 - `arch`：系统架构（`<os>-<arch>`，如 `windows-x64`）
 - `minecraftVersion`：Minecraft 版本；`yeow`：运行时信息（platform/version）
-- `now`：**epoch 微秒**时间戳（通信开销在微秒级，纳秒无意义）
+- `timestamp`：epoch 毫秒时间戳（微秒精度）
 - `pluginDir`：**插件数据目录路径**（如 `plugins/<pluginName>`；原 `dir` 通道并入，Worker 中为主插件目录）
 
 ---

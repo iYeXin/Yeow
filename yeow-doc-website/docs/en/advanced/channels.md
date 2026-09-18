@@ -22,7 +22,7 @@ Supported message channels:
 | `service`   | Service registration/request/subscribe/publish     | ServiceManager                 |
 | `debug`     | Error reporting / heartbeat ping-pong              | Plugin thread handles directly |
 | `log`       | Console logging (auto-adds `[PluginName]` prefix) | Plugin thread handles directly |
-| `env`       | Runtime environment info + microsecond timestamp   | Plugin thread handles directly |
+| `env`       | Runtime environment info + millisecond timestamp (microsecond precision)   | Plugin thread handles directly |
 | `lifecycle` | Lifecycle confirmation (unloadDone)                | Plugin thread handles directly |
 
 ### `$send` Wrapper Layer

@@ -10,6 +10,8 @@
 
 - quickjs-wrapper: polyfill JS bootstrap moved to `native/polyfill/js/` resources; `build.mjs` generates the C header and hosts the build (invoking zig); license changed from Apache-2.0 to MIT
 
+- `getEnv()` timestamp field `now` (epoch microseconds) → `timestamp` (epoch milliseconds, microsecond precision); version 0.6.1 → 0.6.2 (not published yet)
+
 ## 2026-09-13
 
 - **yeow-runtime 0.6.1**: forced-termination robustness — `QuickJSContext` enforces thread affinity (foreign-thread calls other than `interrupt()` throw, avoiding use-after-free/crash); the native interrupt is uncatchable (`catch`/`finally` cannot swallow it); if termination fails the engine is abandoned + quarantined (`postMessage`/`ping` dropped, its `$send` raises an uncatchable abort) and a fresh entity is rebuilt (**abandonment is temporary**: once the stuck call returns or a checkpoint fires the thread destroys its own context and is reclaimed; only a never-returning native op leaks). The timeline is explicit: graceful exit (wait for `unloadDone`) → timeout → forced kill (interrupt + grace period) → abandon/rebuild; it is documented as platform-agnostic behavior in the Runtime Environment Standard (new "Unload and Forced Termination" section: two MUSTs — **ordering and controlled termination**, **prefer graceful unload** — plus an **example flow**; applies to plugins and Workers alike), referenced by `runtime-warning` / `advanced/lifecycle`

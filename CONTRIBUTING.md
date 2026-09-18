@@ -54,7 +54,7 @@ cd quickjs-wrapper
 node build.mjs jar     # 生成 polyfill JS 头 + 产出 zig-out/yeow-quickjs.jar（Java 类 + 全部平台原生库）
 mvn install:install-file \
   -Dfile=zig-out/yeow-quickjs.jar \
-  -DgroupId=wiki.yexin -DartifactId=yeow-quickjs -Dversion=0.6.1 -Dpackaging=jar
+  -DgroupId=wiki.yexin -DartifactId=yeow-quickjs -Dversion=0.6.2 -Dpackaging=jar
 ```
 
 - 构建由 `build.mjs` 主持：先生成 `native/polyfill/js/*.js` 对应的 C 头（`scripts/gen-polyfill.mjs`），再调用 `zig build`。
