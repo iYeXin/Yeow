@@ -138,6 +138,7 @@ function runServer(paperDest, expected, clientCount) {
     let buf = '';
     let stopping = false;
 
+    let clientMsgSeen = false;
     const connectClients = () => {
       for (let i = 0; i < clientCount; i++) {
         const username = clientCount > 1 ? `${CLIENT_PREFIX}${i + 1}` : CLIENT_PREFIX;
@@ -146,6 +147,12 @@ function runServer(paperDest, expected, clientCount) {
           clients.push(c);
           log(`[e2e] connecting fake client ${username}`);
           c.joined.then(() => log(`[e2e] fake client joined: ${username}`));
+          c.client.on('systemChat', (pkt) => {
+            if (JSON.stringify(pkt).includes('E2E-MSG:')) {
+              clientMsgSeen = true;
+              log(`[e2e] fake client received message from server`);
+            }
+          });
         } catch (e) {
           log(`[e2e] fake client ${username} failed: ${e.message}`);
         }
@@ -158,7 +165,7 @@ function runServer(paperDest, expected, clientCount) {
       stopping = true;
       clearTimeout(timer);
       for (const c of clients) c.disconnect();
-      resolvePromise({ code, reports: [...reports.values()], loaded, clients, serverTail });
+      resolvePromise({ code, reports: [...reports.values()], loaded, clients, serverTail, clientMsgSeen });
     };
 
     const onData = (chunk) => {
@@ -187,8 +194,9 @@ function runServer(paperDest, expected, clientCount) {
               reports.set(r.plugin, r);
               log(`[e2e] report: ${r.plugin} (${reports.size}/${expected.length})`);
               if (expected.every((n) => reports.has(n))) {
+                // 稍等片刻再停服，确保服务器→客户端消息已投递（客户端侧校验）。
                 if (KEEP) finish(0);
-                else { try { proc.stdin.write('stop\n'); } catch { /* ignore */ } }
+                else setTimeout(() => { try { proc.stdin.write('stop\n'); } catch { /* ignore */ } }, 800);
               }
             }
           } catch (e) { log(`[e2e] bad report json: ${e.message}`); }
@@ -214,7 +222,7 @@ if (BUILD_ONLY) {
   process.exit(0);
 }
 
-const { code, reports, loaded, clients, serverTail } = await runServer(prepared.paperDest, prepared.expected, prepared.clientCount);
+const { code, reports, loaded, clients, serverTail, clientMsgSeen } = await runServer(prepared.paperDest, prepared.expected, prepared.clientCount);
 
 /** 失败时打印服务器输出尾部（默认不流式打印服务器日志；--server-log 可实时查看）。 */
 function dumpServerTail() {
@@ -232,7 +240,11 @@ let totalOk = 0;
 let totalFail = 0;
 for (const rep of reports) {
   log(`\n[${rep.plugin}]`);
-  for (const r of rep.results) log(`  ${r.ok ? 'ok  ' : 'FAIL'} ${r.name}${r.ok ? '' : '  — ' + r.detail}`);
+  for (const r of rep.results) {
+    const suffix = r.ok ? (r.info ? `  (${r.info})` : '') : `  — ${String(r.detail).split('\n')[0]}`;
+    log(`  ${r.ok ? 'ok  ' : 'FAIL'} ${r.name}${suffix}`);
+    if (!r.ok && r.detail) for (const l of String(r.detail).split('\n').slice(1)) log(`       ${l}`);
+  }
   if (Array.isArray(rep.bench)) {
     log('  bench (debug.payload 同步往返, ms/op):');
     log('    payload           n      mean       min       p50       p99       max');
@@ -259,6 +271,13 @@ if (playersRep && Array.isArray(playersRep.joined)) {
   }
 }
 
+// 客户端侧校验：假玩家应收到插件发送的定向消息。
+if (prepared.clientCount > 0) {
+  log('\n[client]');
+  if (clientMsgSeen) log('  ok   systemChat  (E2E-MSG received)');
+  else { log('  FAIL systemChat  — no E2E-MSG received'); totalFail++; }
+}
+
 log(`\n[e2e] ${totalOk} passed, ${totalFail} failed (plugins: ${reports.length}/${prepared.expected.length})`);
 if (missing.length) {
   log(`[e2e] missing reports: ${missing.join(', ')}`);
@@ -269,3 +288,4 @@ if (totalFail > 0) {
   dumpServerTail();
   process.exit(1);
 }
+process.exit(0);

@@ -62,9 +62,12 @@ node tests/run.mjs full --paper=/path/paper.jar --timeout=300
 
 当前场景（`tests/e2e/plugins/e2e-tests/`）覆盖：
 
-- 通道：`env`、`task`（同步 + 批量）、`util`（UTF-8、gzip）、`fs`、`debug.payload` 往返。
-- 通信层基准：`debug.payload` 同步往返（每载荷 200 预热 + 5000 采样），随报告回传 `bench` 指标（mean/min/p50/p99/max，ms/op）。
-- 假玩家：`eventOn('playerJoin')` + `Player.getSync`，回传 `joined` 供 harness 交叉校验。
+- 通道：`env`（含 `timestamp`）、`server`（版本/最大玩家/MOTD/TPS）、`material`（`getBlocks`）、`task`（同步 + 批量）、`util`（UTF-8、gzip；同步 + 异步）、`fs`（读写/追加/目录/列举/删除）、`debug.payload` 往返。
+- 命令：`registerCommand` + `dispatchCommandSync`，校验 executor 的 label/args/sender。
+- 通信层基准：`debug.payload` 同步往返（每载荷 200 预热 + 5000 采样），回传 `bench` 指标（mean/min/p50/p99/max，ms/op）。
+- 假玩家：`eventOn('playerJoin')` + `Player.getSync` + `player.sendMessage`；harness 交叉校验 `joined`，并断言假玩家客户端收到 `systemChat`（`E2E-MSG`）。
+
+每项断言在成功时附带 `info`（版本/数量/尺寸等），失败时打印错误与栈。
 
 选项：`--server=<dir>`、`--paper=<jar>`、`--runtime=<jar>`、`--clients=<n>`、`--client-prefix=<name>`、`--mc-version=<ver>`、`--build-only`、`--keep`、`--outfile=<path>`、`--timeout=<sec>`、`--server-log`。
 

@@ -20,6 +20,9 @@
 
 - harness：默认不再流式打印服务器输出（失败/超时时打印尾部；`--server-log` 实时、`--outfile` 落盘）；运行时 jar 自动优先取本地最新构建（`yeow-runtime/jvm/paper/target`），避免误用模板中的旧 jar 导致断言失败
 
+- **e2e 场景扩展**：`e2e-tests` 增加 `server`/`material`/`util`（异步）`/`fs`（目录操作）`/registerCommand` + `dispatchCommandSync`/`player.sendMessage`，新增客户端侧 `systemChat` 校验；断言成功附带 `info`
+- **修复 full 结束延迟**：成功路径未显式退出，Node 等待假玩家 socket 等句柄，导致 `✓ paper e2e` 迟到约 30s；改为显式 `process.exit(0)`
+
 ## 2026-09-18
 
 ### 测试套件重写（两层：简易 / 全量）
