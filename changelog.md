@@ -12,6 +12,12 @@
 - **假玩家 e2e**：新增 `tests/package.json`（devDeps `minecraft-protocol` / `systeminformation`）；harness 在服务器加载后以**离线模式**连接 1.21.4 假玩家，`tests/e2e/plugins/players/` 订阅 `playerJoin`（camelCase 事件键）、经 `player.get` 取玩家名并回传 `joined`，harness 与假玩家用户名交叉校验；新增 `--clients/--client-prefix/--mc-version`
 - harness 修正：服务器进程不再经 shell 启动（避免 kill 后 JVM 残留）、清理历史 runtime jar/remap 以避免同名插件歧义
 
+### 测试插件改用 yeow-api + 构建链；修复 gzip 默认级别
+
+- **测试插件改为标准 Yeow 项目**：`tests/e2e/plugins/e2e-tests/`（TypeScript，`yeow-api` 以相对路径声明在 `dependencies`），由 `create-yeow` 的 `build.js` 构建（`tests/e2e/build-plugin.mjs` 复制模板 `.yeow` 工具链并链接 `yeow-api`）；不再手写 `main.js`
+- **修复 `util:gzip.compress` 默认级别**：未指定 `level` 时运行时回退 `-1`（`Deflater.DEFAULT_COMPRESSION`）却被校验拒绝，导致 `Gzip.compressSync()` 总是失败；校验放宽为 `-1..9`（`gzip.compress` 与 `gzip.compressor.create`）
+- full e2e：9/9 通过（含假玩家 `playerJoin`/`player.get`）
+
 ## 2026-09-18
 
 ### 测试套件重写（两层：简易 / 全量）

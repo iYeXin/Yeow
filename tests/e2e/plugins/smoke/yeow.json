@@ -1,9 +1,0 @@
-{
-    "name": "e2e-smoke",
-    "version": "1.0.0",
-    "description": "Yeow e2e smoke test plugin",
-    "api": "1.18",
-    "typecheck": false,
-    "permissions": [],
-    "computedPermissions": []
-}

@@ -1,9 +1,0 @@
-{
-    "name": "e2e-bench",
-    "version": "1.0.0",
-    "description": "Yeow e2e communication-layer benchmark (debug.payload)",
-    "api": "1.18",
-    "typecheck": false,
-    "permissions": [],
-    "computedPermissions": []
-}

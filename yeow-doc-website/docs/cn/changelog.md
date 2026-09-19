@@ -8,6 +8,8 @@
 
 - 测试套件：新增测试平台信息输出（CPU/内存规格，`systeminformation`）与假玩家 e2e（`minecraft-protocol`，离线 1.21.4 客户端；`e2e-players` 订阅 `playerJoin` 并经 `player.get` 校验，harness 交叉校验用户名）；新增 `tests/package.json`
 
+- 测试插件改为标准 Yeow 项目（TypeScript + `yeow-api` 相对依赖），由 `create-yeow` 的 `build.js` 构建（不再手写 `main.js`）；修复 `util:gzip.compress` 未指定 `level` 时被误拒（放宽为 `-1..9`）
+
 ## 2026-09-18
 
 - 测试套件重写为两层：`node tests/run.mjs simple`（QuickJS 桥测试组件 + runtime `mvn test`，不启动服务器）与 `node tests/run.mjs full`（实机 Paper + 测试插件断言，结果经 `[YEOW-E2E]` 哨兵回传）；新增顶层 `tests/`，QuickJS 组件为独立零依赖 Runner（`--filter`/`--json`），e2e 插件放入 `tests/e2e/plugins/` 即自动纳入；full 层含通信层性能基准（`debug.payload`，固定小规模，回传 mean/p50/p99/max）。用法见 `tests/README.md`；实现变更须在同一次改动中同步更新对应测试组件（见 `AGENTS.md`）

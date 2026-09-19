@@ -8,12 +8,12 @@
 // plugins/Yeow/<name>-<version>.yeow.zip。插件在 LOAD 阶段或事件到达时输出
 // [YEOW-E2E] {json} 哨兵；e2e-players 插件需要假玩家触发。
 import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync, readdirSync, statSync, appendFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, basename, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
-import { makeZip } from '../lib/zip.mjs';
 import { ensurePaper } from '../lib/paper.mjs';
 import { connectFake } from '../lib/mc.mjs';
+import { buildPlugin } from './build-plugin.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
@@ -47,32 +47,28 @@ function fail(msg, code = 1) {
 }
 
 // ── 测试插件 ──────────────────────────────────────────────────────
-function listPlugins() {
+function listPluginDirs() {
   if (!existsSync(PLUGINS_SRC)) return [];
   return readdirSync(PLUGINS_SRC, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && existsSync(join(PLUGINS_SRC, e.name, 'main.js')) && existsSync(join(PLUGINS_SRC, e.name, 'yeow.json')))
-    .map((e) => e.name)
+    .filter((e) => e.isDirectory() && existsSync(join(PLUGINS_SRC, e.name, 'yeow.config.json')))
+    .map((e) => join(PLUGINS_SRC, e.name))
     .sort();
 }
 
 function buildPluginZips() {
   const outDir = join(SERVER, 'plugins', 'Yeow');
   mkdirSync(outDir, { recursive: true });
-  const names = listPlugins();
-  if (names.length === 0) fail(`no test plugins under ${PLUGINS_SRC}`);
+  for (const n of readdirSync(outDir)) {
+    if (n.endsWith('.yeow.zip')) rmSync(join(outDir, n), { force: true });
+  }
+  const dirs = listPluginDirs();
+  if (dirs.length === 0) fail(`no test plugin projects under ${PLUGINS_SRC} (need yeow.config.json)`);
   const expected = [];
-  for (const name of names) {
-    const dir = join(PLUGINS_SRC, name);
-    const cfg = JSON.parse(readFileSync(join(dir, 'yeow.json'), 'utf8'));
+  for (const dir of dirs) {
+    const cfg = JSON.parse(readFileSync(join(dir, 'yeow.config.json'), 'utf8'));
     expected.push(cfg.name);
-    for (const n of readdirSync(outDir)) {
-      if (n.startsWith(cfg.name + '-')) rmSync(join(outDir, n), { force: true });
-    }
-    const zip = makeZip([
-      { name: '.yeow/main.js', data: readFileSync(join(dir, 'main.js')) },
-      { name: 'yeow.json', data: Buffer.from(JSON.stringify(cfg)) },
-    ]);
-    writeFileSync(join(outDir, `${cfg.name}-${cfg.version}.yeow.zip`), zip);
+    const zip = buildPlugin(dir, log);
+    copyFileSync(zip, join(outDir, basename(zip)));
   }
   return expected;
 }
@@ -104,7 +100,8 @@ async function prepare() {
   copyFileSync(RUNTIME, runtimeDest);
 
   const expected = buildPluginZips();
-  const clientCount = CLIENTS_ARG != null ? parseInt(CLIENTS_ARG, 10) : (expected.includes('e2e-players') ? 1 : 0);
+  const wantsClients = expected.includes('e2e-tests') || expected.some((n) => n.includes('players'));
+  const clientCount = CLIENTS_ARG != null ? parseInt(CLIENTS_ARG, 10) : (wantsClients ? 1 : 0);
   log(`[e2e] server   ${SERVER}`);
   log(`[e2e] runtime  ${runtimeDest}`);
   log(`[e2e] plugins  ${expected.join(', ')}`);
@@ -218,8 +215,8 @@ for (const rep of reports) {
 }
 
 const missing = prepared.expected.filter((n) => !reports.some((r) => r.plugin === n));
-// 假玩家交叉校验：插件报告的 joined 必须包含 harness 连接的每个用户名。
-const playersRep = reports.find((r) => r.plugin === 'e2e-players');
+// 假玩家交叉校验：报告的 joined 必须包含 harness 连接的每个用户名。
+const playersRep = reports.find((r) => Array.isArray(r.joined));
 if (playersRep && Array.isArray(playersRep.joined)) {
   for (const c of clients) {
     if (!playersRep.joined.includes(c.username)) {

@@ -1,9 +1,0 @@
-{
-    "name": "e2e-players",
-    "version": "1.0.0",
-    "description": "Yeow e2e fake-player (joins via node-minecraft-protocol)",
-    "api": "1.18",
-    "typecheck": false,
-    "permissions": [],
-    "computedPermissions": []
-}

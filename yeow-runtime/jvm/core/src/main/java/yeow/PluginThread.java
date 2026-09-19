@@ -1245,7 +1245,8 @@ public class PluginThread implements Runnable, PluginEntity {
             return switch (t) {
                 case "gzip.compress" -> {
                     var level = p.has("level") ? p.get("level").getAsInt() : -1;
-                    if (level < 0 || level > 9) throw new IllegalArgumentException("level must be 0-9");
+                    // -1 = Deflater.DEFAULT_COMPRESSION（未指定 level 时的引擎默认级别）
+                    if (level < -1 || level > 9) throw new IllegalArgumentException("level must be -1..9 (omit for default)");
                     var raw = Base64.getDecoder().decode(p.get("data").getAsString());
                     // raw=true：原始 deflate（无 GZIP 头/尾/CRC）
                     var out = p.has("raw") && p.get("raw").getAsBoolean()
@@ -1270,7 +1271,8 @@ public class PluginThread implements Runnable, PluginEntity {
                 // ── 流式 gzip（分块压缩/解压；句柄生命周期：create → write×n → finish → close）──
                 case "gzip.compressor.create" -> {
                     var level = p.has("level") ? p.get("level").getAsInt() : -1;
-                    if (level < 0 || level > 9) throw new IllegalArgumentException("level must be 0-9");
+                    // -1 = Deflater.DEFAULT_COMPRESSION（未指定 level 时的引擎默认级别）
+                    if (level < -1 || level > 9) throw new IllegalArgumentException("level must be -1..9 (omit for default)");
                     var raw = p.has("raw") && p.get("raw").getAsBoolean();
                     yield gson.toJson(Map.of("id", newHandle("gc", new yeow.util.GzipCompressor(level, raw))));
                 }

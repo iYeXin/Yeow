@@ -70,5 +70,7 @@ Yeow-Docs/zh/public/docs.zip
 tests/quickjs/out/
 tests/e2e/.work/
 tests/e2e/.paper/
+tests/e2e/plugins/*/.yeow/
+tests/e2e/plugins/*/dist/
 # 测试插件源码必须追踪（上方通用 `plugins/` 规则会误伤 tests/e2e/plugins/）
 !tests/e2e/plugins/

@@ -6,6 +6,8 @@
   "description": "Yeow test suite (not published)",
   "license": "MIT",
   "devDependencies": {
+    "adm-zip": "^0.6.1",
+    "esbuild": "^0.28.2",
     "minecraft-protocol": "^1.68.0",
     "systeminformation": "^5.33.12"
   }
