@@ -27,15 +27,33 @@ function arg(name, def) {
 const has = (n) => process.argv.includes(`--${n}`) || process.argv.some((x) => x.startsWith(`--${n}=`));
 
 const SERVER = resolve(arg('server', join(HERE, '.work', 'server')));
-const RUNTIME = resolve(arg('runtime', join(ROOT, 'create-yeow', 'templates', 'default', '.yeow', 'assets', 'yeow-runtime-0.6.1.jar')));
 const PAPER_ARG = arg('paper', null);
+const RUNTIME_ARG = arg('runtime', null);
 const OUT = arg('outfile', null);
 const TIMEOUT = parseInt(arg('timeout', '240'), 10);
 const KEEP = has('keep');
 const BUILD_ONLY = has('build-only');
+const SERVER_LOG = has('server-log');
 const MC_VERSION = arg('mc-version', '1.21.4');
 const CLIENT_PREFIX = arg('client-prefix', 'E2EPlayer');
 const CLIENTS_ARG = arg('clients', null);
+
+// 运行时 jar：--runtime → $YEOW_RUNTIME_JAR → 本地最新构建（paper/target）→ 模板资产。
+function resolveRuntime() {
+  const candidates = [RUNTIME_ARG, process.env.YEOW_RUNTIME_JAR].filter(Boolean);
+  for (const c of candidates) if (existsSync(c)) return resolve(c);
+  const dirs = [
+    join(ROOT, 'yeow-runtime', 'jvm', 'paper', 'target'),
+    join(ROOT, 'create-yeow', 'templates', 'default', '.yeow', 'assets'),
+  ];
+  for (const dir of dirs) {
+    if (!existsSync(dir)) continue;
+    const jars = readdirSync(dir).filter((n) => /^yeow-runtime-\d.*\.jar$/.test(n)).sort();
+    if (jars.length) return join(dir, jars[jars.length - 1]);
+  }
+  return join(ROOT, 'create-yeow', 'templates', 'default', '.yeow', 'assets', 'yeow-runtime.jar');
+}
+const RUNTIME = resolveRuntime();
 
 function log(line) {
   process.stdout.write(line + '\n');
@@ -134,23 +152,28 @@ function runServer(paperDest, expected, clientCount) {
       }
     };
 
+    const serverTail = [];
     const finish = (code) => {
       if (stopping) return;
       stopping = true;
       clearTimeout(timer);
       for (const c of clients) c.disconnect();
-      resolvePromise({ code, reports: [...reports.values()], loaded, clients });
+      resolvePromise({ code, reports: [...reports.values()], loaded, clients, serverTail });
     };
 
     const onData = (chunk) => {
       const text = chunk.toString('utf8');
       if (OUT) appendFileSync(OUT, text);
-      else process.stdout.write(text);
+      if (SERVER_LOG) process.stdout.write(text);
       buf += text;
       let idx;
       while ((idx = buf.indexOf('\n')) >= 0) {
         const line = buf.slice(0, idx).replace(/\r$/, '');
         buf = buf.slice(idx + 1);
+        if (!SERVER_LOG) {
+          serverTail.push(line);
+          if (serverTail.length > 80) serverTail.shift();
+        }
         if (!loaded && line.includes('Done (') && line.includes('For help')) {
           loaded = true;
           log('[e2e] server loaded');
@@ -191,9 +214,19 @@ if (BUILD_ONLY) {
   process.exit(0);
 }
 
-const { code, reports, loaded, clients } = await runServer(prepared.paperDest, prepared.expected, prepared.clientCount);
+const { code, reports, loaded, clients, serverTail } = await runServer(prepared.paperDest, prepared.expected, prepared.clientCount);
 
-if (reports.length === 0) fail(`no test report received (server exit ${code}, loaded=${loaded})`);
+/** 失败时打印服务器输出尾部（默认不流式打印服务器日志；--server-log 可实时查看）。 */
+function dumpServerTail() {
+  if (SERVER_LOG || !serverTail || serverTail.length === 0) return;
+  log('\n── server output (tail) ──');
+  for (const l of serverTail) log(l);
+}
+
+if (reports.length === 0) {
+  dumpServerTail();
+  fail(`no test report received (server exit ${code}, loaded=${loaded})`);
+}
 
 let totalOk = 0;
 let totalFail = 0;
@@ -229,6 +262,10 @@ if (playersRep && Array.isArray(playersRep.joined)) {
 log(`\n[e2e] ${totalOk} passed, ${totalFail} failed (plugins: ${reports.length}/${prepared.expected.length})`);
 if (missing.length) {
   log(`[e2e] missing reports: ${missing.join(', ')}`);
+  dumpServerTail();
   process.exit(1);
 }
-if (totalFail > 0) process.exit(1);
+if (totalFail > 0) {
+  dumpServerTail();
+  process.exit(1);
+}

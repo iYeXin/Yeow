@@ -53,7 +53,7 @@ node tests/run.mjs full --paper=/path/paper.jar --timeout=300
 
 1. 定位 Paper jar。顺序：`--paper=<jar>` → `$YEOW_PAPER_JAR` → 自动探测 `test/test/.yeow/dev/cache/paper-*.jar` → 从 PaperMC API 下载到 `tests/e2e/.paper/`。
 2. 准备服务器目录（默认 `tests/e2e/.work/server`）：`eula.txt`、`server.properties`。
-3. 用 `create-yeow` 的 `build.js` 构建每个测试插件项目（`tests/e2e/plugins/<name>/`，TypeScript + `yeow-api` 相对路径依赖）为 `.yeow.zip`；部署运行时 jar（`--runtime=<jar>`，默认取 `create-yeow/templates/default/.yeow/assets/yeow-runtime-*.jar`）到 `plugins/`，插件 zip 放入 `plugins/Yeow/`。
+3. 用 `create-yeow` 的 `build.js` 构建每个测试插件项目（`tests/e2e/plugins/<name>/`，TypeScript + `yeow-api` 相对路径依赖）为 `.yeow.zip`；部署运行时 jar 到 `plugins/`，插件 zip 放入 `plugins/Yeow/`。运行时 jar 解析顺序：`--runtime=<jar>` → `$YEOW_RUNTIME_JAR` → 本地最新构建 `yeow-runtime/jvm/paper/target/yeow-runtime-*.jar` → 模板资产 `create-yeow/templates/default/.yeow/assets/yeow-runtime-*.jar`。
 4. 启动 Paper，读取 stdout；测试插件在 `onLoad` 或事件到达时通过 `log` 通道输出单行哨兵 `[YEOW-E2E] {json}`。
 5. 若存在 `e2e-tests`（或名称含 `players`）的插件，则在服务器加载后以**离线模式**连接 `--clients` 个 1.21.4 假玩家（`minecraft-protocol`），并等待其加入。
 6. 收集全部插件的报告，汇总输出；有失败则以非零码退出。
@@ -66,7 +66,9 @@ node tests/run.mjs full --paper=/path/paper.jar --timeout=300
 - 通信层基准：`debug.payload` 同步往返（每载荷 200 预热 + 5000 采样），随报告回传 `bench` 指标（mean/min/p50/p99/max，ms/op）。
 - 假玩家：`eventOn('playerJoin')` + `Player.getSync`，回传 `joined` 供 harness 交叉校验。
 
-选项：`--server=<dir>`、`--paper=<jar>`、`--runtime=<jar>`、`--clients=<n>`、`--client-prefix=<name>`、`--mc-version=<ver>`、`--build-only`、`--keep`、`--outfile=<path>`、`--timeout=<sec>`。
+选项：`--server=<dir>`、`--paper=<jar>`、`--runtime=<jar>`、`--clients=<n>`、`--client-prefix=<name>`、`--mc-version=<ver>`、`--build-only`、`--keep`、`--outfile=<path>`、`--timeout=<sec>`、`--server-log`。
+
+服务器 stdout 默认**不打印**（保持输出整洁）；失败/超时时打印最后 80 行。`--server-log` 实时打印全部服务器输出，`--outfile=<path>` 始终把原始输出落盘。运行时的 `[YEOW-E2E]` 哨兵由 harness 解析并汇总，不直接回显。
 
 产物与缓存（`tests/quickjs/out/`、`tests/e2e/.work/`、`tests/e2e/.paper/`、测试插件的 `.yeow/` 与 `dist/`）不纳入版本控制。
 

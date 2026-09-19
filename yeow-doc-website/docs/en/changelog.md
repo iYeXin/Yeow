@@ -10,6 +10,8 @@
 
 - e2e plugins are now standard Yeow projects (TypeScript + relative-path `yeow-api` dependency) built by create-yeow's `build.js` (no hand-written `main.js`); fixed `util:gzip.compress` rejecting an omitted `level` (now `-1..9`)
 
+- e2e harness: server output is no longer streamed by default (tail printed on failure; `--server-log` streams, `--outfile` records); the runtime jar defaults to the newest local build
+
 ## 2026-09-18
 
 - Test suite rewritten into two tiers: `node tests/run.mjs simple` (QuickJS bridge test component + runtime `mvn test`, no server) and `node tests/run.mjs full` (real Paper + test-plugin assertions reported via the `[YEOW-E2E]` sentinel); new top-level `tests/`, with a standalone zero-dependency Runner for the QuickJS component (`--filter`/`--json`) and auto-discovered e2e plugins under `tests/e2e/plugins/`; the full tier includes a communication-layer benchmark (`debug.payload`, fixed small scale, reporting mean/p50/p99/max). See `tests/README.md`; implementation changes must update the corresponding test components in the same change (see `AGENTS.md`)

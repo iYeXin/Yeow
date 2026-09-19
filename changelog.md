@@ -18,6 +18,8 @@
 - **修复 `util:gzip.compress` 默认级别**：未指定 `level` 时运行时回退 `-1`（`Deflater.DEFAULT_COMPRESSION`）却被校验拒绝，导致 `Gzip.compressSync()` 总是失败；校验放宽为 `-1..9`（`gzip.compress` 与 `gzip.compressor.create`）
 - full e2e：9/9 通过（含假玩家 `playerJoin`/`player.get`）
 
+- harness：默认不再流式打印服务器输出（失败/超时时打印尾部；`--server-log` 实时、`--outfile` 落盘）；运行时 jar 自动优先取本地最新构建（`yeow-runtime/jvm/paper/target`），避免误用模板中的旧 jar 导致断言失败
+
 ## 2026-09-18
 
 ### 测试套件重写（两层：简易 / 全量）
