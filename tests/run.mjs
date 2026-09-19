@@ -8,6 +8,7 @@
 import { spawnSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collectSystemInfo, formatSystemInfo } from './lib/systeminfo.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [tier = 'simple', ...rest] = process.argv.slice(2);
@@ -56,4 +57,5 @@ if (!fn) {
   console.error(`unknown tier: ${tier} (expected: simple | full)`);
   process.exit(2);
 }
+console.log(`\n── system ──\n${formatSystemInfo(await collectSystemInfo())}`);
 process.exit(await fn(rest));

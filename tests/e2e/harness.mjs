@@ -1,19 +1,24 @@
-// Paper e2e harness：准备服务器 → 部署 runtime + 测试插件 → 启动 → 收集断言 → 汇总。
+// Paper e2e harness：准备服务器 → 部署 runtime + 测试插件 → 启动 → （可选）假玩家连接 →
+// 收集断言 → 汇总。
 //   node tests/e2e/harness.mjs [--server=<dir>] [--paper=<jar>] [--runtime=<jar>]
+//                              [--clients=<n>] [--client-prefix=<name>] [--mc-version=<ver>]
 //                              [--build-only] [--keep] [--outfile=<path>] [--timeout=<sec>]
 //
 // 测试插件位于 tests/e2e/plugins/<name>/（main.js + yeow.json），由本脚本打包为
-// plugins/Yeow/<name>-<version>.yeow.zip。插件在 LOAD 阶段输出 [YEOW-E2E] {json} 哨兵。
+// plugins/Yeow/<name>-<version>.yeow.zip。插件在 LOAD 阶段或事件到达时输出
+// [YEOW-E2E] {json} 哨兵；e2e-players 插件需要假玩家触发。
 import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, rmSync, readdirSync, statSync, appendFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
 import { makeZip } from '../lib/zip.mjs';
 import { ensurePaper } from '../lib/paper.mjs';
+import { connectFake } from '../lib/mc.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..', '..');
 const PLUGINS_SRC = join(HERE, 'plugins');
+const PORT = 17367;
 
 function arg(name, def) {
   const a = process.argv.find((x) => x.startsWith(`--${name}=`));
@@ -28,7 +33,9 @@ const OUT = arg('outfile', null);
 const TIMEOUT = parseInt(arg('timeout', '240'), 10);
 const KEEP = has('keep');
 const BUILD_ONLY = has('build-only');
-const WIN = process.platform === 'win32';
+const MC_VERSION = arg('mc-version', '1.21.4');
+const CLIENT_PREFIX = arg('client-prefix', 'E2EPlayer');
+const CLIENTS_ARG = arg('clients', null);
 
 function log(line) {
   process.stdout.write(line + '\n');
@@ -71,7 +78,7 @@ function buildPluginZips() {
 }
 
 async function prepare() {
-  if (!existsSync(RUNTIME)) fail(`runtime jar not found: ${RUNTIME}\n  build: cd yeow-runtime/jvm && mvn -DskipTests install && copy paper/target/yeow-runtime-0.6.1.jar ...`);
+  if (!existsSync(RUNTIME)) fail(`runtime jar not found: ${RUNTIME}\n  build: cd yeow-runtime/jvm && mvn -DskipTests install && copy paper/target/yeow-runtime-<ver>.jar ...`);
   mkdirSync(SERVER, { recursive: true });
   let paperDest = null;
   if (!BUILD_ONLY) {
@@ -82,35 +89,60 @@ async function prepare() {
   if (!existsSync(join(SERVER, 'eula.txt'))) writeFileSync(join(SERVER, 'eula.txt'), 'eula=true\n');
   if (!existsSync(join(SERVER, 'server.properties'))) {
     writeFileSync(join(SERVER, 'server.properties'),
-      'online-mode=false\nserver-port=17367\nspawn-protection=0\nmax-players=10\ndifficulty=easy\n');
+      `online-mode=false\nserver-port=${PORT}\nspawn-protection=0\nmax-players=20\ndifficulty=easy\n`);
   }
   const plugins = join(SERVER, 'plugins');
   mkdirSync(plugins, { recursive: true });
-  const runtimeDest = join(plugins, 'yeow-runtime-0.6.1.jar');
-  if (!existsSync(runtimeDest) || statSync(runtimeDest).size !== statSync(RUNTIME).size) copyFileSync(RUNTIME, runtimeDest);
+  // 清理历史 runtime jar（含 Paper remap 缓存），避免同名插件歧义。
+  for (const d of [plugins, join(plugins, '.paper-remapped')]) {
+    if (!existsSync(d)) continue;
+    for (const n of readdirSync(d)) {
+      if (/^yeow-runtime.*\.jar$/.test(n)) rmSync(join(d, n), { force: true });
+    }
+  }
+  const runtimeDest = join(plugins, 'yeow-runtime.jar');
+  copyFileSync(RUNTIME, runtimeDest);
 
   const expected = buildPluginZips();
+  const clientCount = CLIENTS_ARG != null ? parseInt(CLIENTS_ARG, 10) : (expected.includes('e2e-players') ? 1 : 0);
   log(`[e2e] server   ${SERVER}`);
   log(`[e2e] runtime  ${runtimeDest}`);
   log(`[e2e] plugins  ${expected.join(', ')}`);
-  return { paperDest, expected };
+  if (clientCount > 0) log(`[e2e] clients  ${clientCount} x ${MC_VERSION} (offline)`);
+  return { paperDest, expected, clientCount };
 }
 
-function runServer(paperDest, expected) {
+function runServer(paperDest, expected, clientCount) {
   return new Promise((resolvePromise) => {
     const jvm = ['-Xmx2G', '-Xms1G', '-Dfile.encoding=UTF-8', '-Dstdout.encoding=UTF-8', '-jar', paperDest.split(/[\\/]/).pop(), '--nogui'];
     log(`[e2e] starting: java ${jvm.join(' ')}`);
-    const proc = spawn('java', jvm, { cwd: SERVER, stdio: ['pipe', 'pipe', 'pipe'], shell: WIN });
+    const proc = spawn('java', jvm, { cwd: SERVER, stdio: ['pipe', 'pipe', 'pipe'], shell: false });
     const reports = new Map();
+    const clients = [];
     let loaded = false;
     let buf = '';
     let stopping = false;
+
+    const connectClients = () => {
+      for (let i = 0; i < clientCount; i++) {
+        const username = clientCount > 1 ? `${CLIENT_PREFIX}${i + 1}` : CLIENT_PREFIX;
+        try {
+          const c = connectFake({ host: '127.0.0.1', port: PORT, username, version: MC_VERSION });
+          clients.push(c);
+          log(`[e2e] connecting fake client ${username}`);
+          c.joined.then(() => log(`[e2e] fake client joined: ${username}`));
+        } catch (e) {
+          log(`[e2e] fake client ${username} failed: ${e.message}`);
+        }
+      }
+    };
 
     const finish = (code) => {
       if (stopping) return;
       stopping = true;
       clearTimeout(timer);
-      resolvePromise({ code, reports: [...reports.values()], loaded });
+      for (const c of clients) c.disconnect();
+      resolvePromise({ code, reports: [...reports.values()], loaded, clients });
     };
 
     const onData = (chunk) => {
@@ -122,18 +154,21 @@ function runServer(paperDest, expected) {
       while ((idx = buf.indexOf('\n')) >= 0) {
         const line = buf.slice(0, idx).replace(/\r$/, '');
         buf = buf.slice(idx + 1);
-        if (!loaded && line.includes('Done (') && line.includes('For help')) { loaded = true; log('[e2e] server loaded'); }
+        if (!loaded && line.includes('Done (') && line.includes('For help')) {
+          loaded = true;
+          log('[e2e] server loaded');
+          if (clientCount > 0) connectClients();
+        }
         const m = line.match(/\[YEOW-E2E\]\s*(\{.*\})\s*$/);
         if (m) {
           try {
             const r = JSON.parse(m[1]);
             if (r && r.plugin && !reports.has(r.plugin)) {
               reports.set(r.plugin, r);
-              const done = expected.every((n) => reports.has(n));
               log(`[e2e] report: ${r.plugin} (${reports.size}/${expected.length})`);
-              if (done) {
+              if (expected.every((n) => reports.has(n))) {
                 if (KEEP) finish(0);
-                else { try { proc.stdin.write('stop\n'); } catch {} }
+                else { try { proc.stdin.write('stop\n'); } catch { /* ignore */ } }
               }
             }
           } catch (e) { log(`[e2e] bad report json: ${e.message}`); }
@@ -146,19 +181,20 @@ function runServer(paperDest, expected) {
 
     const timer = setTimeout(() => {
       log(`[e2e] timeout after ${TIMEOUT}s`);
-      try { proc.kill('SIGKILL'); } catch {}
+      try { proc.kill('SIGKILL'); } catch { /* ignore */ }
       finish(-1);
     }, TIMEOUT * 1000);
   });
 }
 
+// ── main ──────────────────────────────────────────────────────────
 const prepared = await prepare();
 if (BUILD_ONLY) {
   log('[e2e] --build-only: packaging OK');
   process.exit(0);
 }
 
-const { code, reports, loaded } = await runServer(prepared.paperDest, prepared.expected);
+const { code, reports, loaded, clients } = await runServer(prepared.paperDest, prepared.expected, prepared.clientCount);
 
 if (reports.length === 0) fail(`no test report received (server exit ${code}, loaded=${loaded})`);
 
@@ -180,9 +216,22 @@ for (const rep of reports) {
   totalOk += rep.ok;
   totalFail += rep.fail;
 }
+
+const missing = prepared.expected.filter((n) => !reports.some((r) => r.plugin === n));
+// 假玩家交叉校验：插件报告的 joined 必须包含 harness 连接的每个用户名。
+const playersRep = reports.find((r) => r.plugin === 'e2e-players');
+if (playersRep && Array.isArray(playersRep.joined)) {
+  for (const c of clients) {
+    if (!playersRep.joined.includes(c.username)) {
+      log(`[e2e] FAIL player.join report missing ${c.username}; got [${playersRep.joined.join(', ')}]`);
+      totalFail++;
+    }
+  }
+}
+
 log(`\n[e2e] ${totalOk} passed, ${totalFail} failed (plugins: ${reports.length}/${prepared.expected.length})`);
-if (reports.length < prepared.expected.length) {
-  log(`[e2e] missing reports: ${prepared.expected.filter((n) => !reports.some((r) => r.plugin === n)).join(', ')}`);
+if (missing.length) {
+  log(`[e2e] missing reports: ${missing.join(', ')}`);
   process.exit(1);
 }
 if (totalFail > 0) process.exit(1);

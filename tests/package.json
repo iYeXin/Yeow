@@ -1,0 +1,12 @@
+{
+  "name": "yeow-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Yeow test suite (not published)",
+  "license": "MIT",
+  "devDependencies": {
+    "minecraft-protocol": "^1.68.0",
+    "systeminformation": "^5.33.12"
+  }
+}

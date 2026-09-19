@@ -13,6 +13,9 @@ Yeow 的自动化测试分为两层，统一入口为 `node tests/run.mjs <tier>
 - **Maven 3.9+**：`simple` 的 runtime 单测。
 - **Node.js 18+**。
 - **Zig 0.16**：仅 `simple --build` 或 `full` 需要重建 wrapper 时使用。
+- **tests 依赖**：`full` 的平台信息与假玩家需要 `cd tests && npm install`（`systeminformation`、`minecraft-protocol`）。缺少依赖时平台信息回退 `node:os`，假玩家不可用（`e2e-players` 不会通过）。
+
+测试开始时统一打印测试平台（CPU 型号/物理核、内存总量与规格、OS、Node 版本）。
 
 `simple` 的 QuickJS 组件使用 `quickjs-wrapper/zig-out/yeow-quickjs.jar`；该文件不存在时用 `--build` 生成。
 
@@ -50,15 +53,18 @@ node tests/run.mjs full --paper=/path/paper.jar --timeout=300
 
 1. 定位 Paper jar。顺序：`--paper=<jar>` → `$YEOW_PAPER_JAR` → 自动探测 `test/test/.yeow/dev/cache/paper-*.jar` → 从 PaperMC API 下载到 `tests/e2e/.paper/`。
 2. 准备服务器目录（默认 `tests/e2e/.work/server`）：`eula.txt`、`server.properties`。
-3. 部署 `yeow-runtime-0.6.1.jar`（取 `create-yeow/templates/default/.yeow/assets/`）到 `plugins/`，并把 `tests/e2e/plugins/*` 逐个打包为 `.yeow.zip` 放入 `plugins/Yeow/`。
-4. 启动 Paper，读取 stdout；测试插件在 LOAD 阶段执行断言并通过 `log` 通道输出单行哨兵 `[YEOW-E2E] {json}`。
-5. 收集全部插件的报告，汇总输出；有失败则以非零码退出。
+3. 部署运行时 jar（`--runtime=<jar>`，默认取 `create-yeow/templates/default/.yeow/assets/yeow-runtime-*.jar`）到 `plugins/`，并把 `tests/e2e/plugins/*` 逐个打包为 `.yeow.zip` 放入 `plugins/Yeow/`。
+4. 启动 Paper，读取 stdout；测试插件在 LOAD 阶段或事件到达时通过 `log` 通道输出单行哨兵 `[YEOW-E2E] {json}`。
+5. 若存在 `e2e-players` 插件，则在服务器加载后以**离线模式**连接 `--clients` 个 1.21.4 假玩家（`minecraft-protocol`），并等待其加入。
+6. 收集全部插件的报告，汇总输出；有失败则以非零码退出。
 
 测试插件为纯 JS（无构建步骤），通过 `globalThis.__yeowLoadCbs` 注册加载回调，使用 `$send` 与运行时全局。断言结果以 JSON 形式回传。
 
 `tests/e2e/plugins/bench/` 为**通信层性能基准**：对 `debug.payload` 做固定小规模的同步往返（每载荷 200 预热 + 5000 采样，全部载荷合计约 0.6–1s），随报告回传 `bench` 指标（mean/min/p50/p99/max，ms/op），由 harness 打印；另附一条宽松上限断言（mean ≤ 10ms），仅用于捕捉数量级退化，避免环境抖动误报。基准不纳入耗时门槛，不作为失败条件（除非越过该宽松上限）。
 
-选项：`--server=<dir>`、`--paper=<jar>`、`--runtime=<jar>`、`--build-only`、`--keep`、`--outfile=<path>`、`--timeout=<sec>`。
+`tests/e2e/plugins/players/` 为**假玩家 e2e**：订阅 `playerJoin`（运行时事件键为 camelCase），经 `player.get` 取玩家名并回传 `joined`；harness 与连接的假玩家用户名交叉校验。事件处理器必须回 `event.complete` 释放事件，否则会阻塞至超时。
+
+选项：`--server=<dir>`、`--paper=<jar>`、`--runtime=<jar>`、`--clients=<n>`、`--client-prefix=<name>`、`--mc-version=<ver>`、`--build-only`、`--keep`、`--outfile=<path>`、`--timeout=<sec>`。
 
 产物与缓存（`tests/quickjs/out/`、`tests/e2e/.work/`、`tests/e2e/.paper/`）不纳入版本控制。
 
@@ -66,8 +72,9 @@ node tests/run.mjs full --paper=/path/paper.jar --timeout=300
 
 ```
 tests/
-  run.mjs                      # 统一入口
-  lib/{proc.mjs,zip.mjs,paper.mjs}
+  run.mjs                      # 统一入口（先打印测试平台信息）
+  package.json                 # 测试依赖（minecraft-protocol / systeminformation）
+  lib/{proc.mjs,zip.mjs,paper.mjs,systeminfo.mjs,mc.mjs}
   quickjs/
     build.mjs
     java/yeow/tests/quickjs/{Runner,Assert,Cases}.java

@@ -4,6 +4,10 @@
 
 ---
 
+## 2026-09-19
+
+- Test suite: added test-platform info output (CPU/memory specs via `systeminformation`) and a fake-player e2e (`minecraft-protocol`, offline 1.21.4 client; `e2e-players` subscribes to `playerJoin` and verifies via `player.get`, with the harness cross-checking the username); added `tests/package.json`
+
 ## 2026-09-18
 
 - Test suite rewritten into two tiers: `node tests/run.mjs simple` (QuickJS bridge test component + runtime `mvn test`, no server) and `node tests/run.mjs full` (real Paper + test-plugin assertions reported via the `[YEOW-E2E]` sentinel); new top-level `tests/`, with a standalone zero-dependency Runner for the QuickJS component (`--filter`/`--json`) and auto-discovered e2e plugins under `tests/e2e/plugins/`; the full tier includes a communication-layer benchmark (`debug.payload`, fixed small scale, reporting mean/p50/p99/max). See `tests/README.md`; implementation changes must update the corresponding test components in the same change (see `AGENTS.md`)

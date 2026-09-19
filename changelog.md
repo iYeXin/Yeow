@@ -4,6 +4,14 @@
 
 ---
 
+## 2026-09-19
+
+### 测试套件：平台信息 + 假玩家 e2e
+
+- **平台信息**：`tests/lib/systeminfo.mjs`（`systeminformation`，缺失时回退 `node:os`）在测试开始时打印 CPU 型号/物理核、内存总量与规格（类型/频率）、OS 与 Node 版本
+- **假玩家 e2e**：新增 `tests/package.json`（devDeps `minecraft-protocol` / `systeminformation`）；harness 在服务器加载后以**离线模式**连接 1.21.4 假玩家，`tests/e2e/plugins/players/` 订阅 `playerJoin`（camelCase 事件键）、经 `player.get` 取玩家名并回传 `joined`，harness 与假玩家用户名交叉校验；新增 `--clients/--client-prefix/--mc-version`
+- harness 修正：服务器进程不再经 shell 启动（避免 kill 后 JVM 残留）、清理历史 runtime jar/remap 以避免同名插件歧义
+
 ## 2026-09-18
 
 ### 测试套件重写（两层：简易 / 全量）
